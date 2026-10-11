@@ -68,9 +68,9 @@ const statusClass = (status) => ({
 }[status] || 'neutral');
 
 function App() {
-  const [userRole, setUserRole] = useState('tech');
+  const [userRole, setUserRole] = useState(() => localStorage.getItem('rt_user_role') || 'client');
   const [userAccessLevel, setUserAccessLevel] = useState('owner');
-  const [active, setActive] = useState('overview');
+  const [active, setActive] = useState(() => userRole === 'tech' ? 'overview' : 'stores_directory');
   
   const [modules, setModules] = useState({
     orders: true,     
@@ -101,7 +101,7 @@ function App() {
     entries: []
   });
 
-  // Equipa
+  // Equipe
   const [teamMembers, setTeamMembers] = useState([]);
 
   // Auditoria
@@ -165,6 +165,10 @@ function App() {
   const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', email: '' });
   const [newProduct, setNewProduct] = useState({ name: '', category: 'Capas', price: '', qty: '1', photo: null });
 
+  const isSuperAdmin = useMemo(() => {
+    return session?.user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  }, [session]);
+
   const navTech = useMemo(() => {
     const list = [{ id: 'overview', label: 'Visão geral', icon: Gauge }];
     if (modules.orders) list.push({ id: 'orders', label: 'Ordens de serviço', icon: ClipboardList });
@@ -193,7 +197,13 @@ function App() {
       setSession(data.session);
       setAuthChecked(true);
     });
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => setSession(nextSession));
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+      if (!nextSession) {
+        setUserRole('client');
+        localStorage.setItem('rt_user_role', 'client');
+      }
+    });
     return () => listener.subscription.unsubscribe();
   }, []);
 
@@ -201,6 +211,13 @@ function App() {
     if (!supabaseConfigured || !session) return;
     const userEmail = session.user?.email?.toLowerCase();
     const isOwnerByEmail = userEmail === ADMIN_EMAIL.toLowerCase();
+
+    // Contagem real das 48 horas da criação da conta
+    const userCreatedAt = session.user?.created_at ? new Date(session.user.created_at) : new Date();
+    const now = new Date();
+    const hoursElapsed = Math.floor((now - userCreatedAt) / (1000 * 60 * 60));
+    const hoursRemaining = Math.max(0, 48 - hoursElapsed);
+    setTrialTimeLeft(hoursRemaining);
 
     const { data: orgData } = await supabase.from('organizations')
       .select('*')
@@ -220,14 +237,14 @@ function App() {
         setIsLifetimeAdmin(true);
         setIsTrialActive(false);
       } else {
-        setIsTrialActive(true);
+        setIsTrialActive(hoursRemaining > 0);
       }
 
       setTeamMembers([
         { id: session.user.id, name: 'Robert Haelley (Proprietário)', email: session.user.email, role: 'owner', status: 'Ativo' }
       ]);
     } else {
-      setIsTrialActive(true);
+      setIsTrialActive(hoursRemaining > 0);
     }
 
     const { data: oData } = await supabase.from('repair_orders')
@@ -273,6 +290,8 @@ function App() {
         ? await supabase.auth.signInWithPassword({ email, password })
         : await supabase.auth.signUp({ email, password });
       if (result.error) throw result.error;
+
+      localStorage.setItem('rt_user_role', userRole);
 
       if (userRole === 'tech') {
         setActive('overview');
@@ -470,7 +489,7 @@ function App() {
   };
 
   const finishUpgradeToWhatsapp = () => {
-    const text = encodeURIComponent(`Olá! Gostaria de fazer um UPGRADE do meu aparelho na ${storeName}.\n\n📱 Meu aparelho atual: ${currentDevice || 'Não especificado'}\n🎯 Desejo pegar o: ${targetDevice}\n\nPodemos avaliar a diferença de valores?`);
+    const text = encodeURIComponent(`Olá! Gostaria de fazer um UPGRADE do meu aparelho na ${storeName}.\n\n Meu aparelho atual: ${currentDevice || 'Não especificado'}\n Desejo pegar o: ${targetDevice}\n\nPodemos avaliar a diferença de valores?`);
     window.open(`https://wa.me/${whatsappNumber}?text=${text}`, '_blank');
     setShowUpgradeModal(false);
     setUpgradeStep(1);
@@ -517,6 +536,7 @@ function App() {
     if (supabaseConfigured) await supabase.auth.signOut();
     setSession(null);
     setUserRole('client');
+    localStorage.setItem('rt_user_role', 'client');
     setActive('stores_directory');
   }
 
@@ -603,6 +623,7 @@ function App() {
           <button className="mobile-close icon-btn" onClick={()=>setMobileNav(false)}><X size={18}/></button>
         </div>
         
+        {/* Nível de Operador vs Dono (só quem está no painel do estabelecimento) */}
         {userRole === 'tech' && (
           <div style={{padding: '8px 12px', background: '#111', borderRadius: '8px', margin: '10px 12px', border: '1px solid #222', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
             <span style={{fontSize: '11px', color: '#888'}}>Nível de Acesso:</span>
@@ -620,42 +641,48 @@ function App() {
           </div>
         )}
 
-        <div 
-          className="workspace-switch" 
-          onClick={() => {
-            const nextRole = userRole === 'tech' ? 'client' : 'tech';
-            setUserRole(nextRole);
-            setActive(nextRole === 'tech' ? 'overview' : 'stores_directory');
-            notify(nextRole === 'tech' ? 'Alternado para MODO ESTABELECIMENTO' : 'Alternado para VISÃO DE CLIENTE');
-          }}
-          style={{background: '#121215', border: '1px solid #222', cursor: 'pointer'}}
-        >
-          <div className="workspace-avatar" style={{background: userRole === 'tech' ? '#25D366' : '#3b82f6', color: '#000', fontWeight: 'bold'}}>
-            {userRole === 'tech' ? 'E' : 'C'}
+        {/* BOTÃO DE ALTERNAR VISÃO: EXCLUSIVO PARA O SUPER ADMIN VITALÍCIO (ROBERT) */}
+        {isSuperAdmin && (
+          <div 
+            className="workspace-switch" 
+            onClick={() => {
+              const nextRole = userRole === 'tech' ? 'client' : 'tech';
+              setUserRole(nextRole);
+              localStorage.setItem('rt_user_role', nextRole);
+              setActive(nextRole === 'tech' ? 'overview' : 'stores_directory');
+              notify(nextRole === 'tech' ? 'Alternado para MODO ESTABELECIMENTO' : 'Alternado para VISÃO DE CLIENTE');
+            }}
+            style={{background: '#121215', border: '1px solid #222', cursor: 'pointer'}}
+          >
+            <div className="workspace-avatar" style={{background: userRole === 'tech' ? '#25D366' : '#3b82f6', color: '#000', fontWeight: 'bold'}}>
+              {userRole === 'tech' ? 'E' : 'C'}
+            </div>
+            <div className="workspace-info">
+              <strong>{userRole === 'tech' ? 'Modo Estabelecimento' : 'Visão do Cliente'}</strong>
+              <span style={{color: '#25D366'}}>Painel ADM Geral ⚡</span>
+            </div>
+            <ChevronDown size={15}/>
           </div>
-          <div className="workspace-info">
-            <strong>{userRole === 'tech' ? 'Modo Estabelecimento' : 'Visão do Cliente'}</strong>
-            <span style={{color: '#25D366'}}>Clique para alternar ⚡</span>
-          </div>
-          <ChevronDown size={15}/>
-        </div>
+        )}
         
         <div className="nav-caption">NAVEGAÇÃO</div>
         <nav>{activeNav.map(item => <button key={item.id} className={`nav-item ${active===item.id?'active':''}`} onClick={()=>{setActive(item.id);setMobileNav(false)}}><item.icon size={18}/><span>{item.label}</span>{item.id==='orders' && <span className="nav-count">{orders.length}</span>}{item.id==='customers' && <span className="nav-count">{customers.length}</span>}{item.id==='inventory' && <span className="nav-count">{inventory.length}</span>}</button>)}</nav>
         
         <div className="sidebar-bottom">
-          <div className="plan-card" style={{background: '#111', border: '1px solid #222'}}>
-            <div className="plan-icon"><Sparkles size={16}/></div>
-            <strong>RT Mobile OS</strong>
-            <p>Seu estabelecimento organizado e produtivo.</p>
-            <div className="plan-progress"><span style={{width: '100%', background: '#25D366'}}/></div>
-            <small style={{color: '#25D366'}}>• {isLifetimeAdmin ? '👑 Licença Vitalícia Ativa' : (isTrialActive ? `Teste Grátis (${trialTimeLeft}h restantes)` : 'Plano Profissional Ativo')}</small>
-          </div>
-          <button className="profile-row" onClick={()=>setActive('settings')} style={{background: '#121215'}}>
-            <div className="profile-avatar">{storeName.slice(0, 1).toUpperCase()}</div>
+          {userRole === 'tech' && (
+            <div className="plan-card" style={{background: '#111', border: '1px solid #222'}}>
+              <div className="plan-icon"><Sparkles size={16}/></div>
+              <strong>RT Mobile OS</strong>
+              <p>Seu estabelecimento organizado e produtivo.</p>
+              <div className="plan-progress"><span style={{width: '100%', background: '#25D366'}}/></div>
+              <small style={{color: '#25D366'}}>• {isLifetimeAdmin ? '👑 Licença Vitalícia Ativa' : (isTrialActive ? `Teste Grátis (${trialTimeLeft}h restantes)` : 'Plano Profissional Ativo')}</small>
+            </div>
+          )}
+          <button className="profile-row" onClick={()=>userRole === 'tech' ? setActive('settings') : logout()} style={{background: '#121215'}}>
+            <div className="profile-avatar">{userRole === 'tech' ? storeName.slice(0, 1).toUpperCase() : 'C'}</div>
             <div className="profile-info">
-              <strong>{userAccessLevel === 'owner' ? 'Dono (Admin)' : 'Operador'}</strong>
-              <span>{session?.user?.email || 'Modo de demonstração'}</span>
+              <strong>{userRole === 'tech' ? (userAccessLevel === 'owner' ? 'Dono (Admin)' : 'Operador') : 'Cliente'}</strong>
+              <span>{session?.user?.email || 'Conectado'}</span>
             </div>
             <span style={{letterSpacing: '2px', color: '#666'}}>•••</span>
           </button>
@@ -684,25 +711,25 @@ function App() {
           <div className="topbar-actions">
             <div className="system-status"><span className="status-dot" style={{background: '#25D366'}}/> RT Mobile v1.0</div>
             <button className="icon-btn notification-btn" onClick={()=>notify('Você está em dia.')}><Bell size={18}/><i/></button>
-            <button className="top-avatar" onClick={()=>setActive('settings')}>
-              {storeName.slice(0, 1).toUpperCase()}
+            <button className="top-avatar" onClick={()=>userRole === 'tech' ? setActive('settings') : logout()}>
+              {userRole === 'tech' ? storeName.slice(0, 1).toUpperCase() : 'C'}
             </button>
           </div>
         </header>
         
-        {active==='overview' && <Overview orders={orders} storeName={storeName} onNew={()=>setShowNewOrder(true)} onNavigate={setActive} modules={modules} inventory={inventory} />}
-        {active==='orders' && <OrdersPage orders={filteredOrders} search={search} setSearch={setSearch} onNew={()=>setShowNewOrder(true)} onStatus={handleUpdateStatus} onShare={shareOsStatusWhatsapp} onSendWarranty={sendWarrantyTermWhatsapp} onOpenChecklist={(o) => setShowChecklistModal(o)} onPrint={(o) => setShowPrintModal(o)} onPellicleReminder={sendPellicleReminder} />}
-        {active==='customers' && <CustomersPage customers={customers} onNew={()=>setShowNewCustomer(true)} />}
-        {active==='crm' && <CrmPage customers={customers} storeName={storeName} whatsapp={whatsappNumber} />}
-        {active==='cash' && <CashPage cashRegister={cashRegister} onNewTransaction={() => setShowCashTransactionModal(true)} />}
-        {active==='inventory' && <InventoryPage inventory={inventory} onNew={()=>setShowNewProduct(true)} onUpdateQty={updateProductQty} onDelete={deleteProduct} />}
+        {active==='overview' && userRole === 'tech' && <Overview orders={orders} storeName={storeName} onNew={()=>setShowNewOrder(true)} onNavigate={setActive} modules={modules} inventory={inventory} />}
+        {active==='orders' && userRole === 'tech' && <OrdersPage orders={filteredOrders} search={search} setSearch={setSearch} onNew={()=>setShowNewOrder(true)} onStatus={handleUpdateStatus} onShare={shareOsStatusWhatsapp} onSendWarranty={sendWarrantyTermWhatsapp} onOpenChecklist={(o) => setShowChecklistModal(o)} onPrint={(o) => setShowPrintModal(o)} onPellicleReminder={sendPellicleReminder} />}
+        {active==='customers' && userRole === 'tech' && <CustomersPage customers={customers} onNew={()=>setShowNewCustomer(true)} />}
+        {active==='crm' && userRole === 'tech' && <CrmPage customers={customers} storeName={storeName} whatsapp={whatsappNumber} />}
+        {active==='cash' && userRole === 'tech' && <CashPage cashRegister={cashRegister} onNewTransaction={() => setShowCashTransactionModal(true)} />}
+        {active==='inventory' && userRole === 'tech' && <InventoryPage inventory={inventory} onNew={()=>setShowNewProduct(true)} onUpdateQty={updateProductQty} onDelete={deleteProduct} />}
         {active==='client_inventory' && <ClientInventoryPage inventory={inventory} whatsapp={whatsappNumber} storeName={storeName} />}
         {active==='stores_directory' && <StoresDirectoryPage stores={activeStores} onSelectStore={(s) => { setStoreName(s.name); setWhatsappNumber(s.phone); notify(`Estabelecimento "${s.name}" selecionado!`); setActive('store'); }} onRequestQuote={(s) => setShowQuoteModal(s)} />}
         {active==='store' && <StorePage whatsapp={whatsappNumber} storeName={storeName} onUpgrade={() => setShowUpgradeModal(true)} />}
         {active==='track' && <TrackPage orders={orders} storeName={storeName} pixKey={pixKey} whatsapp={whatsappNumber} storeAddress={storeAddress} mapsUrl={mapsUrl} setOrders={setOrders} notify={notify} />}
-        {active==='finance' && userAccessLevel === 'owner' && <FinancePage orders={orders} commissionRate={techCommissionRate} setCommissionRate={setTechCommissionRate} />}
-        {active==='payments' && <PaymentsPage pixKey={pixKey} setPixKey={setPixKey} onShowPayModal={() => setShowPaymentModal(true)} />}
-        {active==='settings' && <SettingsPage configured={supabaseConfigured} email={session?.user?.email} storeName={storeName} setStoreName={setStoreName} storeLogo={storeLogo} onLogoUpload={handleLogoUpload} whatsapp={whatsappNumber} setWhatsapp={setWhatsappNumber} pixKey={pixKey} setPixKey={setPixKey} storeAddress={storeAddress} setStoreAddress={setStoreAddress} mapsUrl={mapsUrl} setMapsUrl={setMapsUrl} modules={modules} setModules={setModules} onLogout={logout} teamMembers={teamMembers} onInviteMember={() => setShowInviteMemberModal(true)} auditLogs={auditLogs} userAccessLevel={userAccessLevel} isLifetimeAdmin={isLifetimeAdmin} />}
+        {active==='finance' && userRole === 'tech' && userAccessLevel === 'owner' && <FinancePage orders={orders} commissionRate={techCommissionRate} setCommissionRate={setTechCommissionRate} />}
+        {active==='payments' && userRole === 'tech' && <PaymentsPage pixKey={pixKey} setPixKey={setPixKey} onShowPayModal={() => setShowPaymentModal(true)} />}
+        {active==='settings' && userRole === 'tech' && <SettingsPage configured={supabaseConfigured} email={session?.user?.email} storeName={storeName} setStoreName={setStoreName} storeLogo={storeLogo} onLogoUpload={handleLogoUpload} whatsapp={whatsappNumber} setWhatsapp={setWhatsappNumber} pixKey={pixKey} setPixKey={setPixKey} storeAddress={storeAddress} setStoreAddress={setStoreAddress} mapsUrl={mapsUrl} setMapsUrl={setMapsUrl} modules={modules} setModules={setModules} onLogout={logout} teamMembers={teamMembers} onInviteMember={() => setShowInviteMemberModal(true)} auditLogs={auditLogs} userAccessLevel={userAccessLevel} isLifetimeAdmin={isLifetimeAdmin} />}
         
         <footer className="footer" style={{borderTop: '1px solid #18181b', color: '#666', padding: '20px', fontSize: '11px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px'}}>
           <span>{storeName.toUpperCase()} <span className="footer-dot">•</span> GESTÃO PROFISSIONAL</span>
