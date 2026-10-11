@@ -6,6 +6,8 @@ import {
 } from 'lucide-react';
 import { supabase, supabaseConfigured } from './lib/supabase';
 
+const ADMIN_EMAIL = 'roberthaelley75@gmail.com';
+
 const seminovosList = [
   'iPhone 11', 'iPhone 11 Pro', 'iPhone 11 Pro Max',
   'iPhone 12', 'iPhone 12 Pro', 'iPhone 12 Pro Max',
@@ -80,27 +82,32 @@ function App() {
   });
 
   const [trialTimeLeft, setTrialTimeLeft] = useState(48);
-  const [isTrialActive, setIsTrialActive] = useState(true);
+  const [isTrialActive, setIsTrialActive] = useState(false);
+  const [isLifetimeAdmin, setIsLifetimeAdmin] = useState(false);
 
   // Configurações da Loja
+<<<<<<< Updated upstream
   const [storeName, setStoreName] = useState('RT Assistência');
   const [storeLogo, setStoreLogo] = useState(null);
   const [whatsappNumber, setWhatsappNumber] = useState('5591999998888');
+=======
+  const [storeName, setStoreName] = useState('RT MOBILE');
+  const [storeLogo, setStoreLogo] = useState(null);
+  const [whatsappNumber, setWhatsappNumber] = useState('5591989117332');
+>>>>>>> Stashed changes
   const [pixKey, setPixKey] = useState('91989117332');
-  const [storeAddress, setStoreAddress] = useState('Av. Principal, 1000 - Centro, Ananindeua - PA');
+  const [storeAddress, setStoreAddress] = useState('Santa Izabel do Pará - PA');
   const [mapsUrl, setMapsUrl] = useState('https://maps.google.com');
   const [techCommissionRate, setTechCommissionRate] = useState(10);
 
   // Caixa da Loja
   const [cashRegister, setCashRegister] = useState({
     isOpen: true,
-    openingBalance: 100.00,
-    entries: [
-      { id: '1', type: 'in', description: 'Troca de Tela - OS-2048', amount: 450.00, time: '14:20', user: 'Atendimento Balcão' },
-      { id: '2', type: 'out', description: 'Sangria - Pagamento Motoboy Peças', amount: 30.00, time: '15:10', user: 'Atendimento Balcão' }
-    ]
+    openingBalance: 0.00,
+    entries: []
   });
 
+<<<<<<< Updated upstream
   // Equipa
   const [teamMembers, setTeamMembers] = useState([
     { id: '1', name: 'Robert (Dono)', email: 'robert@sualoja.com', role: 'owner', status: 'Ativo' },
@@ -112,6 +119,13 @@ function App() {
     { id: '1', action: 'Criou OS-2048 (iPhone 13)', user: 'João Técnico', time: '10/10/2026 14:15' },
     { id: '2', action: 'Alterou status OS-2048 para "Pronto para retirada"', user: 'João Técnico', time: '10/10/2026 15:30' }
   ]);
+=======
+  // Equipe
+  const [teamMembers, setTeamMembers] = useState([]);
+
+  // Auditoria
+  const [auditLogs, setAuditLogs] = useState([]);
+>>>>>>> Stashed changes
 
   const addAuditLog = (action) => {
     const logUser = userAccessLevel === 'owner' ? 'Dono (Admin)' : 'Técnico (Bancada)';
@@ -124,42 +138,16 @@ function App() {
     setAuditLogs(prev => [newLog, ...prev]);
   };
 
-  const [orders, setOrders] = useState([
-    {
-      rawId: '1',
-      id: 'OS-2048',
-      customer: 'Carlos Eduardo',
-      phone: '5591999998888',
-      device: 'iPhone 13',
-      devicePassword: '1234 (Padrão)',
-      issue: 'Troca de Tela Frontal',
-      status: 'Pronto para retirada',
-      amount: 'R$ 450.00',
-      partCost: '180.00',
-      time: '10/10/2026',
-      createdAt: new Date().toISOString(),
-      warrantyDays: 90,
-      color: 'green',
-      checklist: { ...defaultChecklist },
-      rating: 5,
-      review: 'Ótimo atendimento e serviço rápido!'
-    }
-  ]);
-
-  const [customers, setCustomers] = useState([
-    { id: '1', name: 'Carlos Eduardo', phone: '5591999998888', email: 'carlos@email.com', created_at: '2025-11-10T10:00:00.000Z', lastServiceDate: '2025-11-10', device: 'iPhone 13' },
-    { id: '2', name: 'Maria Fernanda', phone: '5591988887777', email: 'maria@email.com', created_at: '2026-01-15T10:00:00.000Z', lastServiceDate: '2026-01-15', device: 'iPhone 12' },
-  ]);
-
-  const [inventory, setInventory] = useState([
-    { id: '1', name: 'Fonte Carregador 20W Apple', category: 'Carregadores', price: '89.90', qty: 15, photo: 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=300&auto=format&fit=crop&q=80' },
-    { id: '2', name: 'Cabo USB-C para Lightning 1m', category: 'Carregadores', price: '49.90', qty: 20, photo: null },
-    { id: '3', name: 'Capa MagSafe Transparente iPhone 13/14', category: 'Capas', price: '59.90', qty: 2, photo: null },
-    { id: '4', name: 'Película 3D Vidro Temperado', category: 'Películas', price: '29.90', qty: 30, photo: null },
-  ]);
+  const [orders, setOrders] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [inventory, setInventory] = useState([]);
 
   const [allStores, setAllStores] = useState([
+<<<<<<< Updated upstream
     { id: '1', name: 'RT Assistência', phone: '5591999998888', status: 'active', desc: 'Especialista Apple, Xiaomi & Multimarcas', address: 'Av. Principal, 1000 - Ananindeua', rating: 4.9, reviewsCount: 18 },
+=======
+    { id: '1', name: 'RT MOBILE', phone: '5591989117332', status: 'active', desc: 'Especialista Apple, Xiaomi & Multimarcas', address: 'Santa Izabel do Pará - PA', rating: 5.0, reviewsCount: 1 }
+>>>>>>> Stashed changes
   ]);
 
   const activeStores = useMemo(() => allStores.filter(s => s.status === 'active'), [allStores]);
@@ -235,6 +223,39 @@ function App() {
 
   const fetchData = async () => {
     if (!supabaseConfigured || !session) return;
+    const userEmail = session.user?.email?.toLowerCase();
+    const isOwnerByEmail = userEmail === ADMIN_EMAIL.toLowerCase();
+
+    // 1. Busca a Organização
+    const { data: orgData } = await supabase.from('organizations')
+      .select('*')
+      .eq('owner_user_id', session.user.id)
+      .limit(1);
+
+    const org = orgData?.[0];
+
+    if (org || isOwnerByEmail) {
+      if (org?.Nome) setStoreName(org.Nome);
+      if (org?.WhatsApp) setWhatsappNumber(org.WhatsApp);
+      if (org?.pix_key) setPixKey(org.pix_key);
+
+      const isOrgActive = org?.access_state === 'Ativo' || org?.plan_status === 'Ativo' || org?.plan_name === 'Vitalício';
+
+      if (isOwnerByEmail || isOrgActive) {
+        setIsLifetimeAdmin(true);
+        setIsTrialActive(false);
+      } else {
+        setIsTrialActive(true);
+      }
+
+      setTeamMembers([
+        { id: session.user.id, name: 'Robert Haelley (Proprietário)', email: session.user.email, role: 'owner', status: 'Ativo' }
+      ]);
+    } else {
+      setIsTrialActive(true);
+    }
+
+    // 2. Busca Ordens de Serviço
     const { data: oData } = await supabase.from('repair_orders')
       .select('id, order_number, customer_name, customer_phone, device_brand, device_model, issue_description, status, total_amount, created_at')
       .order('created_at', { ascending: false }).limit(50);
@@ -257,6 +278,8 @@ function App() {
         checklist: { ...defaultChecklist }
       })));
     }
+
+    // 3. Busca Clientes
     const { data: cData } = await supabase.from('customers').select('id, name, phone, email, created_at').order('name', { ascending: true });
     if (cData) setCustomers(cData);
   };
@@ -455,7 +478,7 @@ function App() {
       status: 'Ativo'
     };
     setTeamMembers(prev => [...prev, member]);
-    addAuditLog(`Adicionou o técnico/atendente ${newMember.name} à equipe`);
+    addAuditLog(`Adicionou o membro ${newMember.name} à equipe`);
     setShowInviteMemberModal(false);
     setNewMember({ name: '', email: '', role: 'technician' });
     notify('Membro convidado com sucesso!');
@@ -468,18 +491,6 @@ function App() {
       reader.onloadend = () => {
         setStoreLogo(reader.result);
         notify('Logotipo atualizado com sucesso!');
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handlePhotoCapture = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setCapturedPhoto(reader.result);
-        setUpgradeStep(2);
       };
       reader.readAsDataURL(file);
     }
@@ -664,8 +675,8 @@ function App() {
             <div className="plan-icon"><Sparkles size={16}/></div>
             <strong>RT Mobile OS</strong>
             <p>Seu estabelecimento organizado e produtivo.</p>
-            <div className="plan-progress"><span/></div>
-            <small style={{color: '#25D366'}}>• {isTrialActive ? `Teste Grátis (${trialTimeLeft}h restantes)` : 'Plano Profissional Ativo'}</small>
+            <div className="plan-progress"><span style={{width: '100%', background: '#25D366'}}/></div>
+            <small style={{color: '#25D366'}}>• {isLifetimeAdmin ? '👑 Licença Vitalícia Ativa' : (isTrialActive ? `Teste Grátis (${trialTimeLeft}h restantes)` : 'Plano Profissional Ativo')}</small>
           </div>
           <button className="profile-row" onClick={()=>setActive('settings')} style={{background: '#121215'}}>
             <div className="profile-avatar">{storeName.slice(0, 1).toUpperCase()}</div>
@@ -681,7 +692,7 @@ function App() {
       {mobileNav && <div className="nav-overlay" onClick={()=>setMobileNav(false)} />}
       
       <main className="main-area" style={{background: '#08080a'}}>
-        {userRole === 'tech' && isTrialActive && (
+        {userRole === 'tech' && isTrialActive && !isLifetimeAdmin && (
           <div style={{background: 'linear-gradient(90deg, #1e3a8a, #0284c7)', color: '#fff', padding: '8px 16px', fontSize: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: '500'}}>
             <span style={{display: 'flex', alignItems: 'center', gap: '6px'}}>
               <Clock size={15}/> ⏳ PERÍODO DE TESTE GRÁTIS ATIVO: Você tem <strong>{trialTimeLeft} horas restantes</strong> para usar todas as funções!
@@ -718,7 +729,7 @@ function App() {
         {active==='track' && <TrackPage orders={orders} storeName={storeName} pixKey={pixKey} whatsapp={whatsappNumber} storeAddress={storeAddress} mapsUrl={mapsUrl} setOrders={setOrders} notify={notify} />}
         {active==='finance' && userAccessLevel === 'owner' && <FinancePage orders={orders} commissionRate={techCommissionRate} setCommissionRate={setTechCommissionRate} />}
         {active==='payments' && <PaymentsPage pixKey={pixKey} setPixKey={setPixKey} onShowPayModal={() => setShowPaymentModal(true)} />}
-        {active==='settings' && <SettingsPage configured={supabaseConfigured} email={session?.user?.email} storeName={storeName} setStoreName={setStoreName} storeLogo={storeLogo} onLogoUpload={handleLogoUpload} whatsapp={whatsappNumber} setWhatsapp={setWhatsappNumber} pixKey={pixKey} setPixKey={setPixKey} storeAddress={storeAddress} setStoreAddress={setStoreAddress} mapsUrl={mapsUrl} setMapsUrl={setMapsUrl} modules={modules} setModules={setModules} onLogout={logout} teamMembers={teamMembers} onInviteMember={() => setShowInviteMemberModal(true)} auditLogs={auditLogs} userAccessLevel={userAccessLevel} />}
+        {active==='settings' && <SettingsPage configured={supabaseConfigured} email={session?.user?.email} storeName={storeName} setStoreName={setStoreName} storeLogo={storeLogo} onLogoUpload={handleLogoUpload} whatsapp={whatsappNumber} setWhatsapp={setWhatsappNumber} pixKey={pixKey} setPixKey={setPixKey} storeAddress={storeAddress} setStoreAddress={setStoreAddress} mapsUrl={mapsUrl} setMapsUrl={setMapsUrl} modules={modules} setModules={setModules} onLogout={logout} teamMembers={teamMembers} onInviteMember={() => setShowInviteMemberModal(true)} auditLogs={auditLogs} userAccessLevel={userAccessLevel} isLifetimeAdmin={isLifetimeAdmin} />}
         
         <footer className="footer" style={{borderTop: '1px solid #18181b', color: '#666', padding: '20px', fontSize: '11px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px'}}>
           <span>{storeName.toUpperCase()} <span className="footer-dot">•</span> GESTÃO PROFISSIONAL</span>
@@ -1758,7 +1769,7 @@ function PaymentsPage({pixKey, setPixKey, onShowPayModal}) {
   </div>
 }
 
-function SettingsPage({configured,email,storeName,setStoreName,storeLogo,onLogoUpload,whatsapp,setWhatsapp,pixKey,setPixKey,storeAddress,setStoreAddress,mapsUrl,setMapsUrl,modules,setModules,onLogout,teamMembers,onInviteMember,auditLogs,userAccessLevel}) {
+function SettingsPage({configured,email,storeName,setStoreName,storeLogo,onLogoUpload,whatsapp,setWhatsapp,pixKey,setPixKey,storeAddress,setStoreAddress,mapsUrl,setMapsUrl,modules,setModules,onLogout,teamMembers,onInviteMember,auditLogs,userAccessLevel,isLifetimeAdmin}) {
   return <div className="page-content">
     <div className="page-heading">
       <div>
@@ -1917,7 +1928,7 @@ function SettingsPage({configured,email,storeName,setStoreName,storeLogo,onLogoU
 
       <section className="panel settings-panel" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
         <div className="settings-title"><div className="settings-icon"><ShieldCheck size={19}/></div><div><h3>Licença & Suporte RT Mobile</h3><p>Administração da plataforma</p></div><span className={`connection-badge ${configured?'connected':''}`}><i/>{configured?'Ativo':'Pendente'}</span></div>
-        <div className="settings-row"><span>Status da Licença</span><strong style={{color: '#25D366'}}>Plano Profissional Ativo (R$ 50/mês)</strong></div>
+        <div className="settings-row"><span>Status da Licença</span><strong style={{color: '#25D366'}}>{isLifetimeAdmin ? '👑 Licença Vitalícia de Administrador (Sem Cobrança)' : 'Plano Profissional Ativo (R$ 50/mês)'}</strong></div>
         <div className="settings-row"><span>E-mail do Administrador</span><strong>{email || 'Nenhum'}</strong></div>
         
         <a href={`https://wa.me/${adminWhatsapp}?text=${encodeURIComponent('Olá Robert! Preciso de suporte no sistema RT Mobile.')}`} target="_blank" rel="noreferrer" className="secondary-btn full-btn" style={{marginTop: '15px', textDecoration: 'none', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'}}>
