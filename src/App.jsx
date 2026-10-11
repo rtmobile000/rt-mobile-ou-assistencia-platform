@@ -84,6 +84,7 @@ function App() {
   const [trialTimeLeft, setTrialTimeLeft] = useState(48);
   const [isTrialActive, setIsTrialActive] = useState(false);
   const [isLifetimeAdmin, setIsLifetimeAdmin] = useState(false);
+  const [isAccountExpired, setIsAccountExpired] = useState(false);
 
   // Configurações da Loja
   const [storeName, setStoreName] = useState('RT MOBILE');
@@ -212,17 +213,33 @@ function App() {
     const userEmail = session.user?.email?.toLowerCase();
     const isOwnerByEmail = userEmail === ADMIN_EMAIL.toLowerCase();
 
-    // Contagem real das 48 horas da criação da conta
+    // Contagem real das 48h
     const userCreatedAt = session.user?.created_at ? new Date(session.user.created_at) : new Date();
     const now = new Date();
     const hoursElapsed = Math.floor((now - userCreatedAt) / (1000 * 60 * 60));
     const hoursRemaining = Math.max(0, 48 - hoursElapsed);
     setTrialTimeLeft(hoursRemaining);
 
-    const { data: orgData } = await supabase.from('organizations')
+    // Consulta perfil da loja no Supabase
+    let { data: orgData } = await supabase.from('organizations')
       .select('*')
       .eq('owner_user_id', session.user.id)
       .limit(1);
+
+    // Criação automática no Supabase para estabelecimentos se ainda não existir
+    if ((!orgData || orgData.length === 0) && userRole === 'tech' && !isOwnerByEmail) {
+      const defaultName = `Loja ${session.user.email.split('@')[0].toUpperCase()}`;
+      const { data: createdOrg } = await supabase.from('organizations').insert({
+        owner_user_id: session.user.id,
+        Nome: defaultName,
+        WhatsApp: '5591989117332',
+        pix_key: '91989117332',
+        access_state: 'Teste',
+        plan_status: 'Teste',
+        plan_name: 'Teste 48h'
+      }).select();
+      if (createdOrg) orgData = createdOrg;
+    }
 
     const org = orgData?.[0];
 
@@ -236,15 +253,27 @@ function App() {
       if (isOwnerByEmail || isOrgActive) {
         setIsLifetimeAdmin(true);
         setIsTrialActive(false);
+        setIsAccountExpired(false);
       } else {
-        setIsTrialActive(hoursRemaining > 0);
+        if (hoursRemaining > 0) {
+          setIsTrialActive(true);
+          setIsAccountExpired(false);
+        } else {
+          setIsTrialActive(false);
+          setIsAccountExpired(true);
+        }
       }
 
       setTeamMembers([
-        { id: session.user.id, name: 'Robert Haelley (Proprietário)', email: session.user.email, role: 'owner', status: 'Ativo' }
+        { id: session.user.id, name: isOwnerByEmail ? 'Robert Haelley (Proprietário)' : (org?.Nome || 'Responsável'), email: session.user.email, role: 'owner', status: 'Ativo' }
       ]);
     } else {
-      setIsTrialActive(hoursRemaining > 0);
+      if (hoursRemaining > 0) {
+        setIsTrialActive(true);
+        setIsAccountExpired(false);
+      } else {
+        setIsAccountExpired(!isOwnerByEmail);
+      }
     }
 
     const { data: oData } = await supabase.from('repair_orders')
@@ -623,8 +652,8 @@ function App() {
           <button className="mobile-close icon-btn" onClick={()=>setMobileNav(false)}><X size={18}/></button>
         </div>
         
-        {/* Nível de Operador vs Dono (só quem está no painel do estabelecimento) */}
-        {userRole === 'tech' && (
+        {/* Nível de Acesso (Dono vs Técnico) */}
+        {userRole === 'tech' && !isAccountExpired && (
           <div style={{padding: '8px 12px', background: '#111', borderRadius: '8px', margin: '10px 12px', border: '1px solid #222', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
             <span style={{fontSize: '11px', color: '#888'}}>Nível de Acesso:</span>
             <select 
@@ -641,7 +670,7 @@ function App() {
           </div>
         )}
 
-        {/* BOTÃO DE ALTERNAR VISÃO: EXCLUSIVO PARA O SUPER ADMIN VITALÍCIO (ROBERT) */}
+        {/* BOTÃO EXCLUSIVO DO SUPER ADMIN (ROBERT) */}
         {isSuperAdmin && (
           <div 
             className="workspace-switch" 
@@ -669,7 +698,7 @@ function App() {
         <nav>{activeNav.map(item => <button key={item.id} className={`nav-item ${active===item.id?'active':''}`} onClick={()=>{setActive(item.id);setMobileNav(false)}}><item.icon size={18}/><span>{item.label}</span>{item.id==='orders' && <span className="nav-count">{orders.length}</span>}{item.id==='customers' && <span className="nav-count">{customers.length}</span>}{item.id==='inventory' && <span className="nav-count">{inventory.length}</span>}</button>)}</nav>
         
         <div className="sidebar-bottom">
-          {userRole === 'tech' && (
+          {userRole === 'tech' && !isAccountExpired && (
             <div className="plan-card" style={{background: '#111', border: '1px solid #222'}}>
               <div className="plan-icon"><Sparkles size={16}/></div>
               <strong>RT Mobile OS</strong>
@@ -691,62 +720,114 @@ function App() {
       
       {mobileNav && <div className="nav-overlay" onClick={()=>setMobileNav(false)} />}
       
-      <main className="main-area" style={{background: '#08080a'}}>
-        {userRole === 'tech' && isTrialActive && !isLifetimeAdmin && (
-          <div style={{background: 'linear-gradient(90deg, #1e3a8a, #0284c7)', color: '#fff', padding: '8px 16px', fontSize: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: '500'}}>
-            <span style={{display: 'flex', alignItems: 'center', gap: '6px'}}>
-              <Clock size={15}/> ⏳ PERÍODO DE TESTE GRÁTIS ATIVO: Você tem <strong>{trialTimeLeft} horas restantes</strong> para usar todas as funções!
-            </span>
-            <button onClick={()=>setShowPaymentModal(true)} style={{background: '#fff', color: '#000', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px'}}>
-              Ativar R$ 50/mês
-            </button>
-          </div>
-        )}
+      <main className="main-area" style={{background: '#08080a', position: 'relative'}}>
+        {/* TELA DE BLOQUEIO TOTAL QUANDO AS 48 HORAS ACABAM */}
+        {userRole === 'tech' && isAccountExpired && !isLifetimeAdmin ? (
+          <div style={{
+            position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', minHeight: '100vh',
+            background: 'radial-gradient(circle at center, #111116 0%, #050507 100%)',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            padding: '24px', textAlign: 'center', zIndex: 99
+          }}>
+            <div style={{
+              background: '#0d0d12', border: '1px solid #27272a', padding: '36px', borderRadius: '16px',
+              maxWidth: '480px', width: '100%', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)'
+            }}>
+              <div style={{width: '64px', height: '64px', background: '#27272a', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', color: '#f59e0b'}}>
+                <Lock size={32}/>
+              </div>
+              <h2 style={{fontSize: '22px', fontWeight: 'bold', margin: '0 0 10px', color: '#fff'}}>Período de Teste Finalizado</h2>
+              <p style={{fontSize: '14px', color: '#a1a1aa', lineHeight: '1.5', margin: '0 0 24px'}}>
+                Suas 48 horas de teste gratuito na <strong>RT Mobile</strong> se esgotaram. Seus dados, ordens de serviço, clientes e estoque continuam salvos e seguros.
+              </p>
 
-        <header className="topbar" style={{background: '#0a0a0c', borderBottom: '1px solid #18181b'}}>
-          <div className="topbar-left">
-            <button className="icon-btn menu-trigger" onClick={()=>setMobileNav(true)}><Menu size={20}/></button>
-            <div className="breadcrumb">{storeName} <span>/</span> <strong>{activeNav.find(n=>n.id===active)?.label || 'Visão geral'}</strong></div>
+              <div style={{background: '#000', border: '1px solid #333', borderRadius: '12px', padding: '20px', margin: '0 0 24px'}}>
+                <QrCode size={130} color="#25D366" style={{margin: '0 auto 12px', display: 'block'}} />
+                <span style={{fontSize: '12px', color: '#888'}}>Chave Pix (Telefone / PicPay):</span>
+                <div style={{fontSize: '16px', fontWeight: 'bold', color: '#fff', background: '#18181f', padding: '8px', borderRadius: '6px', margin: '6px 0', border: '1px solid #444'}}>
+                  {adminPixKey}
+                </div>
+                <small style={{color: '#aaa', fontSize: '11px'}}>Valor: R$ 50,00/mês | Titular: Robert (RT Mobile)</small>
+              </div>
+
+              <a 
+                href={`https://wa.me/${adminWhatsapp}?text=${encodeURIComponent(`Olá Robert! Meu período de teste de 48h da loja (${session?.user?.email}) encerrou. Acabei de realizar o Pix de R$ 50,00, pode liberar meu acesso?`)}`}
+                target="_blank" 
+                rel="noreferrer"
+                className="primary-btn full-btn"
+                style={{background: '#25D366', color: '#000', fontWeight: 'bold', textDecoration: 'none', padding: '12px', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'}}
+              >
+                <MessageCircle size={18}/> Enviar Comprovante no WhatsApp
+              </a>
+
+              <button 
+                onClick={logout}
+                className="secondary-btn full-btn"
+                style={{marginTop: '12px', padding: '10px', fontSize: '13px'}}
+              >
+                Sair da conta
+              </button>
+            </div>
           </div>
-          <div className="topbar-actions">
-            <div className="system-status"><span className="status-dot" style={{background: '#25D366'}}/> RT Mobile v1.0</div>
-            <button className="icon-btn notification-btn" onClick={()=>notify('Você está em dia.')}><Bell size={18}/><i/></button>
-            <button className="top-avatar" onClick={()=>userRole === 'tech' ? setActive('settings') : logout()}>
-              {userRole === 'tech' ? storeName.slice(0, 1).toUpperCase() : 'C'}
-            </button>
-          </div>
-        </header>
-        
-        {active==='overview' && userRole === 'tech' && <Overview orders={orders} storeName={storeName} onNew={()=>setShowNewOrder(true)} onNavigate={setActive} modules={modules} inventory={inventory} />}
-        {active==='orders' && userRole === 'tech' && <OrdersPage orders={filteredOrders} search={search} setSearch={setSearch} onNew={()=>setShowNewOrder(true)} onStatus={handleUpdateStatus} onShare={shareOsStatusWhatsapp} onSendWarranty={sendWarrantyTermWhatsapp} onOpenChecklist={(o) => setShowChecklistModal(o)} onPrint={(o) => setShowPrintModal(o)} onPellicleReminder={sendPellicleReminder} />}
-        {active==='customers' && userRole === 'tech' && <CustomersPage customers={customers} onNew={()=>setShowNewCustomer(true)} />}
-        {active==='crm' && userRole === 'tech' && <CrmPage customers={customers} storeName={storeName} whatsapp={whatsappNumber} />}
-        {active==='cash' && userRole === 'tech' && <CashPage cashRegister={cashRegister} onNewTransaction={() => setShowCashTransactionModal(true)} />}
-        {active==='inventory' && userRole === 'tech' && <InventoryPage inventory={inventory} onNew={()=>setShowNewProduct(true)} onUpdateQty={updateProductQty} onDelete={deleteProduct} />}
-        {active==='client_inventory' && <ClientInventoryPage inventory={inventory} whatsapp={whatsappNumber} storeName={storeName} />}
-        {active==='stores_directory' && <StoresDirectoryPage stores={activeStores} onSelectStore={(s) => { setStoreName(s.name); setWhatsappNumber(s.phone); notify(`Estabelecimento "${s.name}" selecionado!`); setActive('store'); }} onRequestQuote={(s) => setShowQuoteModal(s)} />}
-        {active==='store' && <StorePage whatsapp={whatsappNumber} storeName={storeName} onUpgrade={() => setShowUpgradeModal(true)} />}
-        {active==='track' && <TrackPage orders={orders} storeName={storeName} pixKey={pixKey} whatsapp={whatsappNumber} storeAddress={storeAddress} mapsUrl={mapsUrl} setOrders={setOrders} notify={notify} />}
-        {active==='finance' && userRole === 'tech' && userAccessLevel === 'owner' && <FinancePage orders={orders} commissionRate={techCommissionRate} setCommissionRate={setTechCommissionRate} />}
-        {active==='payments' && userRole === 'tech' && <PaymentsPage pixKey={pixKey} setPixKey={setPixKey} onShowPayModal={() => setShowPaymentModal(true)} />}
-        {active==='settings' && userRole === 'tech' && <SettingsPage configured={supabaseConfigured} email={session?.user?.email} storeName={storeName} setStoreName={setStoreName} storeLogo={storeLogo} onLogoUpload={handleLogoUpload} whatsapp={whatsappNumber} setWhatsapp={setWhatsappNumber} pixKey={pixKey} setPixKey={setPixKey} storeAddress={storeAddress} setStoreAddress={setStoreAddress} mapsUrl={mapsUrl} setMapsUrl={setMapsUrl} modules={modules} setModules={setModules} onLogout={logout} teamMembers={teamMembers} onInviteMember={() => setShowInviteMemberModal(true)} auditLogs={auditLogs} userAccessLevel={userAccessLevel} isLifetimeAdmin={isLifetimeAdmin} />}
-        
-        <footer className="footer" style={{borderTop: '1px solid #18181b', color: '#666', padding: '20px', fontSize: '11px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px'}}>
-          <span>{storeName.toUpperCase()} <span className="footer-dot">•</span> GESTÃO PROFISSIONAL</span>
-          <span>
-            DESENVOLVIDO POR <strong style={{color: '#aaa'}}>RT MOBILE</strong> 
-            <span style={{margin: '0 8px', color: '#444'}}>|</span> 
-            Quer este sistema no seu estabelecimento?{' '}
-            <a 
-              href={`https://wa.me/${adminWhatsapp}?text=${encodeURIComponent('Olá! Vi o sistema RT Mobile rodando em um estabelecimento e gostaria de saber como ter no meu negócio.')}`} 
-              target="_blank" 
-              rel="noreferrer" 
-              style={{color: '#25D366', fontWeight: 'bold', textDecoration: 'none'}}
-            >
-              Falar com Desenvolvedor ↗
-            </a>
-          </span>
-        </footer>
+        ) : (
+          <>
+            {userRole === 'tech' && isTrialActive && !isLifetimeAdmin && (
+              <div style={{background: 'linear-gradient(90deg, #1e3a8a, #0284c7)', color: '#fff', padding: '8px 16px', fontSize: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: '500'}}>
+                <span style={{display: 'flex', alignItems: 'center', gap: '6px'}}>
+                  <Clock size={15}/> ⏳ PERÍODO DE TESTE GRÁTIS ATIVO: Você tem <strong>{trialTimeLeft} horas restantes</strong> para usar todas as funções!
+                </span>
+                <button onClick={()=>setShowPaymentModal(true)} style={{background: '#fff', color: '#000', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px'}}>
+                  Ativar R$ 50/mês
+                </button>
+              </div>
+            )}
+
+            <header className="topbar" style={{background: '#0a0a0c', borderBottom: '1px solid #18181b'}}>
+              <div className="topbar-left">
+                <button className="icon-btn menu-trigger" onClick={()=>setMobileNav(true)}><Menu size={20}/></button>
+                <div className="breadcrumb">{storeName} <span>/</span> <strong>{activeNav.find(n=>n.id===active)?.label || 'Visão geral'}</strong></div>
+              </div>
+              <div className="topbar-actions">
+                <div className="system-status"><span className="status-dot" style={{background: '#25D366'}}/> RT Mobile v1.0</div>
+                <button className="icon-btn notification-btn" onClick={()=>notify('Você está em dia.')}><Bell size={18}/><i/></button>
+                <button className="top-avatar" onClick={()=>userRole === 'tech' ? setActive('settings') : logout()}>
+                  {userRole === 'tech' ? storeName.slice(0, 1).toUpperCase() : 'C'}
+                </button>
+              </div>
+            </header>
+            
+            {active==='overview' && userRole === 'tech' && <Overview orders={orders} storeName={storeName} onNew={()=>setShowNewOrder(true)} onNavigate={setActive} modules={modules} inventory={inventory} />}
+            {active==='orders' && userRole === 'tech' && <OrdersPage orders={filteredOrders} search={search} setSearch={setSearch} onNew={()=>setShowNewOrder(true)} onStatus={handleUpdateStatus} onShare={shareOsStatusWhatsapp} onSendWarranty={sendWarrantyTermWhatsapp} onOpenChecklist={(o) => setShowChecklistModal(o)} onPrint={(o) => setShowPrintModal(o)} onPellicleReminder={sendPellicleReminder} />}
+            {active==='customers' && userRole === 'tech' && <CustomersPage customers={customers} onNew={()=>setShowNewCustomer(true)} />}
+            {active==='crm' && userRole === 'tech' && <CrmPage customers={customers} storeName={storeName} whatsapp={whatsappNumber} />}
+            {active==='cash' && userRole === 'tech' && <CashPage cashRegister={cashRegister} onNewTransaction={() => setShowCashTransactionModal(true)} />}
+            {active==='inventory' && userRole === 'tech' && <InventoryPage inventory={inventory} onNew={()=>setShowNewProduct(true)} onUpdateQty={updateProductQty} onDelete={deleteProduct} />}
+            {active==='client_inventory' && <ClientInventoryPage inventory={inventory} whatsapp={whatsappNumber} storeName={storeName} />}
+            {active==='stores_directory' && <StoresDirectoryPage stores={activeStores} onSelectStore={(s) => { setStoreName(s.name); setWhatsappNumber(s.phone); notify(`Estabelecimento "${s.name}" selecionado!`); setActive('store'); }} onRequestQuote={(s) => setShowQuoteModal(s)} />}
+            {active==='store' && <StorePage whatsapp={whatsappNumber} storeName={storeName} onUpgrade={() => setShowUpgradeModal(true)} />}
+            {active==='track' && <TrackPage orders={orders} storeName={storeName} pixKey={pixKey} whatsapp={whatsappNumber} storeAddress={storeAddress} mapsUrl={mapsUrl} setOrders={setOrders} notify={notify} />}
+            {active==='finance' && userRole === 'tech' && userAccessLevel === 'owner' && <FinancePage orders={orders} commissionRate={techCommissionRate} setCommissionRate={setTechCommissionRate} />}
+            {active==='payments' && userRole === 'tech' && <PaymentsPage pixKey={pixKey} setPixKey={setPixKey} onShowPayModal={() => setShowPaymentModal(true)} />}
+            {active==='settings' && userRole === 'tech' && <SettingsPage configured={supabaseConfigured} email={session?.user?.email} storeName={storeName} setStoreName={setStoreName} storeLogo={storeLogo} onLogoUpload={handleLogoUpload} whatsapp={whatsappNumber} setWhatsapp={setWhatsappNumber} pixKey={pixKey} setPixKey={setPixKey} storeAddress={storeAddress} setStoreAddress={setStoreAddress} mapsUrl={mapsUrl} setMapsUrl={setMapsUrl} modules={modules} setModules={setModules} onLogout={logout} teamMembers={teamMembers} onInviteMember={() => setShowInviteMemberModal(true)} auditLogs={auditLogs} userAccessLevel={userAccessLevel} isLifetimeAdmin={isLifetimeAdmin} />}
+            
+            <footer className="footer" style={{borderTop: '1px solid #18181b', color: '#666', padding: '20px', fontSize: '11px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px'}}>
+              <span>{storeName.toUpperCase()} <span className="footer-dot">•</span> GESTÃO PROFISSIONAL</span>
+              <span>
+                DESENVOLVIDO POR <strong style={{color: '#aaa'}}>RT MOBILE</strong> 
+                <span style={{margin: '0 8px', color: '#444'}}>|</span> 
+                Quer este sistema no seu estabelecimento?{' '}
+                <a 
+                  href={`https://wa.me/${adminWhatsapp}?text=${encodeURIComponent('Olá! Vi o sistema RT Mobile rodando em um estabelecimento e gostaria de saber como ter no meu negócio.')}`} 
+                  target="_blank" 
+                  rel="noreferrer" 
+                  style={{color: '#25D366', fontWeight: 'bold', textDecoration: 'none'}}
+                >
+                  Falar com Desenvolvedor ↗
+                </a>
+              </span>
+            </footer>
+          </>
+        )}
       </main>
 
       {/* MODAL LANÇAMENTO NO CAIXA DA LOJA */}
