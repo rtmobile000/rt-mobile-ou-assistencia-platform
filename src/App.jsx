@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity, ArrowUpRight, Bell, Camera, Check, ChevronDown, CircleHelp,
   ClipboardList, Clock3, CreditCard, Gauge, LogOut, Menu, MessageCircle,
-  Plus, RefreshCw, Search, Settings, ShieldCheck, Smartphone, Sparkles, Store, Users, Wrench, X, Upload, PhoneCall, QrCode, Package, Sliders, Trash2, CheckSquare, Printer, Star, DollarSign, Send, Calendar, Clock, Lock, UserPlus, AlertTriangle, History, Wallet, MapPin, Copy, FileText, HeartHandshake, Key
+  Plus, RefreshCw, Search, Settings, ShieldCheck, Smartphone, Sparkles, Store, Users, Wrench, X, Upload, PhoneCall, QrCode, Package, Sliders, Trash2, CheckSquare, Printer, Star, DollarSign, Send, Calendar, Clock, Lock, UserPlus, AlertTriangle, History, Wallet, MapPin, Copy, FileText, HeartHandshake, Key, CheckCircle2, XCircle, Eraser
 } from 'lucide-react';
 import { supabase, supabaseConfigured } from './lib/supabase';
 
@@ -66,6 +66,112 @@ const statusClass = (status) => ({
   'Aguardando aprovação': 'amber',
   'Entregue': 'green',
 }[status] || 'neutral');
+
+const orderSteps = [
+  'Recebido',
+  'Em diagnóstico',
+  'Aguardando peça',
+  'Em manutenção',
+  'Pronto para retirada',
+  'Entregue'
+];
+
+function PatternDrawer({ value, onChange }) {
+  const canvasRef = useRef(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+
+  const drawGrid = (ctx) => {
+    ctx.fillStyle = '#0a0a0f';
+    ctx.fillRect(0, 0, 160, 160);
+    ctx.fillStyle = '#444';
+    for (let r = 0; r < 3; r++) {
+      for (let c = 0; c < 3; c++) {
+        ctx.beginPath();
+        ctx.arc(30 + c * 50, 30 + r * 50, 6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  };
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (value) {
+      const img = new Image();
+      img.onload = () => ctx.drawImage(img, 0, 0);
+      img.src = value;
+    } else {
+      drawGrid(ctx);
+    }
+  }, [value]);
+
+  const startDraw = (e) => {
+    e.preventDefault();
+    setIsDrawing(true);
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+    const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+    ctx.strokeStyle = '#25D366';
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(clientX - rect.left, clientY - rect.top);
+  };
+
+  const draw = (e) => {
+    if (!isDrawing) return;
+    e.preventDefault();
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+    const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+    ctx.lineTo(clientX - rect.left, clientY - rect.top);
+    ctx.stroke();
+  };
+
+  const endDraw = (e) => {
+    if (!isDrawing) return;
+    e.preventDefault();
+    setIsDrawing(false);
+    const canvas = canvasRef.current;
+    onChange(canvas.toDataURL());
+  };
+
+  const clear = (e) => {
+    e.preventDefault();
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    drawGrid(ctx);
+    onChange('');
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+      <div style={{ position: 'relative', border: '1px solid #333', borderRadius: '10px', overflow: 'hidden', width: '160px', height: '160px', touchAction: 'none' }}>
+        <canvas
+          ref={canvasRef}
+          width={160}
+          height={160}
+          onMouseDown={startDraw}
+          onMouseMove={draw}
+          onMouseUp={endDraw}
+          onTouchStart={startDraw}
+          onTouchMove={draw}
+          onTouchEnd={endDraw}
+          style={{ cursor: 'crosshair', display: 'block' }}
+        />
+      </div>
+      <button type="button" onClick={clear} className="secondary-btn" style={{ fontSize: '11px', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+        <Eraser size={12}/> Limpar Padrão
+      </button>
+    </div>
+  );
+}
 
 function App() {
   const [userRole, setUserRole] = useState(() => localStorage.getItem('rt_user_role') || 'client');
@@ -161,8 +267,10 @@ function App() {
   const [cashTx, setCashTx] = useState({ type: 'in', description: '', amount: '' });
   const [newMember, setNewMember] = useState({ name: '', email: '', role: 'technician' });
 
+  // Senha: PIN ou Desenho Padrão
+  const [passwordType, setPasswordType] = useState('text'); // 'text' ou 'pattern'
   const [newOrder, setNewOrder] = useState({ 
-    customer: '', device: 'iPhone 13', devicePassword: '', issue: '', phone: '', status: 'Recebido', amount: '', partCost: '0.00', warrantyDays: 90,
+    customer: '', device: 'iPhone 13', devicePassword: '', patternDrawing: '', issue: '', phone: '', status: 'Recebido', amount: '', partCost: '0.00', warrantyDays: 90,
     checklist: { ...defaultChecklist }
   });
   const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', email: '' });
@@ -307,6 +415,7 @@ function App() {
         phone: o.customer_phone || '',
         device: [o.device_brand, o.device_model].filter(Boolean).join(' '),
         devicePassword: 'Sem senha',
+        patternDrawing: '',
         issue: o.issue_description || 'Sem descrição',
         status: o.status,
         amount: o.total_amount ? `R$ ${Number(o.total_amount).toFixed(2)}` : 'R$ 0.00',
@@ -382,7 +491,8 @@ function App() {
           customer: newOrder.customer.trim(),
           phone: newOrder.phone.trim(),
           device: newOrder.device.trim(),
-          devicePassword: newOrder.devicePassword.trim() || 'Sem Senha',
+          devicePassword: passwordType === 'pattern' ? 'Padrão Desenho' : (newOrder.devicePassword.trim() || 'Sem Senha'),
+          patternDrawing: passwordType === 'pattern' ? newOrder.patternDrawing : '',
           issue: newOrder.issue.trim(),
           status: newOrder.status,
           amount: newOrder.amount ? `R$ ${parseFloat(newOrder.amount.replace(',', '.')).toFixed(2)}` : 'R$ 0.00',
@@ -399,7 +509,8 @@ function App() {
       addAuditLog(`Criou a ${generatedId} para o cliente ${newOrder.customer.trim()}`);
       
       setShowNewOrder(false);
-      setNewOrder({ customer: '', device: 'iPhone 13', devicePassword: '', issue: '', phone: '', status: 'Recebido', amount: '', partCost: '0.00', warrantyDays: 90, checklist: { ...defaultChecklist } });
+      setNewOrder({ customer: '', device: 'iPhone 13', devicePassword: '', patternDrawing: '', issue: '', phone: '', status: 'Recebido', amount: '', partCost: '0.00', warrantyDays: 90, checklist: { ...defaultChecklist } });
+      setPasswordType('text');
       notify('Ordem salva com sucesso!');
     } catch (err) { notify(err.message || 'Erro ao salvar ordem.'); }
     finally { setSaving(false); }
@@ -551,6 +662,7 @@ function App() {
     if (order.status === 'Recebido') msg = `Olá ${order.customer}! Seu ${order.device} foi recebido em nossa assistência (${storeName}). Código para acompanhar: ${order.id}`;
     else if (order.status === 'Em manutenção') msg = `Olá ${order.customer}! Seu ${order.device} (${order.id}) já entrou em bancada de testes e reparo na ${storeName}.`;
     else if (order.status === 'Pronto para retirada') msg = `Oba ${order.customer}! Seu ${order.device} (${order.id}) está PRONTO para retirada na ${storeName}! Valor: ${order.amount}`;
+    else if (order.status === 'Aguardando aprovação') msg = `Olá ${order.customer}! O orçamento do seu ${order.device} (${order.id}) foi gerado: ${order.amount}. Podemos iniciar o reparo?`;
     else if (order.status === 'Aguardando peça') msg = `Olá ${order.customer}! O reparo do seu ${order.device} (${order.id}) está aguardando a chegada da peça de reposição. Logo te avisamos!`;
     else msg = `Olá ${order.customer}! Atualização da sua OS ${order.id} (${order.device}): Status atual é ${order.status}.`;
 
@@ -953,7 +1065,17 @@ function App() {
               <p style={{margin: '4px 0'}}><strong>CLIENTE:</strong> {showPrintModal.customer}</p>
               <p style={{margin: '4px 0'}}><strong>TEL:</strong> {showPrintModal.phone || 'Não informado'}</p>
               <p style={{margin: '4px 0'}}><strong>APARELHO:</strong> {showPrintModal.device}</p>
-              <p style={{margin: '4px 0', background: '#eee', padding: '2px 4px', borderRadius: '3px'}}><strong>🔑 SENHA:</strong> {showPrintModal.devicePassword || 'Sem Senha'}</p>
+              
+              <div style={{margin: '6px 0', background: '#eee', padding: '6px', borderRadius: '4px'}}>
+                <p style={{margin: 0}}><strong>🔑 SENHA:</strong> {showPrintModal.devicePassword || 'Sem Senha'}</p>
+                {showPrintModal.patternDrawing && (
+                  <div style={{marginTop: '6px', textAlign: 'center'}}>
+                    <span style={{fontSize: '10px', display: 'block', color: '#555', marginBottom: '4px'}}>PADRÃO DE DESENHO:</span>
+                    <img src={showPrintModal.patternDrawing} alt="Padrão" style={{width: '90px', height: '90px', border: '1px solid #000', background: '#000', borderRadius: '4px'}}/>
+                  </div>
+                )}
+              </div>
+
               <p style={{margin: '4px 0'}}><strong>DEFEITO:</strong> {showPrintModal.issue}</p>
               <p style={{margin: '4px 0'}}><strong>STATUS:</strong> {showPrintModal.status}</p>
               <p style={{margin: '4px 0'}}><strong>VALOR TOTAL:</strong> {showPrintModal.amount}</p>
@@ -1139,47 +1261,82 @@ function App() {
         )}
       </div></div>}
 
-      {showNewOrder && <div className="modal-backdrop" onClick={()=>setShowNewOrder(false)}><form className="modal" onClick={e=>e.stopPropagation()} onSubmit={handleCreateOrder} style={{background: '#0f0f12', border: '1px solid #222'}}><div className="modal-head"><div><div className="eyebrow">NOVA ENTRADA</div><h2>Criar ordem de serviço</h2></div><button type="button" className="icon-btn" onClick={()=>setShowNewOrder(false)}><X size={19}/></button></div><p className="muted">Registre os dados principais e a senha do aparelho para os testes.</p>
-      <label>Cliente
-        <input list="customers-list" value={newOrder.customer} onChange={e=>{
-            const val = e.target.value;
-            const found = customers.find(c => c.name === val);
-            setNewOrder({...newOrder, customer: val, phone: found?.phone || newOrder.phone});
-          }} placeholder="Selecione ou digite o nome do cliente" required/>
-        <datalist id="customers-list">
-          {customers.map(c => <option key={c.id} value={c.name}>{c.phone ? `(${c.phone})` : ''}</option>)}
-        </datalist>
-      </label>
-      <div className="form-grid">
-        <label>Telefone / WhatsApp<input value={newOrder.phone} onChange={e=>setNewOrder({...newOrder,phone:e.target.value})} placeholder="(91) 99999-9999"/></label>
-        <label>Modelo do aparelho<input value={newOrder.device} onChange={e=>setNewOrder({...newOrder,device:e.target.value})} placeholder="Ex.: iPhone 15 Pro ou Redmi Note 15" required/></label>
-      </div>
-      <div className="form-grid">
-        <label style={{color: '#f59e0b', fontWeight: 'bold'}}>🔑 Senha do Aparelho / Padrão
-          <input value={newOrder.devicePassword} onChange={e=>setNewOrder({...newOrder,devicePassword:e.target.value})} placeholder="Ex: 123456 ou L (Desenho)" />
-        </label>
-        <label>Garantia (Dias)
-          <select value={newOrder.warrantyDays} onChange={e=>setNewOrder({...newOrder,warrantyDays:e.target.value})}>
-            <option value="30">30 Dias</option>
-            <option value="90">90 Dias (3 Meses)</option>
-            <option value="180">180 Dias (6 Meses)</option>
-            <option value="365">365 Dias (1 Ano)</option>
-          </select>
-        </label>
-      </div>
-      <div className="form-grid">
-        <label>Valor cobrado (R$)<input type="number" step="0.01" value={newOrder.amount} onChange={e=>setNewOrder({...newOrder,amount:e.target.value})} placeholder="0,00"/></label>
-        <label>Custo da Peça (R$)<input type="number" step="0.01" value={newOrder.partCost} onChange={e=>setNewOrder({...newOrder,partCost:e.target.value})} placeholder="0,00"/></label>
-      </div>
-      <div className="form-grid">
-        <label>Status inicial
-          <select value={newOrder.status} onChange={e=>setNewOrder({...newOrder,status:e.target.value})}>
-            {['Recebido','Em diagnóstico','Aguardando aprovação','Aguardando peça','Em manutenção','Pronto para retirada','Entregue'].map(s=><option key={s}>{s}</option>)}
-          </select>
-        </label>
-      </div>
-      <label>Defeito informado<textarea value={newOrder.issue} onChange={e=>setNewOrder({...newOrder,issue:e.target.value})} placeholder="Descreva o problema relatado..." rows="2" required/></label>
-      <div className="modal-foot"><button type="button" className="secondary-btn" onClick={()=>setShowNewOrder(false)}>Cancelar</button><button className="primary-btn" disabled={saving}>{saving?'Salvando...':'Salvar OS & Vistoria'}<ArrowUpRight size={16}/></button></div></form></div>}
+      {showNewOrder && (
+        <div className="modal-backdrop" onClick={()=>setShowNewOrder(false)}>
+          <form className="modal" onClick={e=>e.stopPropagation()} onSubmit={handleCreateOrder} style={{background: '#0f0f12', border: '1px solid #222'}}>
+            <div className="modal-head"><div><div className="eyebrow">NOVA ENTRADA</div><h2>Criar ordem de serviço</h2></div><button type="button" className="icon-btn" onClick={()=>setShowNewOrder(false)}><X size={19}/></button></div><p className="muted">Registre os dados principais e a senha do aparelho para os testes.</p>
+            <label>Cliente
+              <input list="customers-list" value={newOrder.customer} onChange={e=>{
+                  const val = e.target.value;
+                  const found = customers.find(c => c.name === val);
+                  setNewOrder({...newOrder, customer: val, phone: found?.phone || newOrder.phone});
+                }} placeholder="Selecione ou digite o nome do cliente" required/>
+              <datalist id="customers-list">
+                {customers.map(c => <option key={c.id} value={c.name}>{c.phone ? `(${c.phone})` : ''}</option>)}
+              </datalist>
+            </label>
+            <div className="form-grid">
+              <label>Telefone / WhatsApp<input value={newOrder.phone} onChange={e=>setNewOrder({...newOrder,phone:e.target.value})} placeholder="(91) 99999-9999"/></label>
+              <label>Modelo do aparelho<input value={newOrder.device} onChange={e=>setNewOrder({...newOrder,device:e.target.value})} placeholder="Ex.: iPhone 15 Pro ou Redmi Note 15" required/></label>
+            </div>
+
+            {/* SELEÇÃO DO TIPO DE SENHA */}
+            <div style={{background: '#121216', padding: '12px', borderRadius: '10px', border: '1px solid #25252d', margin: '10px 0'}}>
+              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px'}}>
+                <span style={{fontSize: '12px', color: '#f59e0b', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px'}}>
+                  <Key size={14}/> Senha de Desbloqueio
+                </span>
+                <div style={{display: 'flex', gap: '4px'}}>
+                  <button
+                    type="button"
+                    onClick={()=>setPasswordType('text')}
+                    className={`secondary-btn ${passwordType === 'text' ? 'primary-btn' : ''}`}
+                    style={{fontSize: '11px', padding: '3px 8px'}}
+                  >
+                    PIN / Texto
+                  </button>
+                  <button
+                    type="button"
+                    onClick={()=>setPasswordType('pattern')}
+                    className={`secondary-btn ${passwordType === 'pattern' ? 'primary-btn' : ''}`}
+                    style={{fontSize: '11px', padding: '3px 8px'}}
+                  >
+                    Padrão Desenho (Android)
+                  </button>
+                </div>
+              </div>
+
+              {passwordType === 'text' ? (
+                <input value={newOrder.devicePassword} onChange={e=>setNewOrder({...newOrder, devicePassword: e.target.value})} placeholder="Ex: 123456 ou Sem Senha" />
+              ) : (
+                <PatternDrawer value={newOrder.patternDrawing} onChange={(drawing) => setNewOrder({...newOrder, patternDrawing: drawing})} />
+              )}
+            </div>
+
+            <div className="form-grid">
+              <label>Garantia (Dias)
+                <select value={newOrder.warrantyDays} onChange={e=>setNewOrder({...newOrder,warrantyDays:e.target.value})}>
+                  <option value="30">30 Dias</option>
+                  <option value="90">90 Dias (3 Meses)</option>
+                  <option value="180">180 Dias (6 Meses)</option>
+                  <option value="365">365 Dias (1 Ano)</option>
+                </select>
+              </label>
+              <label>Status inicial
+                <select value={newOrder.status} onChange={e=>setNewOrder({...newOrder,status:e.target.value})}>
+                  {['Recebido','Em diagnóstico','Aguardando aprovação','Aguardando peça','Em manutenção','Pronto para retirada','Entregue'].map(s=><option key={s}>{s}</option>)}
+                </select>
+              </label>
+            </div>
+            <div className="form-grid">
+              <label>Valor cobrado (R$)<input type="number" step="0.01" value={newOrder.amount} onChange={e=>setNewOrder({...newOrder,amount:e.target.value})} placeholder="0,00"/></label>
+              <label>Custo da Peça (R$)<input type="number" step="0.01" value={newOrder.partCost} onChange={e=>setNewOrder({...newOrder,partCost:e.target.value})} placeholder="0,00"/></label>
+            </div>
+            <label>Defeito informado<textarea value={newOrder.issue} onChange={e=>setNewOrder({...newOrder,issue:e.target.value})} placeholder="Descreva o problema relatado..." rows="2" required/></label>
+            <div className="modal-foot"><button type="button" className="secondary-btn" onClick={()=>setShowNewOrder(false)}>Cancelar</button><button className="primary-btn" disabled={saving}>{saving?'Salvando...':'Salvar OS & Vistoria'}<ArrowUpRight size={16}/></button></div>
+          </form>
+        </div>
+      )}
 
       {showNewCustomer && <div className="modal-backdrop" onClick={()=>setShowNewCustomer(false)}><form className="modal" onClick={e=>e.stopPropagation()} onSubmit={handleCreateCustomer} style={{background: '#0f0f12', border: '1px solid #222'}}><div className="modal-head"><div><div className="eyebrow">NOVO CADASTRO</div><h2>Cadastrar cliente</h2></div><button type="button" className="icon-btn" onClick={()=>setShowNewCustomer(false)}><X size={19}/></button></div><p className="muted">Adicione os dados de contato do cliente.</p><label>Nome completo<input value={newCustomer.name} onChange={e=>setNewCustomer({...newCustomer,name:e.target.value})} placeholder="Nome do cliente" required/></label><div className="form-grid"><label>Telefone / WhatsApp<input value={newCustomer.phone} onChange={e=>setNewCustomer({...newCustomer,phone:e.target.value})} placeholder="(91) 99999-9999"/></label><label>E-mail<input type="email" value={newCustomer.email} onChange={e=>setNewCustomer({...newCustomer,email:e.target.value})} placeholder="cliente@email.com"/></label></div><div className="modal-foot"><button type="button" className="secondary-btn" onClick={()=>setShowNewCustomer(false)}>Cancelar</button><button className="primary-btn" disabled={saving}>{saving?'Salvando...':'Salvar cliente'}<ArrowUpRight size={16}/></button></div></form></div>}
 
@@ -1234,7 +1391,20 @@ function StatusPill({status}) {return <span className={`status-pill ${statusClas
 function QuickAction({icon:Icon,title,desc,onClick}) {return <button className="quick-action" onClick={onClick} style={{background: '#111115'}}><div className="quick-action-icon"><Icon size={17}/></div><span><strong>{title}</strong><small>{desc}</small></span><ArrowUpRight size={15} className="quick-arrow"/></button>}
 
 function OrdersPage({orders,search,setSearch,onNew,onStatus,onShare,onSendWarranty,onOpenChecklist,onPrint,onPellicleReminder}) {
-  return <div className="page-content"><div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line"/> OPERAÇÃO</div><h1>Ordens de <span>serviço.</span></h1><p>Registre entradas e acompanhe cada atendimento do início à entrega.</p></div><button className="primary-btn" onClick={onNew}><Plus size={17}/> Nova ordem</button></div><div className="list-toolbar"><div className="search-box"><Search size={17}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar por cliente, aparelho ou ordem..."/></div><div className="toolbar-count">{orders.length} registros</div></div><div className="panel orders-full" style={{background: '#0a0a0d', border: '1px solid #18181b'}}><div className="table-wrap"><table><thead><tr><th>ORDEM / CLIENTE</th><th>APARELHO / DEFEITO</th><th>SENHA DO APARELHO</th><th>STATUS DO ATENDIMENTO</th><th>VISTORIA</th><th>AÇÕES / DISPAROS</th></tr></thead><tbody>{orders.map(o=><tr key={o.id}><td><div className="order-id">{o.id}</div><div className="cell-sub">{o.customer}</div></td><td><div className="device-cell"><div className="device-mini"><Smartphone size={15}/></div><span>{o.device}</span></div><div className="cell-sub">{o.issue}</div></td><td><div style={{display: 'flex', alignItems: 'center', gap: '6px', background: '#111', padding: '4px 8px', borderRadius: '6px', border: '1px solid #333', fontSize: '12px', width: 'fit-content'}}><Key size={13} color="#f59e0b"/> <strong style={{color: '#fff'}}>{o.devicePassword || 'Sem Senha'}</strong></div></td><td><select className={`status-select ${statusClass(o.status)}`} value={o.status} onChange={e=>onStatus(o.rawId,e.target.value)}>{['Recebido','Em diagnóstico','Aguardando aprovação','Aguardando peça','Em manutenção','Pronto para retirada','Entregue'].map(s=><option key={s}>{s}</option>)}</select></td><td><button className="secondary-btn" onClick={()=>onOpenChecklist(o)} style={{display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '12px'}}><CheckSquare size={14} color="#3b82f6"/> Vistoria</button></td><td><div style={{display: 'flex', gap: '6px'}}><button className="secondary-btn" onClick={()=>onShare(o)} title="Disparar Status WhatsApp" style={{padding: '6px 10px'}}><MessageCircle size={14} color="#25D366"/></button><button className="secondary-btn" onClick={()=>onSendWarranty(o)} title="Enviar Termo de Garantia Legal WhatsApp" style={{padding: '6px 10px', color: '#3b82f6'}}><FileText size={14}/></button><button className="secondary-btn" onClick={()=>onPrint(o)} title="Imprimir Cupom Térmico" style={{padding: '6px 10px'}}><Printer size={14}/></button><button className="secondary-btn" onClick={()=>onPellicleReminder(o)} title="Lembrete / Revisão" style={{padding: '6px 10px', color: '#eab308'}}><Calendar size={14}/></button></div></td></tr>)}</tbody></table>{!orders.length && <div className="empty-state"><ClipboardList size={28}/><strong>Nenhuma ordem encontrada</strong><span>Tente mudar a busca ou registre uma nova ordem.</span></div>}</div></div></div>
+  return <div className="page-content"><div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line"/> OPERAÇÃO</div><h1>Ordens de <span>serviço.</span></h1><p>Registre entradas e acompanhe cada atendimento do início à entrega.</p></div><button className="primary-btn" onClick={onNew}><Plus size={17}/> Nova ordem</button></div><div className="list-toolbar"><div className="search-box"><Search size={17}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar por cliente, aparelho ou ordem..."/></div><div className="toolbar-count">{orders.length} registros</div></div><div className="panel orders-full" style={{background: '#0a0a0d', border: '1px solid #18181b'}}><div className="table-wrap"><table><thead><tr><th>ORDEM / CLIENTE</th><th>APARELHO / DEFEITO</th><th>SENHA / PADRÃO</th><th>STATUS DO ATENDIMENTO</th><th>VISTORIA</th><th>AÇÕES / DISPAROS</th></tr></thead><tbody>{orders.map(o=><tr key={o.id}><td><div className="order-id">{o.id}</div><div className="cell-sub">{o.customer}</div></td><td><div className="device-cell"><div className="device-mini"><Smartphone size={15}/></div><span>{o.device}</span></div><div className="cell-sub">{o.issue}</div></td><td>
+    <div style={{display: 'flex', alignItems: 'center', gap: '6px'}}>
+      {o.patternDrawing ? (
+        <div style={{display: 'flex', alignItems: 'center', gap: '6px', background: '#000', padding: '2px 6px', borderRadius: '6px', border: '1px solid #333'}}>
+          <img src={o.patternDrawing} alt="Padrão" style={{width: '24px', height: '24px', borderRadius: '3px'}}/>
+          <span style={{fontSize: '11px', color: '#25D366'}}>Padrão</span>
+        </div>
+      ) : (
+        <div style={{display: 'flex', alignItems: 'center', gap: '6px', background: '#111', padding: '4px 8px', borderRadius: '6px', border: '1px solid #333', fontSize: '12px', width: 'fit-content'}}>
+          <Key size={13} color="#f59e0b"/> <strong style={{color: '#fff'}}>{o.devicePassword || 'Sem Senha'}</strong>
+        </div>
+      )}
+    </div>
+  </td><td><select className={`status-select ${statusClass(o.status)}`} value={o.status} onChange={e=>onStatus(o.rawId,e.target.value)}>{['Recebido','Em diagnóstico','Aguardando aprovação','Aguardando peça','Em manutenção','Pronto para retirada','Entregue'].map(s=><option key={s}>{s}</option>)}</select></td><td><button className="secondary-btn" onClick={()=>onOpenChecklist(o)} style={{display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '12px'}}><CheckSquare size={14} color="#3b82f6"/> Vistoria</button></td><td><div style={{display: 'flex', gap: '6px'}}><button className="secondary-btn" onClick={()=>onShare(o)} title="Disparar Status WhatsApp" style={{padding: '6px 10px'}}><MessageCircle size={14} color="#25D366"/></button><button className="secondary-btn" onClick={()=>onSendWarranty(o)} title="Enviar Termo de Garantia Legal WhatsApp" style={{padding: '6px 10px', color: '#3b82f6'}}><FileText size={14}/></button><button className="secondary-btn" onClick={()=>onPrint(o)} title="Imprimir Cupom Térmico" style={{padding: '6px 10px'}}><Printer size={14}/></button><button className="secondary-btn" onClick={()=>onPellicleReminder(o)} title="Lembrete / Revisão" style={{padding: '6px 10px', color: '#eab308'}}><Calendar size={14}/></button></div></td></tr>)}</tbody></table>{!orders.length && <div className="empty-state"><ClipboardList size={28}/><strong>Nenhuma ordem encontrada</strong><span>Tente mudar a busca ou registre uma nova ordem.</span></div>}</div></div></div>
 }
 
 function CustomersPage({customers, onNew}) {
@@ -1760,6 +1930,29 @@ function TrackPage({orders, storeName, pixKey, whatsapp, storeAddress, mapsUrl, 
     return Math.max(0, order.warrantyDays - diffDays);
   };
 
+  const approveBudget = (order) => {
+    const text = encodeURIComponent(`Olá ${storeName}! Gostaria de *APROVAR* o orçamento da minha OS *${order.id}* (${order.device}) no valor de *${order.amount}*. Pode dar andamento no serviço!`);
+    window.open(`https://wa.me/${whatsapp}?text=${text}`, '_blank');
+  };
+
+  const rejectBudget = (order) => {
+    const text = encodeURIComponent(`Olá ${storeName}! Gostaria de conversar a respeito do orçamento da minha OS *${order.id}* (${order.device}). No momento não tenho interesse no reparo ou gostaria de rever o valor.`);
+    window.open(`https://wa.me/${whatsapp}?text=${text}`, '_blank');
+  };
+
+  const getStepIndex = (status) => {
+    const map = {
+      'Recebido': 0,
+      'Em diagnóstico': 1,
+      'Aguardando aprovação': 2,
+      'Aguardando peça': 2,
+      'Em manutenção': 3,
+      'Pronto para retirada': 4,
+      'Entregue': 5
+    };
+    return map[status] ?? 0;
+  };
+
   return <div className="page-content">
     <div className="page-heading">
       <div>
@@ -1769,7 +1962,7 @@ function TrackPage({orders, storeName, pixKey, whatsapp, storeAddress, mapsUrl, 
       </div>
     </div>
 
-    <div className="panel" style={{background: '#0a0a0d', border: '1px solid #18181b', padding: '24px', maxWidth: '600px', margin: '0 auto'}}>
+    <div className="panel" style={{background: '#0a0a0d', border: '1px solid #18181b', padding: '24px', maxWidth: '640px', margin: '0 auto'}}>
       <form onSubmit={handleSearchOs} style={{display: 'flex', gap: '10px'}}>
         <input 
           value={trackQuery} 
@@ -1787,10 +1980,72 @@ function TrackPage({orders, storeName, pixKey, whatsapp, storeAddress, mapsUrl, 
             <strong>{foundOs.id}</strong>
             <span className={`status-pill ${foundOs.color}`}>{foundOs.status}</span>
           </div>
+
+          {/* LINHA DO TEMPO VISUAL DO REPARO */}
+          <div style={{margin: '20px 0 25px', background: '#0a0a0d', padding: '16px', borderRadius: '10px', border: '1px solid #1f1f23'}}>
+            <span style={{fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '1px', display: 'block', marginBottom: '12px'}}>
+              Progresso do Atendimento
+            </span>
+            <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative'}}>
+              {orderSteps.map((step, idx) => {
+                const currentIdx = getStepIndex(foundOs.status);
+                const isCompleted = idx <= currentIdx;
+                const isCurrent = idx === currentIdx;
+                return (
+                  <div key={step} style={{display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, position: 'relative', zIndex: 1}}>
+                    <div style={{
+                      width: '24px', height: '24px', borderRadius: '50%',
+                      background: isCompleted ? '#25D366' : '#222',
+                      color: isCompleted ? '#000' : '#666',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '11px', fontWeight: 'bold',
+                      border: isCurrent ? '2px solid #fff' : 'none'
+                    }}>
+                      {isCompleted ? '✓' : idx + 1}
+                    </div>
+                    <span style={{fontSize: '10px', color: isCompleted ? '#fff' : '#666', marginTop: '6px', textAlign: 'center'}}>
+                      {step}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           <p style={{margin: '5px 0', fontSize: '14px', color: '#aaa'}}><strong>Cliente:</strong> {foundOs.customer}</p>
           <p style={{margin: '5px 0', fontSize: '14px', color: '#aaa'}}><strong>Item / Aparelho:</strong> {foundOs.device}</p>
           <p style={{margin: '5px 0', fontSize: '14px', color: '#aaa'}}><strong>Descrição:</strong> {foundOs.issue}</p>
           <p style={{margin: '5px 0', fontSize: '14px', color: '#aaa'}}><strong>Valor do Serviço:</strong> <span style={{color: '#25D366', fontWeight: 'bold'}}>{foundOs.amount}</span></p>
+
+          {/* BOTÕES DE APROVAÇÃO DE ORÇAMENTO (QUANDO AGUARDANDO APROVAÇÃO) */}
+          {foundOs.status === 'Aguardando aprovação' && (
+            <div style={{marginTop: '20px', background: '#1c1917', border: '1px solid #78350f', padding: '16px', borderRadius: '10px', textAlign: 'center'}}>
+              <span style={{fontSize: '13px', color: '#f59e0b', fontWeight: 'bold', display: 'block', marginBottom: '8px'}}>
+                ⚠️ Orçamento aguardando sua resposta: {foundOs.amount}
+              </span>
+              <p style={{fontSize: '12px', color: '#d6d3d1', margin: '0 0 14px'}}>
+                Deseja aprovar a execução do serviço pelo valor informado?
+              </p>
+              <div style={{display: 'flex', gap: '8px'}}>
+                <button
+                  type="button"
+                  onClick={() => approveBudget(foundOs)}
+                  className="primary-btn"
+                  style={{flex: 1, background: '#25D366', color: '#000', fontWeight: 'bold', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'}}
+                >
+                  <CheckCircle2 size={16}/> Aprovar no WhatsApp
+                </button>
+                <button
+                  type="button"
+                  onClick={() => rejectBudget(foundOs)}
+                  className="secondary-btn"
+                  style={{flex: 1, borderColor: '#ef4444', color: '#ef4444', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'}}
+                >
+                  <XCircle size={16}/> Recusar / Negociar
+                </button>
+              </div>
+            </div>
+          )}
 
           <div style={{marginTop: '15px', background: '#111827', border: '1px solid #1e3a8a', padding: '12px', borderRadius: '8px'}}>
             <span style={{fontSize: '12px', color: '#3b82f6', fontWeight: 'bold'}}>🛡️ GARANTIA DIGITAL ATIVA</span>
