@@ -82,9 +82,11 @@ function App() {
   });
 
   const [trialTimeLeft, setTrialTimeLeft] = useState(48);
+  const [planDaysLeft, setPlanDaysLeft] = useState(30);
   const [isTrialActive, setIsTrialActive] = useState(false);
   const [isLifetimeAdmin, setIsLifetimeAdmin] = useState(false);
   const [isAccountExpired, setIsAccountExpired] = useState(false);
+  const [expiredReason, setExpiredReason] = useState('trial');
 
   // Configurações da Loja
   const [storeName, setStoreName] = useState('RT MOBILE');
@@ -213,20 +215,17 @@ function App() {
     const userEmail = session.user?.email?.toLowerCase();
     const isOwnerByEmail = userEmail === ADMIN_EMAIL.toLowerCase();
 
-    // Contagem real das 48h
     const userCreatedAt = session.user?.created_at ? new Date(session.user.created_at) : new Date();
     const now = new Date();
     const hoursElapsed = Math.floor((now - userCreatedAt) / (1000 * 60 * 60));
     const hoursRemaining = Math.max(0, 48 - hoursElapsed);
     setTrialTimeLeft(hoursRemaining);
 
-    // Consulta perfil da loja no Supabase
     let { data: orgData } = await supabase.from('organizations')
       .select('*')
       .eq('owner_user_id', session.user.id)
       .limit(1);
 
-    // Criação automática no Supabase para estabelecimentos se ainda não existir
     if ((!orgData || orgData.length === 0) && userRole === 'tech' && !isOwnerByEmail) {
       const defaultName = `Loja ${session.user.email.split('@')[0].toUpperCase()}`;
       const { data: createdOrg } = await supabase.from('organizations').insert({
@@ -248,12 +247,31 @@ function App() {
       if (org?.WhatsApp) setWhatsappNumber(org.WhatsApp);
       if (org?.pix_key) setPixKey(org.pix_key);
 
-      const isOrgActive = org?.access_state === 'Ativo' || org?.plan_status === 'Ativo' || org?.plan_name === 'Vitalício';
+      const isVitalicio = isOwnerByEmail || org?.plan_name === 'Vitalício';
+      const isPaidActive = org?.access_state === 'Ativo' || org?.plan_status === 'Ativo';
 
-      if (isOwnerByEmail || isOrgActive) {
+      if (isVitalicio) {
         setIsLifetimeAdmin(true);
         setIsTrialActive(false);
         setIsAccountExpired(false);
+      } else if (isPaidActive) {
+        if (org?.subscription_expires_at) {
+          const expiryDate = new Date(org.subscription_expires_at);
+          const diffDays = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
+          setPlanDaysLeft(diffDays);
+
+          if (diffDays <= 0) {
+            setIsAccountExpired(true);
+            setExpiredReason('monthly');
+            setIsTrialActive(false);
+          } else {
+            setIsAccountExpired(false);
+            setIsTrialActive(false);
+          }
+        } else {
+          setIsAccountExpired(false);
+          setIsTrialActive(false);
+        }
       } else {
         if (hoursRemaining > 0) {
           setIsTrialActive(true);
@@ -261,6 +279,7 @@ function App() {
         } else {
           setIsTrialActive(false);
           setIsAccountExpired(true);
+          setExpiredReason('trial');
         }
       }
 
@@ -273,6 +292,7 @@ function App() {
         setIsAccountExpired(false);
       } else {
         setIsAccountExpired(!isOwnerByEmail);
+        setExpiredReason('trial');
       }
     }
 
@@ -575,7 +595,7 @@ function App() {
     <div className="auth-shell" style={{background: '#050505'}}>
       <div className="auth-visual">
         <div className="auth-orb orb-one"></div><div className="auth-orb orb-two"></div>
-        <div className="auth-brand"><div className="brand-mark">{storeLogo ? <img src={storeLogo} alt="Logo" style={{width: '100%', height: '100%', borderRadius: '6px', objectFit: 'cover'}}/> : <Smartphone size={23}/>}</div><span>RT MOBILE<span className="brand-light"> / SYSTEMS</span></span></div>
+        <div className="auth-brand"><div className="brand-mark" style={{background: '#000', border: '1px solid #222'}}>{storeLogo ? <img src={storeLogo} alt="Logo" style={{width: '100%', height: '100%', borderRadius: '6px', objectFit: 'cover'}}/> : <span style={{fontWeight: 900, color: '#fff', fontSize: '13px'}}>RT</span>}</div><span>RT MOBILE<span className="brand-light"> / SYSTEMS</span></span></div>
         <div className="auth-hero-copy"><div className="eyebrow"><Sparkles size={14}/> GESTÃO PROFISSIONAL PARA ESTABELECIMENTOS</div><h1>Sistema de Gestão<br/><span>para o seu Negócio.</span></h1><p>Organize ordens de serviço, caixa, estoque e atendimento em um só lugar.</p></div>
         <div className="auth-visual-footer"><span>RT MOBILE PLATFORM</span><span>v1.0</span></div>
       </div>
@@ -620,6 +640,14 @@ function App() {
               <QrCode size={120} color="#25D366" />
               <span style={{fontSize: '12px', color: '#aaa'}}>Chave Pix (PicPay / Telefone):</span>
               <strong style={{fontSize: '16px', color: '#fff', background: '#18181f', padding: '8px 14px', borderRadius: '6px', border: '1px solid #444'}}>{adminPixKey}</strong>
+              <button 
+                type="button" 
+                onClick={() => { navigator.clipboard.writeText(adminPixKey); notify('Chave Pix copiada!'); }}
+                className="secondary-btn" 
+                style={{fontSize: '11px', padding: '4px 8px', display: 'flex', alignItems: 'center', gap: '4px'}}
+              >
+                <Copy size={12}/> Copiar Chave Pix
+              </button>
               <small style={{color: '#888'}}>Titular: Robert (RT Mobile)</small>
             </div>
 
@@ -638,11 +666,11 @@ function App() {
     <div className="app-shell" style={{background: '#08080a', color: '#f0f0f0'}}>
       <aside className={`sidebar ${mobileNav ? 'sidebar-open' : ''}`} style={{background: '#0a0a0c', borderRight: '1px solid #18181b'}}>
         <div className="brand-lockup">
-          <div className="brand-mark" style={{background: '#18181b', width: '38px', height: '38px', borderRadius: '8px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+          <div className="brand-mark" style={{background: '#000', width: '38px', height: '38px', borderRadius: '8px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #222'}}>
             {storeLogo ? (
-              <img src={storeLogo} alt="Logo do estabelecimento" style={{width: '100%', height: '100%', objectFit: 'cover'}} />
+              <img src={storeLogo} alt="Logo" style={{width: '100%', height: '100%', objectFit: 'cover'}} />
             ) : (
-              <Smartphone size={22}/>
+              <span style={{fontWeight: 900, color: '#fff', fontSize: '13px', letterSpacing: '-0.5px'}}>RT</span>
             )}
           </div>
           <div>
@@ -652,7 +680,6 @@ function App() {
           <button className="mobile-close icon-btn" onClick={()=>setMobileNav(false)}><X size={18}/></button>
         </div>
         
-        {/* Nível de Acesso (Dono vs Técnico) */}
         {userRole === 'tech' && !isAccountExpired && (
           <div style={{padding: '8px 12px', background: '#111', borderRadius: '8px', margin: '10px 12px', border: '1px solid #222', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
             <span style={{fontSize: '11px', color: '#888'}}>Nível de Acesso:</span>
@@ -670,7 +697,6 @@ function App() {
           </div>
         )}
 
-        {/* BOTÃO EXCLUSIVO DO SUPER ADMIN (ROBERT) */}
         {isSuperAdmin && (
           <div 
             className="workspace-switch" 
@@ -704,7 +730,7 @@ function App() {
               <strong>RT Mobile OS</strong>
               <p>Seu estabelecimento organizado e produtivo.</p>
               <div className="plan-progress"><span style={{width: '100%', background: '#25D366'}}/></div>
-              <small style={{color: '#25D366'}}>• {isLifetimeAdmin ? '👑 Licença Vitalícia Ativa' : (isTrialActive ? `Teste Grátis (${trialTimeLeft}h restantes)` : 'Plano Profissional Ativo')}</small>
+              <small style={{color: '#25D366'}}>• {isLifetimeAdmin ? '👑 Licença Vitalícia Ativa' : (isTrialActive ? `Teste Grátis (${trialTimeLeft}h restantes)` : `Plano Profissional (${planDaysLeft} dias restantes)`)}</small>
             </div>
           )}
           <button className="profile-row" onClick={()=>userRole === 'tech' ? setActive('settings') : logout()} style={{background: '#121215'}}>
@@ -721,7 +747,6 @@ function App() {
       {mobileNav && <div className="nav-overlay" onClick={()=>setMobileNav(false)} />}
       
       <main className="main-area" style={{background: '#08080a', position: 'relative'}}>
-        {/* TELA DE BLOQUEIO TOTAL QUANDO AS 48 HORAS ACABAM */}
         {userRole === 'tech' && isAccountExpired && !isLifetimeAdmin ? (
           <div style={{
             position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', minHeight: '100vh',
@@ -736,9 +761,13 @@ function App() {
               <div style={{width: '64px', height: '64px', background: '#27272a', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', color: '#f59e0b'}}>
                 <Lock size={32}/>
               </div>
-              <h2 style={{fontSize: '22px', fontWeight: 'bold', margin: '0 0 10px', color: '#fff'}}>Período de Teste Finalizado</h2>
+              <h2 style={{fontSize: '22px', fontWeight: 'bold', margin: '0 0 10px', color: '#fff'}}>
+                {expiredReason === 'monthly' ? 'Assinatura Mensal Vencida' : 'Período de Teste Finalizado'}
+              </h2>
               <p style={{fontSize: '14px', color: '#a1a1aa', lineHeight: '1.5', margin: '0 0 24px'}}>
-                Suas 48 horas de teste gratuito na <strong>RT Mobile</strong> se esgotaram. Seus dados, ordens de serviço, clientes e estoque continuam salvos e seguros.
+                {expiredReason === 'monthly'
+                  ? 'Seu plano mensal de 30 dias na RT Mobile encerrou. Renove sua assinatura para continuar usando o sistema.'
+                  : 'Suas 48 horas de teste gratuito na RT Mobile se esgotaram. Seus dados, ordens de serviço, clientes e estoque continuam salvos e seguros.'}
               </p>
 
               <div style={{background: '#000', border: '1px solid #333', borderRadius: '12px', padding: '20px', margin: '0 0 24px'}}>
@@ -747,11 +776,19 @@ function App() {
                 <div style={{fontSize: '16px', fontWeight: 'bold', color: '#fff', background: '#18181f', padding: '8px', borderRadius: '6px', margin: '6px 0', border: '1px solid #444'}}>
                   {adminPixKey}
                 </div>
-                <small style={{color: '#aaa', fontSize: '11px'}}>Valor: R$ 50,00/mês | Titular: Robert (RT Mobile)</small>
+                <button 
+                  type="button" 
+                  onClick={() => { navigator.clipboard.writeText(adminPixKey); notify('Chave Pix copiada com sucesso!'); }}
+                  className="secondary-btn" 
+                  style={{fontSize: '11px', padding: '4px 10px', margin: '6px auto 0', display: 'flex', alignItems: 'center', gap: '4px'}}
+                >
+                  <Copy size={12}/> Copiar Chave Pix
+                </button>
+                <small style={{color: '#aaa', fontSize: '11px', display: 'block', marginTop: '6px'}}>Valor: R$ 50,00/mês | Titular: Robert (RT Mobile)</small>
               </div>
 
               <a 
-                href={`https://wa.me/${adminWhatsapp}?text=${encodeURIComponent(`Olá Robert! Meu período de teste de 48h da loja (${session?.user?.email}) encerrou. Acabei de realizar o Pix de R$ 50,00, pode liberar meu acesso?`)}`}
+                href={`https://wa.me/${adminWhatsapp}?text=${encodeURIComponent(`Olá Robert! Minha assinatura da loja (${session?.user?.email}) encerrou. Acabei de realizar o Pix de R$ 50,00 para renovar por 30 dias, pode liberar meu acesso?`)}`}
                 target="_blank" 
                 rel="noreferrer"
                 className="primary-btn full-btn"
@@ -778,6 +815,17 @@ function App() {
                 </span>
                 <button onClick={()=>setShowPaymentModal(true)} style={{background: '#fff', color: '#000', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px'}}>
                   Ativar R$ 50/mês
+                </button>
+              </div>
+            )}
+
+            {userRole === 'tech' && !isTrialActive && !isLifetimeAdmin && planDaysLeft <= 5 && (
+              <div style={{background: 'linear-gradient(90deg, #b45309, #d97706)', color: '#fff', padding: '8px 16px', fontSize: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: '500'}}>
+                <span style={{display: 'flex', alignItems: 'center', gap: '6px'}}>
+                  <AlertTriangle size={15}/> ⚠️ ATENÇÃO: Sua assinatura expira em <strong>{planDaysLeft} dias</strong>! Renove para não perder o acesso ao caixa e ordens.
+                </span>
+                <button onClick={()=>setShowPaymentModal(true)} style={{background: '#fff', color: '#000', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px'}}>
+                  Renovar Pix (R$ 50)
                 </button>
               </div>
             )}
