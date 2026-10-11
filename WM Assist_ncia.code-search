@@ -1,0 +1,17 @@
+# Query: WM Assistência
+# ContextLines: 1
+
+3 resultados - Um arquivo
+
+src/App.jsx:
+    86    // Configurações da Loja (Editáveis pelo dono do estabelecimento)
+    87:   const [storeName, setStoreName] = useState('RT Assistência');
+    88    const [storeLogo, setStoreLogo] = useState(null);
+
+   162    const [allStores, setAllStores] = useState([
+   163:     { id: '1', name: 'RT Assistência', phone: '5591999998888', status: 'active', desc: 'Especialista Apple, Xiaomi & Multimarcas', address: 'Av. Principal, 1000 - Ananindeua', rating: 4.9, reviewsCount: 18 },
+   164    ]);
+
+  1899            <span>Nome Comercial</span>
+  1900:           <input value={storeName} onChange={e=>setStoreName(e.target.value)} placeholder="Ex: RT Assistência ou Loja X" style={{background: '#111', color: '#fff', border: '1px solid #333', padding: '6px 10px', borderRadius: '6px', fontSize: '13px', width: '220px'}}/>
+  1901          </div>

@@ -42,7 +42,7 @@ const imgLacrado = 'https://images.unsplash.com/photo-1592750475338-74b7b21085ab
 const imgXiaomi = 'https://images.unsplash.com/photo-1598327105666-5b89351aff97?w=300&auto=format&fit=crop&q=80';
 const imgRealme = 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=300&auto=format&fit=crop&q=80';
 
-const adminWhatsapp = '5591989117332'; // Seu WhatsApp pessoal exclusivo para novas assinaturas da plataforma
+const adminWhatsapp = '5591989117332';
 const adminPixKey = '91989117332';
 
 const defaultChecklist = {
@@ -66,8 +66,8 @@ const statusClass = (status) => ({
 }[status] || 'neutral');
 
 function App() {
-  const [userRole, setUserRole] = useState('tech'); // 'tech' | 'client'
-  const [userAccessLevel, setUserAccessLevel] = useState('owner'); // 'owner' | 'technician'
+  const [userRole, setUserRole] = useState('tech');
+  const [userAccessLevel, setUserAccessLevel] = useState('owner');
   const [active, setActive] = useState('overview');
   
   const [modules, setModules] = useState({
@@ -79,14 +79,13 @@ function App() {
     crm: true,
   });
 
-  // Teste Grátis de 48h
   const [trialTimeLeft, setTrialTimeLeft] = useState(48);
   const [isTrialActive, setIsTrialActive] = useState(true);
 
-  // Configurações da Loja (Editáveis pelo dono do estabelecimento)
-  const [storeName, setStoreName] = useState('WM Assistência');
+  // Configurações da Loja
+  const [storeName, setStoreName] = useState('RT Assistência');
   const [storeLogo, setStoreLogo] = useState(null);
-  const [whatsappNumber, setWhatsappNumber] = useState('5591999998888'); // WhatsApp da loja (editável)
+  const [whatsappNumber, setWhatsappNumber] = useState('5591999998888');
   const [pixKey, setPixKey] = useState('91989117332');
   const [storeAddress, setStoreAddress] = useState('Av. Principal, 1000 - Centro, Ananindeua - PA');
   const [mapsUrl, setMapsUrl] = useState('https://maps.google.com');
@@ -102,13 +101,13 @@ function App() {
     ]
   });
 
-  // Equipe
+  // Equipa
   const [teamMembers, setTeamMembers] = useState([
     { id: '1', name: 'Robert (Dono)', email: 'robert@sualoja.com', role: 'owner', status: 'Ativo' },
     { id: '2', name: 'João Técnico', email: 'joao.bancada@sualoja.com', role: 'technician', status: 'Ativo' }
   ]);
 
-  // Logs de Auditoria
+  // Registos de Auditoria
   const [auditLogs, setAuditLogs] = useState([
     { id: '1', action: 'Criou OS-2048 (iPhone 13)', user: 'João Técnico', time: '10/10/2026 14:15' },
     { id: '2', action: 'Alterou status OS-2048 para "Pronto para retirada"', user: 'João Técnico', time: '10/10/2026 15:30' }
@@ -160,7 +159,7 @@ function App() {
   ]);
 
   const [allStores, setAllStores] = useState([
-    { id: '1', name: 'WM Assistência', phone: '5591999998888', status: 'active', desc: 'Especialista Apple, Xiaomi & Multimarcas', address: 'Av. Principal, 1000 - Ananindeua', rating: 4.9, reviewsCount: 18 },
+    { id: '1', name: 'RT Assistência', phone: '5591999998888', status: 'active', desc: 'Especialista Apple, Xiaomi & Multimarcas', address: 'Av. Principal, 1000 - Ananindeua', rating: 4.9, reviewsCount: 18 },
   ]);
 
   const activeStores = useMemo(() => allStores.filter(s => s.status === 'active'), [allStores]);
@@ -424,7 +423,6 @@ function App() {
     } catch (err) { notify('Erro ao atualizar status.'); }
   }
 
-  // Movimentação do Caixa da Loja
   const handleCashTransaction = (e) => {
     e.preventDefault();
     if (!cashTx.description || !cashTx.amount) {
@@ -446,7 +444,6 @@ function App() {
     notify('Lançamento registrado no caixa da loja!');
   };
 
-  // Convidar membro
   const handleInviteMember = (e) => {
     e.preventDefault();
     if (!newMember.name || !newMember.email) return;
@@ -723,7 +720,6 @@ function App() {
         {active==='payments' && <PaymentsPage pixKey={pixKey} setPixKey={setPixKey} onShowPayModal={() => setShowPaymentModal(true)} />}
         {active==='settings' && <SettingsPage configured={supabaseConfigured} email={session?.user?.email} storeName={storeName} setStoreName={setStoreName} storeLogo={storeLogo} onLogoUpload={handleLogoUpload} whatsapp={whatsappNumber} setWhatsapp={setWhatsappNumber} pixKey={pixKey} setPixKey={setPixKey} storeAddress={storeAddress} setStoreAddress={setStoreAddress} mapsUrl={mapsUrl} setMapsUrl={setMapsUrl} modules={modules} setModules={setModules} onLogout={logout} teamMembers={teamMembers} onInviteMember={() => setShowInviteMemberModal(true)} auditLogs={auditLogs} userAccessLevel={userAccessLevel} />}
         
-        {/* RODAPÉ ESTRATÉGICO UNIVERSAL RT MOBILE (Com o seu contato corporativo para novos lojistas) */}
         <footer className="footer" style={{borderTop: '1px solid #18181b', color: '#666', padding: '20px', fontSize: '11px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px'}}>
           <span>{storeName.toUpperCase()} <span className="footer-dot">•</span> GESTÃO PROFISSIONAL</span>
           <span>
@@ -802,7 +798,7 @@ function App() {
         </div>
       )}
 
-      {/* IMPRESSÃO DE COMPROVANTE TÉRMICO COM SENHA DO APARELHO */}
+      {/* IMPRESSÃO DE COMPROVANTE TÉRMICO */}
       {showPrintModal && (
         <div className="modal-backdrop" onClick={()=>setShowPrintModal(null)}>
           <div className="modal" onClick={e=>e.stopPropagation()} style={{background: '#fff', color: '#000', fontFamily: 'monospace', maxWidth: '380px', padding: '15px', borderRadius: '0'}}>
@@ -971,7 +967,6 @@ function App() {
             <div style={{marginTop: '15px', textAlign: 'center'}}>
               <label className="primary-btn full-btn" style={{cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', background: '#1a1a20', border: '1px solid #333'}}>
                 <Camera size={18}/> Tirar foto do aparelho
-                <input type="file" accept="image/*" capture="environment" onChange={handlePhotoCapture} style={{display: 'none'}} />
               </label>
               <button className="text-btn" style={{marginTop: '10px', color: '#888'}} onClick={()=>setUpgradeStep(2)}>Pular foto e escolher novo modelo →</button>
             </div>
@@ -1004,7 +999,6 @@ function App() {
         )}
       </div></div>}
 
-      {/* FORMULÁRIO DE NOVA OS COM CAMPO DE SENHA */}
       {showNewOrder && <div className="modal-backdrop" onClick={()=>setShowNewOrder(false)}><form className="modal" onClick={e=>e.stopPropagation()} onSubmit={handleCreateOrder} style={{background: '#0f0f12', border: '1px solid #222'}}><div className="modal-head"><div><div className="eyebrow">NOVA ENTRADA</div><h2>Criar ordem de serviço</h2></div><button type="button" className="icon-btn" onClick={()=>setShowNewOrder(false)}><X size={19}/></button></div><p className="muted">Registre os dados principais e a senha do aparelho para os testes.</p>
       <label>Cliente
         <input list="customers-list" value={newOrder.customer} onChange={e=>{
@@ -1897,7 +1891,7 @@ function SettingsPage({configured,email,storeName,setStoreName,storeLogo,onLogoU
 
         <div className="settings-row">
           <span>Nome Comercial</span>
-          <input value={storeName} onChange={e=>setStoreName(e.target.value)} placeholder="Ex: WM Assistência ou Loja X" style={{background: '#111', color: '#fff', border: '1px solid #333', padding: '6px 10px', borderRadius: '6px', fontSize: '13px', width: '220px'}}/>
+          <input value={storeName} onChange={e=>setStoreName(e.target.value)} placeholder="Ex: RT Assistência ou Loja X" style={{background: '#111', color: '#fff', border: '1px solid #333', padding: '6px 10px', borderRadius: '6px', fontSize: '13px', width: '220px'}}/>
         </div>
 
         <div className="settings-row">
