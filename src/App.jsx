@@ -101,7 +101,7 @@ function App() {
     entries: []
   });
 
-  // Equipe
+  // Equipa
   const [teamMembers, setTeamMembers] = useState([]);
 
   // Auditoria
@@ -820,6 +820,7 @@ function App() {
         </div>
       )}
 
+      {/* MODAL PEDIR ORÇAMENTO */}
       {showQuoteModal && (
         <div className="modal-backdrop" onClick={()=>setShowQuoteModal(null)}>
           <div className="modal" onClick={e=>e.stopPropagation()} style={{background: '#0f0f12', border: '1px solid #222', maxWidth: '420px'}}>
@@ -840,6 +841,7 @@ function App() {
         </div>
       )}
 
+      {/* MODAL DE CHECKLIST */}
       {showChecklistModal && (
         <div className="modal-backdrop" onClick={()=>setShowChecklistModal(null)}>
           <div className="modal" onClick={e=>e.stopPropagation()} style={{background: '#0f0f12', border: '1px solid #222', maxWidth: '500px'}}>
@@ -1524,16 +1526,16 @@ function StorePage({whatsapp, storeName, onUpgrade}) {
 
     <div className="list-toolbar" style={{gap: '10px', flexWrap: 'wrap'}}>
       <button className={`secondary-btn ${tab === 'seminovos' ? 'primary-btn' : ''}`} onClick={() => setTab('seminovos')} style={{borderRadius: '8px'}}>
-        🍎 iPhones Seminovos
+        iPhones Seminovos
       </button>
       <button className={`secondary-btn ${tab === 'lacrados' ? 'primary-btn' : ''}`} onClick={() => setTab('lacrados')} style={{borderRadius: '8px'}}>
-        🍎 iPhones Lacrados
+        iPhones Lacrados
       </button>
       <button className={`secondary-btn ${tab === 'xiaomi' ? 'primary-btn' : ''}`} onClick={() => setTab('xiaomi')} style={{borderRadius: '8px'}}>
-        ⚡ Xiaomi & Poco
+        Xiaomi & Poco
       </button>
       <button className={`secondary-btn ${tab === 'realme' ? 'primary-btn' : ''}`} onClick={() => setTab('realme')} style={{borderRadius: '8px'}}>
-        📱 Realme
+        Realme
       </button>
     </div>
 
