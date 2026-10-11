@@ -86,15 +86,9 @@ function App() {
   const [isLifetimeAdmin, setIsLifetimeAdmin] = useState(false);
 
   // Configurações da Loja
-<<<<<<< Updated upstream
-  const [storeName, setStoreName] = useState('RT Assistência');
-  const [storeLogo, setStoreLogo] = useState(null);
-  const [whatsappNumber, setWhatsappNumber] = useState('5591999998888');
-=======
   const [storeName, setStoreName] = useState('RT MOBILE');
   const [storeLogo, setStoreLogo] = useState(null);
   const [whatsappNumber, setWhatsappNumber] = useState('5591989117332');
->>>>>>> Stashed changes
   const [pixKey, setPixKey] = useState('91989117332');
   const [storeAddress, setStoreAddress] = useState('Santa Izabel do Pará - PA');
   const [mapsUrl, setMapsUrl] = useState('https://maps.google.com');
@@ -107,25 +101,11 @@ function App() {
     entries: []
   });
 
-<<<<<<< Updated upstream
-  // Equipa
-  const [teamMembers, setTeamMembers] = useState([
-    { id: '1', name: 'Robert (Dono)', email: 'robert@sualoja.com', role: 'owner', status: 'Ativo' },
-    { id: '2', name: 'João Técnico', email: 'joao.bancada@sualoja.com', role: 'technician', status: 'Ativo' }
-  ]);
-
-  // Registos de Auditoria
-  const [auditLogs, setAuditLogs] = useState([
-    { id: '1', action: 'Criou OS-2048 (iPhone 13)', user: 'João Técnico', time: '10/10/2026 14:15' },
-    { id: '2', action: 'Alterou status OS-2048 para "Pronto para retirada"', user: 'João Técnico', time: '10/10/2026 15:30' }
-  ]);
-=======
   // Equipe
   const [teamMembers, setTeamMembers] = useState([]);
 
   // Auditoria
   const [auditLogs, setAuditLogs] = useState([]);
->>>>>>> Stashed changes
 
   const addAuditLog = (action) => {
     const logUser = userAccessLevel === 'owner' ? 'Dono (Admin)' : 'Técnico (Bancada)';
@@ -143,11 +123,7 @@ function App() {
   const [inventory, setInventory] = useState([]);
 
   const [allStores, setAllStores] = useState([
-<<<<<<< Updated upstream
-    { id: '1', name: 'RT Assistência', phone: '5591999998888', status: 'active', desc: 'Especialista Apple, Xiaomi & Multimarcas', address: 'Av. Principal, 1000 - Ananindeua', rating: 4.9, reviewsCount: 18 },
-=======
     { id: '1', name: 'RT MOBILE', phone: '5591989117332', status: 'active', desc: 'Especialista Apple, Xiaomi & Multimarcas', address: 'Santa Izabel do Pará - PA', rating: 5.0, reviewsCount: 1 }
->>>>>>> Stashed changes
   ]);
 
   const activeStores = useMemo(() => allStores.filter(s => s.status === 'active'), [allStores]);
@@ -226,7 +202,6 @@ function App() {
     const userEmail = session.user?.email?.toLowerCase();
     const isOwnerByEmail = userEmail === ADMIN_EMAIL.toLowerCase();
 
-    // 1. Busca a Organização
     const { data: orgData } = await supabase.from('organizations')
       .select('*')
       .eq('owner_user_id', session.user.id)
@@ -255,7 +230,6 @@ function App() {
       setIsTrialActive(true);
     }
 
-    // 2. Busca Ordens de Serviço
     const { data: oData } = await supabase.from('repair_orders')
       .select('id, order_number, customer_name, customer_phone, device_brand, device_model, issue_description, status, total_amount, created_at')
       .order('created_at', { ascending: false }).limit(50);
@@ -279,7 +253,6 @@ function App() {
       })));
     }
 
-    // 3. Busca Clientes
     const { data: cData } = await supabase.from('customers').select('id, name, phone, email, created_at').order('name', { ascending: true });
     if (cData) setCustomers(cData);
   };
@@ -684,7 +657,7 @@ function App() {
               <strong>{userAccessLevel === 'owner' ? 'Dono (Admin)' : 'Operador'}</strong>
               <span>{session?.user?.email || 'Modo de demonstração'}</span>
             </div>
-            <MoreDots/>
+            <span style={{letterSpacing: '2px', color: '#666'}}>•••</span>
           </button>
         </div>
       </aside>
@@ -847,7 +820,6 @@ function App() {
         </div>
       )}
 
-      {/* MODAL PEDIR ORÇAMENTO */}
       {showQuoteModal && (
         <div className="modal-backdrop" onClick={()=>setShowQuoteModal(null)}>
           <div className="modal" onClick={e=>e.stopPropagation()} style={{background: '#0f0f12', border: '1px solid #222', maxWidth: '420px'}}>
@@ -868,7 +840,6 @@ function App() {
         </div>
       )}
 
-      {/* MODAL DE CHECKLIST */}
       {showChecklistModal && (
         <div className="modal-backdrop" onClick={()=>setShowChecklistModal(null)}>
           <div className="modal" onClick={e=>e.stopPropagation()} style={{background: '#0f0f12', border: '1px solid #222', maxWidth: '500px'}}>
@@ -1058,8 +1029,6 @@ function App() {
     </div>
   );
 }
-
-function MoreDots(){return <span className="more-dots">•••</span>}
 
 function Overview({orders,storeName,onNew,onNavigate,modules,inventory}) {
   const ready = orders.filter(o=>o.status==='Pronto para retirada').length;
