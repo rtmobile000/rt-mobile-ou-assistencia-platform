@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity, ArrowUpRight, Bell, Camera, Check, ChevronDown, CircleHelp,
   ClipboardList, Clock3, CreditCard, Gauge, LogOut, Menu, MessageCircle,
-  Plus, RefreshCw, Search, Settings, ShieldCheck, Smartphone, Sparkles, Store, Users, Wrench, X, Upload, PhoneCall, QrCode, Package, Sliders, Trash2, CheckSquare, Printer, Star, DollarSign, Send, Calendar, Clock, Lock, UserPlus, AlertTriangle, History, Wallet, MapPin, Copy, FileText, HeartHandshake, Key, CheckCircle2, XCircle, Eraser, Play
+  Plus, RefreshCw, Search, Settings, ShieldCheck, Smartphone, Sparkles, Store, Users, Wrench, X, Upload, PhoneCall, QrCode, Package, Sliders, Trash2, CheckSquare, Printer, Star, DollarSign, Send, Calendar, Clock, Lock, UserPlus, AlertTriangle, History, Wallet, MapPin, Copy, FileText, HeartHandshake, Key, CheckCircle2, XCircle, Eraser
 } from 'lucide-react';
 import { supabase, supabaseConfigured } from './lib/supabase';
 
@@ -76,7 +76,6 @@ const orderSteps = [
   'Entregue'
 ];
 
-// COMPONENTE DE PADRÃO DESENHO (ANDROID)
 function PatternDrawer({ value, onChange }) {
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -174,147 +173,61 @@ function PatternDrawer({ value, onChange }) {
   );
 }
 
-// COMPONENTE DE INTRO CINEMÁTICA (5 SEGUNDOS)
-function CinematicIntro({ onFinish }) {
-  const [stage, setStage] = useState(1); // 1: iPhone 16 Pro, 2: Xiaomi, 3: 18 Pro Max, 4: Logo RT Mobile
+// SPLASH SCREEN MINIMALISTA & VELOZ COM A LOGO OFICIAL
+function BrandSplash({ onFinish }) {
   const [fadingOut, setFadingOut] = useState(false);
 
   useEffect(() => {
-    const t1 = setTimeout(() => setStage(2), 1250);
-    const t2 = setTimeout(() => setStage(3), 2500);
-    const t3 = setTimeout(() => setStage(4), 3700);
-    const t4 = setTimeout(() => setFadingOut(true), 4700);
-    const t5 = setTimeout(() => onFinish(), 5000);
-
-    return () => {
-      clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); clearTimeout(t5);
-    };
+    const tFade = setTimeout(() => setFadingOut(true), 1800);
+    const tEnd = setTimeout(() => onFinish(), 2200);
+    return () => { clearTimeout(tFade); clearTimeout(tEnd); };
   }, [onFinish]);
-
-  const devices = {
-    1: { name: 'iPhone 16 Pro', brand: 'APPLE', tag: 'TITANIUM DESIGN', color: '#38bdf8', img: imgSeminovo },
-    2: { name: 'Xiaomi Note 15 Pro', brand: 'XIAOMI', tag: 'HYPEROS DISPLAY', color: '#fb923c', img: imgXiaomi },
-    3: { name: 'iPhone 18 Pro Max', brand: 'APPLE', tag: 'FLAGSHIP NEXT-GEN', color: '#a855f7', img: imgLacrado },
-  };
-
-  const curr = devices[stage] || devices[1];
 
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 99999, background: '#000000',
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      overflow: 'hidden', opacity: fadingOut ? 0 : 1, transition: 'opacity 0.4s ease-out'
+      opacity: fadingOut ? 0 : 1, transition: 'opacity 0.4s ease-out'
     }}>
-      {/* Luz volumétrica de fundo (Glow Neon) */}
-      <div style={{
-        position: 'absolute', width: '380px', height: '380px', borderRadius: '50%',
-        background: `radial-gradient(circle, ${stage === 4 ? '#25D366' : curr.color} 0%, transparent 70%)`,
-        opacity: stage === 4 ? 0.35 : 0.22, filter: 'blur(60px)',
-        transform: 'scale(1.2)', transition: 'all 0.8s ease'
-      }} />
-
-      {/* Orbes orbitando */}
       <div style={{
         position: 'absolute', width: '320px', height: '320px', borderRadius: '50%',
-        border: '1px dashed rgba(255,255,255,0.08)', animation: 'spinOrb 12s linear infinite'
+        background: 'radial-gradient(circle, #25D366 0%, transparent 70%)',
+        opacity: 0.18, filter: 'blur(50px)'
       }} />
 
-      {stage < 4 ? (
-        <div key={stage} style={{
-          position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center',
-          animation: 'deviceSlideIn 1.15s cubic-bezier(0.2, 0.8, 0.2, 1) forwards'
-        }}>
-          {/* Aparelho em 3D Floating */}
-          <div style={{
-            width: '180px', height: '320px', borderRadius: '28px',
-            border: '2px solid rgba(255,255,255,0.2)', overflow: 'hidden',
-            boxShadow: `0 25px 50px -10px rgba(0,0,0,0.9), 0 0 35px ${curr.color}33`,
-            position: 'relative', background: '#0a0a0d',
-            transform: 'perspective(800px) rotateY(-18deg) rotateX(8deg)',
-            transition: 'transform 0.8s ease'
-          }}>
-            <img src={curr.img} alt={curr.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            <div style={{
-              position: 'absolute', inset: 0,
-              background: 'linear-gradient(135deg, rgba(255,255,255,0.25) 0%, transparent 60%)'
-            }} />
-          </div>
-
-          {/* Textos Cinematográficos */}
-          <div style={{ textAlign: 'center', marginTop: '24px' }}>
-            <span style={{
-              fontSize: '11px', letterSpacing: '4px', textTransform: 'uppercase',
-              color: curr.color, fontWeight: 700, display: 'block', marginBottom: '4px'
-            }}>
-              {curr.brand} • {curr.tag}
-            </span>
-            <h2 style={{
-              fontSize: '24px', fontWeight: 900, color: '#ffffff', letterSpacing: '-0.5px', margin: 0,
-              textShadow: '0 2px 10px rgba(0,0,0,0.8)'
-            }}>
-              {curr.name}
-            </h2>
-          </div>
-        </div>
-      ) : (
-        /* REVELAÇÃO FINAL: LOGO RT MOBILE */
+      <div style={{
+        position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center',
+        animation: 'logoEntry 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards'
+      }}>
         <div style={{
-          position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center',
-          animation: 'logoReveal 1.1s cubic-bezier(0.16, 1, 0.3, 1) forwards'
+          width: '84px', height: '84px', borderRadius: '18px', background: '#000000',
+          border: '1.5px solid #333', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 0 35px rgba(37, 211, 102, 0.25)', marginBottom: '16px'
         }}>
-          <div style={{
-            width: '90px', height: '90px', borderRadius: '20px', background: '#000000',
-            border: '2px solid #25D366', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 0 50px rgba(37, 211, 102, 0.45)', marginBottom: '16px'
-          }}>
-            <span style={{ fontSize: '38px', fontWeight: 900, color: '#ffffff', letterSpacing: '-1.5px' }}>
-              RT
-            </span>
-          </div>
-
-          <h1 style={{
-            fontSize: '32px', fontWeight: 900, color: '#ffffff', letterSpacing: '8px', margin: 0,
-            textShadow: '0 4px 20px rgba(0,0,0,0.9)'
-          }}>
-            RT MOBILE
-          </h1>
-          <span style={{
-            fontSize: '11px', color: '#25D366', letterSpacing: '4px', textTransform: 'uppercase',
-            fontWeight: 700, marginTop: '8px'
-          }}>
-            SISTEMA DE GESTÃO PROFISSIONAL
+          <span style={{ fontSize: '34px', fontWeight: 900, color: '#ffffff', letterSpacing: '-1px' }}>
+            RT
           </span>
         </div>
-      )}
 
-      {/* Botão para pular a intro */}
-      <button
-        onClick={onFinish}
-        type="button"
-        style={{
-          position: 'absolute', bottom: '24px', right: '24px',
-          background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)',
-          color: '#888', padding: '6px 14px', borderRadius: '20px', fontSize: '11px',
-          cursor: 'pointer', backdropFilter: 'blur(8px)', transition: 'all 0.2s'
-        }}
-      >
-        Pular abertura ➔
-      </button>
+        <h1 style={{
+          fontSize: '26px', fontWeight: 900, color: '#ffffff', letterSpacing: '6px', margin: 0,
+          textShadow: '0 4px 15px rgba(0,0,0,0.8)'
+        }}>
+          RT MOBILE
+        </h1>
+        <span style={{
+          fontSize: '10px', color: '#25D366', letterSpacing: '3px', textTransform: 'uppercase',
+          fontWeight: 700, marginTop: '8px'
+        }}>
+          SISTEMA DE GESTÃO PROFISSIONAL
+        </span>
+      </div>
 
       <style>{`
-        @keyframes deviceSlideIn {
-          0% { opacity: 0; transform: scale(0.85) translateY(20px) rotateY(-35deg); }
-          30% { opacity: 1; }
-          100% { opacity: 1; transform: scale(1) translateY(0) rotateY(-14deg); }
-        }
-        @keyframes logoReveal {
-          0% { opacity: 0; transform: scale(0.6); filter: blur(10px); }
-          60% { transform: scale(1.06); filter: blur(0); }
+        @keyframes logoEntry {
+          0% { opacity: 0; transform: scale(0.85); }
+          50% { opacity: 1; }
           100% { opacity: 1; transform: scale(1); }
-        }
-        @keyframes spinOrb {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
         }
       `}</style>
     </div>
@@ -322,7 +235,7 @@ function CinematicIntro({ onFinish }) {
 }
 
 function App() {
-  const [showIntro, setShowIntro] = useState(() => !sessionStorage.getItem('rt_intro_shown'));
+  const [showSplash, setShowSplash] = useState(() => !sessionStorage.getItem('rt_splash_shown'));
   const [userRole, setUserRole] = useState(() => localStorage.getItem('rt_user_role') || 'client');
   const [userAccessLevel, setUserAccessLevel] = useState('owner');
   const [active, setActive] = useState(() => userRole === 'tech' ? 'overview' : 'stores_directory');
@@ -416,7 +329,7 @@ function App() {
   const [cashTx, setCashTx] = useState({ type: 'in', description: '', amount: '' });
   const [newMember, setNewMember] = useState({ name: '', email: '', role: 'technician' });
 
-  // Senha: PIN ou Padrão Desenho
+  // Senha: PIN ou Desenho
   const [passwordType, setPasswordType] = useState('text');
   const [newOrder, setNewOrder] = useState({ 
     customer: '', device: 'iPhone 13', devicePassword: '', patternDrawing: '', issue: '', phone: '', status: 'Recebido', amount: '', partCost: '0.00', warrantyDays: 90,
@@ -850,11 +763,11 @@ function App() {
     setActive('stores_directory');
   }
 
-  // SE A INTRO ESTIVER ATIVA, RENDERIZA ELA PRIMEIRO
-  if (showIntro) {
-    return <CinematicIntro onFinish={() => {
-      setShowIntro(false);
-      sessionStorage.setItem('rt_intro_shown', 'true');
+  // EXIBE A SPLASH SCREEN DA MARCA NO INÍCIO
+  if (showSplash) {
+    return <BrandSplash onFinish={() => {
+      setShowSplash(false);
+      sessionStorage.setItem('rt_splash_shown', 'true');
     }} />;
   }
 
