@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity, ArrowUpRight, Bell, Camera, Check, ChevronDown, CircleHelp,
   ClipboardList, Clock3, CreditCard, Gauge, LogOut, Menu, MessageCircle,
-  Plus, RefreshCw, Search, Settings, ShieldCheck, Smartphone, Sparkles, Store, Users, Wrench, X, Upload, PhoneCall, QrCode, Package, Sliders, Trash2, CheckSquare, Printer, Star, DollarSign, Send, Calendar, Clock, Lock, UserPlus, AlertTriangle, History, Wallet, MapPin, Copy, FileText, HeartHandshake, Key, CheckCircle2, XCircle, Eraser
+  Plus, RefreshCw, Search, Settings, ShieldCheck, Smartphone, Sparkles, Store, Users, Wrench, X, Upload, PhoneCall, QrCode, Package, Sliders, Trash2, CheckSquare, Printer, Star, DollarSign, Send, Calendar, Clock, Lock, UserPlus, AlertTriangle, History, Wallet, MapPin, Copy, FileText, HeartHandshake, Key, CheckCircle2, XCircle, Eraser, ShoppingCart, Truck, UserCheck, CheckCircle
 } from 'lucide-react';
 import { supabase, supabaseConfigured } from './lib/supabase';
 
@@ -173,7 +173,6 @@ function PatternDrawer({ value, onChange }) {
   );
 }
 
-// SPLASH SCREEN MINIMALISTA & VELOZ COM A LOGO OFICIAL
 function BrandSplash({ onFinish }) {
   const [fadingOut, setFadingOut] = useState(false);
 
@@ -265,6 +264,20 @@ function App() {
   const [mapsUrl, setMapsUrl] = useState('https://maps.google.com');
   const [techCommissionRate, setTechCommissionRate] = useState(10);
 
+  // Auxiliar de Upgrade (Configurações)
+  const [upgradeAssistantEnabled, setUpgradeAssistantEnabled] = useState(true);
+  const [upgradeDiscounts, setUpgradeDiscounts] = useState({
+    screenReplaced: 200,      // Tela trocada/trincada
+    batteryReplaced: 100,     // Bateria não original/trocada
+    faceIdOff: 250,           // Face ID / Biometria inoperante
+    housingScratched: 80,     // Carcaça arranhada/amassada
+    cameraLensScratched: 120, // Lente/vidro da câmera arranhado
+  });
+
+  // Carrinho de Acessórios do Cliente
+  const [cart, setCart] = useState([]);
+  const [showCartModal, setShowCartModal] = useState(false);
+
   // Caixa da Loja
   const [cashRegister, setCashRegister] = useState({
     isOpen: true,
@@ -320,16 +333,23 @@ function App() {
   const [authError, setAuthError] = useState('');
   const [saving, setSaving] = useState(false);
   
+  // Modal de Upgrade
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [upgradeStep, setUpgradeStep] = useState(1);
   const [currentDevice, setCurrentDevice] = useState('');
   const [targetDevice, setTargetDevice] = useState(seminovosList[0]);
   const [capturedPhoto, setCapturedPhoto] = useState(null);
+  const [selectedDefects, setSelectedDefects] = useState({
+    screenReplaced: false,
+    batteryReplaced: false,
+    faceIdOff: false,
+    housingScratched: false,
+    cameraLensScratched: false,
+  });
 
   const [cashTx, setCashTx] = useState({ type: 'in', description: '', amount: '' });
   const [newMember, setNewMember] = useState({ name: '', email: '', role: 'technician' });
 
-  // Senha: PIN ou Desenho
   const [passwordType, setPasswordType] = useState('text');
   const [newOrder, setNewOrder] = useState({ 
     customer: '', device: 'iPhone 13', devicePassword: '', patternDrawing: '', issue: '', phone: '', status: 'Recebido', amount: '', partCost: '0.00', warrantyDays: 90,
@@ -647,6 +667,30 @@ function App() {
     notify('Produto removido.');
   };
 
+  // Funções do Carrinho de Compras
+  const addToCart = (product) => {
+    setCart(prev => {
+      const existing = prev.find(item => item.id === product.id);
+      if (existing) {
+        return prev.map(item => item.id === product.id ? { ...item, cartQty: item.cartQty + 1 } : item);
+      }
+      return [...prev, { ...product, cartQty: 1 }];
+    });
+    notify(`${product.name} adicionado ao carrinho!`);
+  };
+
+  const updateCartQty = (id, delta) => {
+    setCart(prev => prev.map(item => {
+      if (item.id === id) {
+        const newQty = item.cartQty + delta;
+        return newQty > 0 ? { ...item, cartQty: newQty } : null;
+      }
+      return item;
+    }).filter(Boolean));
+  };
+
+  const clearCart = () => setCart([]);
+
   async function handleUpdateStatus(rawId, newStatus) {
     try {
       if (supabaseConfigured && session && rawId) {
@@ -710,13 +754,55 @@ function App() {
     }
   };
 
+  // Cálculo e finalização do Upgrade com Auxiliar de Desconto
+  const calculateTotalUpgradeDiscount = () => {
+    let total = 0;
+    if (selectedDefects.screenReplaced) total += Number(upgradeDiscounts.screenReplaced || 0);
+    if (selectedDefects.batteryReplaced) total += Number(upgradeDiscounts.batteryReplaced || 0);
+    if (selectedDefects.faceIdOff) total += Number(upgradeDiscounts.faceIdOff || 0);
+    if (selectedDefects.housingScratched) total += Number(upgradeDiscounts.housingScratched || 0);
+    if (selectedDefects.cameraLensScratched) total += Number(upgradeDiscounts.cameraLensScratched || 0);
+    return total;
+  };
+
   const finishUpgradeToWhatsapp = () => {
-    const text = encodeURIComponent(`Olá! Gostaria de fazer um UPGRADE do meu aparelho na ${storeName}.\n\n Meu aparelho atual: ${currentDevice || 'Não especificado'}\n Desejo pegar o: ${targetDevice}\n\nPodemos avaliar a diferença de valores?`);
+    let defectDetails = '';
+    const totalDiscount = calculateTotalUpgradeDiscount();
+
+    if (upgradeAssistantEnabled) {
+      const list = [];
+      if (selectedDefects.screenReplaced) list.push(`• Tela Trocada/Trincada (-R$ ${upgradeDiscounts.screenReplaced})`);
+      if (selectedDefects.batteryReplaced) list.push(`• Bateria Trocada/Não Original (-R$ ${upgradeDiscounts.batteryReplaced})`);
+      if (selectedDefects.faceIdOff) list.push(`• Face ID/Biometria Off (-R$ ${upgradeDiscounts.faceIdOff})`);
+      if (selectedDefects.housingScratched) list.push(`• Carcaça com marcas/arranhões (-R$ ${upgradeDiscounts.housingScratched})`);
+      if (selectedDefects.cameraLensScratched) list.push(`• Lente da Câmera arranhada (-R$ ${upgradeDiscounts.cameraLensScratched})`);
+
+      if (list.length > 0) {
+        defectDetails = `\n\n🔍 *Estado informado do aparelho atual:*\n${list.join('\n')}\n*Abatimento estimado:* -R$ ${totalDiscount.toFixed(2)}`;
+      } else {
+        defectDetails = `\n\n🔍 *Estado informado do aparelho atual:* 100% Impecável (Sem detalhes/peças trocadas)`;
+      }
+    }
+
+    const text = encodeURIComponent(
+      `Olá! Gostaria de fazer uma simulação de *UPGRADE* na ${storeName}.\n\n` +
+      `📱 *Aparelho atual:* ${currentDevice || 'Não especificado'}\n` +
+      `✨ *Aparelho desejado:* ${targetDevice}` +
+      defectDetails +
+      `\n\nPodemos avaliar a diferença de valores final?`
+    );
     window.open(`https://wa.me/${whatsappNumber}?text=${text}`, '_blank');
     setShowUpgradeModal(false);
     setUpgradeStep(1);
     setCapturedPhoto(null);
     setCurrentDevice('');
+    setSelectedDefects({
+      screenReplaced: false,
+      batteryReplaced: false,
+      faceIdOff: false,
+      housingScratched: false,
+      cameraLensScratched: false,
+    });
   };
 
   const shareOsStatusWhatsapp = (order) => {
@@ -763,7 +849,6 @@ function App() {
     setActive('stores_directory');
   }
 
-  // EXIBE A SPLASH SCREEN DA MARCA NO INÍCIO
   if (showSplash) {
     return <BrandSplash onFinish={() => {
       setShowSplash(false);
@@ -1032,13 +1117,13 @@ function App() {
             {active==='crm' && userRole === 'tech' && <CrmPage customers={customers} storeName={storeName} whatsapp={whatsappNumber} />}
             {active==='cash' && userRole === 'tech' && <CashPage cashRegister={cashRegister} onNewTransaction={() => setShowCashTransactionModal(true)} />}
             {active==='inventory' && userRole === 'tech' && <InventoryPage inventory={inventory} onNew={()=>setShowNewProduct(true)} onUpdateQty={updateProductQty} onDelete={deleteProduct} />}
-            {active==='client_inventory' && <ClientInventoryPage inventory={inventory} whatsapp={whatsappNumber} storeName={storeName} />}
+            {active==='client_inventory' && <ClientInventoryPage inventory={inventory} storeName={storeName} cart={cart} addToCart={addToCart} onOpenCart={() => setShowCartModal(true)} />}
             {active==='stores_directory' && <StoresDirectoryPage stores={activeStores} onSelectStore={(s) => { setStoreName(s.name); setWhatsappNumber(s.phone); notify(`Estabelecimento "${s.name}" selecionado!`); setActive('store'); }} onRequestQuote={(s) => setShowQuoteModal(s)} />}
             {active==='store' && <StorePage whatsapp={whatsappNumber} storeName={storeName} onUpgrade={() => setShowUpgradeModal(true)} />}
             {active==='track' && <TrackPage orders={orders} storeName={storeName} pixKey={pixKey} whatsapp={whatsappNumber} storeAddress={storeAddress} mapsUrl={mapsUrl} setOrders={setOrders} notify={notify} />}
             {active==='finance' && userRole === 'tech' && userAccessLevel === 'owner' && <FinancePage orders={orders} commissionRate={techCommissionRate} setCommissionRate={setTechCommissionRate} />}
             {active==='payments' && userRole === 'tech' && <PaymentsPage pixKey={pixKey} setPixKey={setPixKey} onShowPayModal={() => setShowPaymentModal(true)} />}
-            {active==='settings' && userRole === 'tech' && <SettingsPage configured={supabaseConfigured} email={session?.user?.email} storeName={storeName} setStoreName={setStoreName} storeLogo={storeLogo} onLogoUpload={handleLogoUpload} whatsapp={whatsappNumber} setWhatsapp={setWhatsappNumber} pixKey={pixKey} setPixKey={setPixKey} storeAddress={storeAddress} setStoreAddress={setStoreAddress} mapsUrl={mapsUrl} setMapsUrl={setMapsUrl} modules={modules} setModules={setModules} onLogout={logout} teamMembers={teamMembers} onInviteMember={() => setShowInviteMemberModal(true)} auditLogs={auditLogs} userAccessLevel={userAccessLevel} isLifetimeAdmin={isLifetimeAdmin} />}
+            {active==='settings' && userRole === 'tech' && <SettingsPage configured={supabaseConfigured} email={session?.user?.email} storeName={storeName} setStoreName={setStoreName} storeLogo={storeLogo} onLogoUpload={handleLogoUpload} whatsapp={whatsappNumber} setWhatsapp={setWhatsappNumber} pixKey={pixKey} setPixKey={setPixKey} storeAddress={storeAddress} setStoreAddress={setStoreAddress} mapsUrl={mapsUrl} setMapsUrl={setMapsUrl} modules={modules} setModules={setModules} onLogout={logout} teamMembers={teamMembers} onInviteMember={() => setShowInviteMemberModal(true)} auditLogs={auditLogs} userAccessLevel={userAccessLevel} isLifetimeAdmin={isLifetimeAdmin} upgradeAssistantEnabled={upgradeAssistantEnabled} setUpgradeAssistantEnabled={setUpgradeAssistantEnabled} upgradeDiscounts={upgradeDiscounts} setUpgradeDiscounts={setUpgradeDiscounts} />}
             
             <footer className="footer" style={{borderTop: '1px solid #18181b', color: '#666', padding: '20px', fontSize: '11px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px'}}>
               <span>{storeName.toUpperCase()} <span className="footer-dot">•</span> GESTÃO PROFISSIONAL</span>
@@ -1059,6 +1144,21 @@ function App() {
           </>
         )}
       </main>
+
+      {/* MODAL DO CARRINHO DE COMPRAS & CHECKOUT PIX */}
+      {showCartModal && (
+        <CartModal
+          cart={cart}
+          onClose={() => setShowCartModal(false)}
+          onUpdateQty={updateCartQty}
+          onClear={clearCart}
+          pixKey={pixKey}
+          storeName={storeName}
+          storeAddress={storeAddress}
+          whatsappNumber={whatsappNumber}
+          notify={notify}
+        />
+      )}
 
       {/* MODAL LANÇAMENTO NO CAIXA DA LOJA */}
       {showCashTransactionModal && (
@@ -1289,47 +1389,112 @@ function App() {
         </div>
       )}
 
-      {showUpgradeModal && <div className="modal-backdrop" onClick={()=>setShowUpgradeModal(false)}><div className="modal" onClick={e=>e.stopPropagation()} style={{background: '#0f0f12', border: '1px solid #222'}}><div className="modal-head"><div><div className="eyebrow">AVALIAÇÃO DE UPGRADE</div><h2>Troque de Aparelho</h2></div><button type="button" className="icon-btn" onClick={()=>setShowUpgradeModal(false)}><X size={19}/></button></div>
-        {upgradeStep === 1 ? (
-          <div>
-            <p className="muted">Informe o seu modelo atual e tire uma foto do estado do aparelho.</p>
-            <label style={{marginTop: '10px'}}>Modelo atual
-              <input value={currentDevice} onChange={e=>setCurrentDevice(e.target.value)} placeholder="Ex: iPhone 13 Pro Max ou Xiaomi Note 13" required />
-            </label>
-            <div style={{marginTop: '15px', textAlign: 'center'}}>
-              <label className="primary-btn full-btn" style={{cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', background: '#1a1a20', border: '1px solid #333'}}>
-                <Camera size={18}/> Tirar foto do aparelho
-              </label>
-              <button className="text-btn" style={{marginTop: '10px', color: '#888'}} onClick={()=>setUpgradeStep(2)}>Pular foto e escolher novo modelo →</button>
+      {/* MODAL DE UPGRADE COM AUXILIAR DE DESCONTO EDITÁVEL */}
+      {showUpgradeModal && (
+        <div className="modal-backdrop" onClick={()=>setShowUpgradeModal(false)}>
+          <div className="modal" onClick={e=>e.stopPropagation()} style={{background: '#0f0f12', border: '1px solid #222', maxWidth: '480px'}}>
+            <div className="modal-head">
+              <div><div className="eyebrow">AVALIAÇÃO DE UPGRADE</div><h2>Troque de Aparelho</h2></div>
+              <button type="button" className="icon-btn" onClick={()=>setShowUpgradeModal(false)}><X size={19}/></button>
             </div>
+
+            {upgradeStep === 1 ? (
+              <div>
+                <p className="muted">Informe o seu modelo atual e tire uma foto do estado do aparelho.</p>
+                <label style={{marginTop: '10px'}}>Modelo atual que você possui
+                  <input value={currentDevice} onChange={e=>setCurrentDevice(e.target.value)} placeholder="Ex: iPhone 13 Pro Max ou Xiaomi Note 13" required />
+                </label>
+
+                {/* PAINEL DO AUXILIAR DE UPGRADE (SE ATIVADO PELO DONO DA LOJA) */}
+                {upgradeAssistantEnabled && (
+                  <div style={{marginTop: '16px', background: '#121217', padding: '14px', borderRadius: '10px', border: '1px solid #26262e'}}>
+                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px'}}>
+                      <span style={{fontSize: '12px', fontWeight: 'bold', color: '#25D366'}}>
+                        ⚡ Auxiliar de Avaliação: Marque se o seu aparelho tem:
+                      </span>
+                    </div>
+
+                    <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                      {[
+                        { key: 'screenReplaced', label: 'Tela Trocada ou Trincada', val: upgradeDiscounts.screenReplaced },
+                        { key: 'batteryReplaced', label: 'Bateria Trocada / Não Genuína', val: upgradeDiscounts.batteryReplaced },
+                        { key: 'faceIdOff', label: 'Face ID ou Biometria não funciona', val: upgradeDiscounts.faceIdOff },
+                        { key: 'housingScratched', label: 'Carcaça com arranhões / marcas', val: upgradeDiscounts.housingScratched },
+                        { key: 'cameraLensScratched', label: 'Lente / Vidrinho da Câmera arranhado', val: upgradeDiscounts.cameraLensScratched },
+                      ].map(item => (
+                        <label key={item.key} style={{
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                          padding: '8px 10px', background: selectedDefects[item.key] ? '#1e1414' : '#18181f',
+                          border: `1px solid ${selectedDefects[item.key] ? '#ef4444' : '#2a2a35'}`,
+                          borderRadius: '6px', cursor: 'pointer', margin: 0
+                        }}>
+                          <span style={{fontSize: '12px', color: '#ddd', display: 'flex', alignItems: 'center', gap: '8px'}}>
+                            <input
+                              type="checkbox"
+                              checked={selectedDefects[item.key]}
+                              onChange={e => setSelectedDefects({...selectedDefects, [item.key]: e.target.checked})}
+                              style={{accentColor: '#ef4444', width: '15px', height: '15px'}}
+                            />
+                            {item.label}
+                          </span>
+                          <span style={{fontSize: '11px', color: '#ef4444', fontWeight: 'bold'}}>
+                            - R$ {Number(item.val).toFixed(2)}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+
+                    {calculateTotalUpgradeDiscount() > 0 && (
+                      <div style={{marginTop: '10px', textAlign: 'right', fontSize: '12px', color: '#ef4444', fontWeight: 'bold'}}>
+                        Abatimento Estimado: - R$ {calculateTotalUpgradeDiscount().toFixed(2)}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div style={{marginTop: '15px', textAlign: 'center'}}>
+                  <button className="primary-btn full-btn" onClick={()=>setUpgradeStep(2)}>
+                    Avançar e Escolher Novo Aparelho →
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <p className="muted">Qual modelo você gostaria de pegar na troca?</p>
+                <label style={{marginTop: '10px'}}>Selecione o novo modelo desejado
+                  <select value={targetDevice} onChange={e=>setTargetDevice(e.target.value)}>
+                    <optgroup label="Apple (Seminovos)">
+                      {seminovosList.map(item => <option key={item} value={`${item} (Seminovo)`}>{item} (Seminovo)</option>)}
+                    </optgroup>
+                    <optgroup label="Apple (Lacrados)">
+                      {lacradosList.map(item => <option key={item} value={`${item} (Lacrado)`}>{item} (Lacrado)</option>)}
+                    </optgroup>
+                    <optgroup label="Xiaomi & Poco">
+                      {xiaomiList.map(item => <option key={item} value={item}>{item}</option>)}
+                    </optgroup>
+                    <optgroup label="Realme">
+                      {realmeList.map(item => <option key={item} value={item}>{item}</option>)}
+                    </optgroup>
+                  </select>
+                </label>
+
+                {upgradeAssistantEnabled && calculateTotalUpgradeDiscount() > 0 && (
+                  <div style={{marginTop: '12px', padding: '10px', background: '#1c1414', border: '1px solid #7f1d1d', borderRadius: '8px', fontSize: '12px', color: '#fca5a5'}}>
+                    ⚠️ Foi considerado um abatimento prévio de <strong>- R$ {calculateTotalUpgradeDiscount().toFixed(2)}</strong> pelos detalhes informados no seu aparelho atual.
+                  </div>
+                )}
+
+                <div className="modal-foot" style={{marginTop: '20px'}}>
+                  <button type="button" className="secondary-btn" onClick={()=>setUpgradeStep(1)}>Voltar</button>
+                  <button type="button" className="primary-btn" onClick={finishUpgradeToWhatsapp} style={{background: '#25D366', color: '#000', fontWeight: 'bold'}}>
+                    <MessageCircle size={16}/> Enviar Proposta no WhatsApp da Loja
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-        ) : (
-          <div>
-            {capturedPhoto && <div style={{textAlign: 'center', marginBottom: '15px'}}><img src={capturedPhoto} alt="Aparelho atual" style={{maxHeight: '120px', borderRadius: '8px', border: '1px solid #333'}}/></div>}
-            <p className="muted">Qual modelo você gostaria de pegar na troca?</p>
-            <label style={{marginTop: '10px'}}>Selecione o novo modelo desejado
-              <select value={targetDevice} onChange={e=>setTargetDevice(e.target.value)}>
-                <optgroup label="Apple (Seminovos)">
-                  {seminovosList.map(item => <option key={item} value={`${item} (Seminovo)`}>{item} (Seminovo)</option>)}
-                </optgroup>
-                <optgroup label="Apple (Lacrados)">
-                  {lacradosList.map(item => <option key={item} value={`${item} (Lacrado)`}>{item} (Lacrado)</option>)}
-                </optgroup>
-                <optgroup label="Xiaomi & Poco">
-                  {xiaomiList.map(item => <option key={item} value={item}>{item}</option>)}
-                </optgroup>
-                <optgroup label="Realme">
-                  {realmeList.map(item => <option key={item} value={item}>{item}</option>)}
-                </optgroup>
-              </select>
-            </label>
-            <div className="modal-foot" style={{marginTop: '20px'}}>
-              <button type="button" className="secondary-btn" onClick={()=>setUpgradeStep(1)}>Voltar</button>
-              <button type="button" className="primary-btn" onClick={finishUpgradeToWhatsapp} style={{background: '#25D366', color: '#000', fontWeight: 'bold'}}><MessageCircle size={16}/> Enviar Proposta no WhatsApp da Loja</button>
-            </div>
-          </div>
-        )}
-      </div></div>}
+        </div>
+      )}
 
       {showNewOrder && (
         <div className="modal-backdrop" onClick={()=>setShowNewOrder(false)}>
@@ -1350,7 +1515,6 @@ function App() {
               <label>Modelo do aparelho<input value={newOrder.device} onChange={e=>setNewOrder({...newOrder,device:e.target.value})} placeholder="Ex.: iPhone 15 Pro ou Redmi Note 15" required/></label>
             </div>
 
-            {/* SELEÇÃO DO TIPO DE SENHA */}
             <div style={{background: '#121216', padding: '12px', borderRadius: '10px', border: '1px solid #25252d', margin: '10px 0'}}>
               <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px'}}>
                 <span style={{fontSize: '12px', color: '#f59e0b', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px'}}>
@@ -1793,19 +1957,23 @@ function FinancePage({orders, commissionRate, setCommissionRate}) {
   </div>
 }
 
-function ClientInventoryPage({inventory, whatsapp, storeName}) {
-  const buyAccessory = (prod) => {
-    const text = encodeURIComponent(`Olá ${storeName}! Gostaria de comprar o produto: ${prod.name} (R$ ${prod.price}). Teria disponível para retirada/envio?`);
-    window.open(`https://wa.me/${whatsapp}?text=${text}`, '_blank');
-  };
+// VITRINE DE ACESSÓRIOS DO CLIENTE COM SUPORTE A CARRINHO
+function ClientInventoryPage({inventory, storeName, cart, addToCart, onOpenCart}) {
+  const totalCartItems = cart.reduce((acc, item) => acc + item.cartQty, 0);
 
   return <div className="page-content">
-    <div className="page-heading">
+    <div className="page-heading" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
       <div>
         <div className="eyebrow"><span className="eyebrow-line"/> VITRINE DO ESTABELECIMENTO</div>
         <h1>Produtos & <span>Acessórios.</span></h1>
-        <p>Confira os itens disponíveis na {storeName}.</p>
+        <p>Confira os itens disponíveis na {storeName} e adicione à sua sacola.</p>
       </div>
+      
+      {totalCartItems > 0 && (
+        <button className="primary-btn" onClick={onOpenCart} style={{background: '#25D366', color: '#000', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px'}}>
+          <ShoppingCart size={18}/> Ver Carrinho ({totalCartItems})
+        </button>
+      )}
     </div>
 
     <div className="module-cards">
@@ -1832,15 +2000,211 @@ function ClientInventoryPage({inventory, whatsapp, storeName}) {
           <button 
             className="primary-btn full-btn" 
             disabled={prod.qty <= 0}
-            style={{marginTop: '10px', background: prod.qty > 0 ? '#25D366' : '#333', color: prod.qty > 0 ? '#000' : '#888', fontWeight: 'bold'}} 
-            onClick={() => buyAccessory(prod)}
+            style={{marginTop: '10px', background: prod.qty > 0 ? '#1f2937' : '#333', color: prod.qty > 0 ? '#fff' : '#888', border: '1px solid #374151'}} 
+            onClick={() => addToCart(prod)}
           >
-            <MessageCircle size={16}/> {prod.qty > 0 ? 'Comprar no WhatsApp' : 'Indisponível'}
+            <ShoppingCart size={16}/> {prod.qty > 0 ? 'Adicionar ao Carrinho' : 'Indisponível'}
           </button>
         </div>
       ))}
+      {!inventory.length && (
+        <div style={{gridColumn: '1 / -1', textAlign: 'center', color: '#888', padding: '40px'}}>
+          Nenhum acessório disponível no momento nesta loja.
+        </div>
+      )}
     </div>
   </div>
+}
+
+// MODAL DE CHECKOUT DO CARRINHO (OPÇÃO 2: PIX, QR CODE, ENTREGA/RETIRADA E WHATSAPP)
+function CartModal({cart, onClose, onUpdateQty, onClear, pixKey, storeName, storeAddress, whatsappNumber, notify}) {
+  const [deliveryType, setDeliveryType] = useState('pickup'); // 'pickup' ou 'delivery'
+  const [customerName, setCustomerName] = useState('');
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [isThirdPartyPickup, setIsThirdPartyPickup] = useState(false);
+  const [pickupPersonName, setPickupPersonName] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('pix'); // 'pix' ou 'card'
+
+  const cartTotal = cart.reduce((acc, item) => acc + (Number(item.price) * item.cartQty), 0);
+
+  const copyPix = () => {
+    navigator.clipboard.writeText(pixKey);
+    notify('Chave Pix copiada com sucesso!');
+  };
+
+  const handleFinishOrder = () => {
+    if (!customerName.trim()) {
+      notify('Por favor, informe seu nome.'); return;
+    }
+    if (deliveryType === 'delivery' && !deliveryAddress.trim()) {
+      notify('Por favor, informe o endereço para entrega.'); return;
+    }
+    if (deliveryType === 'pickup' && isThirdPartyPickup && !pickupPersonName.trim()) {
+      notify('Informe o nome da pessoa autorizada a retirar.'); return;
+    }
+
+    const itemsSummary = cart.map(i => `• ${i.cartQty}x ${i.name} (R$ ${(Number(i.price) * i.cartQty).toFixed(2)})`).join('\n');
+    
+    let logisticsInfo = '';
+    if (deliveryType === 'pickup') {
+      logisticsInfo = `🏬 *Modalidade:* RETIRADA NO LOCAL\n📍 *Endereço da Loja:* ${storeAddress}`;
+      if (isThirdPartyPickup) {
+        logisticsInfo += `\n👤 *Pessoa autorizada a retirar:* ${pickupPersonName.trim()}`;
+      }
+    } else {
+      logisticsInfo = `🛵 *Modalidade:* ENTREGA / DELIVERY\n📍 *Endereço de Entrega:* ${deliveryAddress.trim()}`;
+    }
+
+    const message = encodeURIComponent(
+      `🛍️ *NOVO PEDIDO DE ACESSÓRIOS - ${storeName.toUpperCase()}*\n\n` +
+      `👤 *Cliente:* ${customerName.trim()}\n` +
+      `💰 *Total do Pedido:* R$ ${cartTotal.toFixed(2)}\n` +
+      `💳 *Forma de Pagamento:* ${paymentMethod === 'pix' ? 'Pix (Comprovante em anexo)' : 'Cartão / Na entrega'}\n\n` +
+      `📦 *Itens Escolhidos:*\n${itemsSummary}\n\n` +
+      `${logisticsInfo}\n\n` +
+      `Poderiam confirmar o recebimento do pedido?`
+    );
+
+    window.open(`https://wa.me/${whatsappNumber}?text=${message}`, '_blank');
+    onClear();
+    onClose();
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={e=>e.stopPropagation()} style={{background: '#0f0f12', border: '1px solid #222', maxWidth: '520px'}}>
+        <div className="modal-head">
+          <div><div className="eyebrow">FINALIZAÇÃO DE PEDIDO</div><h2>Seu Carrinho de Compras</h2></div>
+          <button type="button" className="icon-btn" onClick={onClose}><X size={19}/></button>
+        </div>
+
+        {cart.length === 0 ? (
+          <div style={{textAlign: 'center', padding: '30px 0', color: '#888'}}>
+            <ShoppingCart size={40} style={{marginBottom: '10px'}}/>
+            <p>Seu carrinho está vazio.</p>
+          </div>
+        ) : (
+          <div>
+            {/* ITENS NO CARRINHO */}
+            <div style={{maxHeight: '160px', overflowY: 'auto', marginBottom: '15px', borderBottom: '1px solid #222', paddingBottom: '10px'}}>
+              {cart.map(item => (
+                <div key={item.id} style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '6px 0', fontSize: '13px'}}>
+                  <span>{item.name}</span>
+                  <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                    <button className="secondary-btn" style={{padding: '2px 6px'}} onClick={()=>onUpdateQty(item.id, -1)}>-</button>
+                    <strong>{item.cartQty}</strong>
+                    <button className="secondary-btn" style={{padding: '2px 6px'}} onClick={()=>onUpdateQty(item.id, 1)}>+</button>
+                    <span style={{minWidth: '65px', textAlign: 'right', color: '#25D366'}}>R$ {(Number(item.price) * item.cartQty).toFixed(2)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: 'bold', marginBottom: '15px'}}>
+              <span>Valor Total:</span>
+              <span style={{color: '#25D366'}}>R$ {cartTotal.toFixed(2)}</span>
+            </div>
+
+            {/* SEU NOME */}
+            <label style={{marginBottom: '10px'}}>Seu Nome Completo
+              <input value={customerName} onChange={e=>setCustomerName(e.target.value)} placeholder="Ex: Lucas Gabriel" required />
+            </label>
+
+            {/* ESCOLHA: RETIRADA OU ENTREGA */}
+            <div style={{display: 'flex', gap: '8px', marginBottom: '12px'}}>
+              <button
+                type="button"
+                className={`secondary-btn ${deliveryType === 'pickup' ? 'primary-btn' : ''}`}
+                style={{flex: 1, fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'}}
+                onClick={() => setDeliveryType('pickup')}
+              >
+                <Store size={15}/> Retirada na Loja
+              </button>
+              <button
+                type="button"
+                className={`secondary-btn ${deliveryType === 'delivery' ? 'primary-btn' : ''}`}
+                style={{flex: 1, fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'}}
+                onClick={() => setDeliveryType('delivery')}
+              >
+                <Truck size={15}/> Entrega / Delivery
+              </button>
+            </div>
+
+            {deliveryType === 'delivery' ? (
+              <label style={{marginBottom: '12px'}}>Endereço de Entrega (Rua, Número, Bairro)
+                <input value={deliveryAddress} onChange={e=>setDeliveryAddress(e.target.value)} placeholder="Ex: Travessa das Flores, 142 - Centro" required />
+              </label>
+            ) : (
+              <div style={{background: '#141419', padding: '10px', borderRadius: '8px', border: '1px solid #282830', marginBottom: '12px'}}>
+                <span style={{fontSize: '11px', color: '#888', display: 'block', marginBottom: '6px'}}>Retirar no local: {storeAddress}</span>
+                <label style={{display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0, fontSize: '12px'}}>
+                  <input
+                    type="checkbox"
+                    checked={isThirdPartyPickup}
+                    onChange={e => setIsThirdPartyPickup(e.target.checked)}
+                    style={{accentColor: '#25D366'}}
+                  />
+                  Outra pessoa vai retirar o pedido por mim?
+                </label>
+                {isThirdPartyPickup && (
+                  <input
+                    value={pickupPersonName}
+                    onChange={e => setPickupPersonName(e.target.value)}
+                    placeholder="Nome de quem vai buscar na loja"
+                    style={{marginTop: '8px', fontSize: '12px'}}
+                  />
+                )}
+              </div>
+            )}
+
+            {/* FORMA DE PAGAMENTO */}
+            <div style={{marginBottom: '15px'}}>
+              <span style={{fontSize: '12px', color: '#aaa', display: 'block', marginBottom: '6px'}}>Forma de Pagamento:</span>
+              <div style={{display: 'flex', gap: '8px'}}>
+                <button
+                  type="button"
+                  className={`secondary-btn ${paymentMethod === 'pix' ? 'primary-btn' : ''}`}
+                  style={{flex: 1, fontSize: '12px'}}
+                  onClick={() => setPaymentMethod('pix')}
+                >
+                  Pix Instantâneo
+                </button>
+                <button
+                  type="button"
+                  className={`secondary-btn ${paymentMethod === 'card' ? 'primary-btn' : ''}`}
+                  style={{flex: 1, fontSize: '12px'}}
+                  onClick={() => setPaymentMethod('card')}
+                >
+                  Cartão / Na Entrega
+                </button>
+              </div>
+            </div>
+
+            {paymentMethod === 'pix' && (
+              <div style={{background: '#000', padding: '12px', borderRadius: '10px', border: '1px solid #333', textAlign: 'center', marginBottom: '16px'}}>
+                <QrCode size={90} color="#25D366" style={{margin: '0 auto 6px', display: 'block'}} />
+                <span style={{fontSize: '11px', color: '#aaa'}}>Chave Pix da Loja:</span>
+                <div style={{fontSize: '13px', fontWeight: 'bold', color: '#fff', margin: '4px 0'}}>{pixKey}</div>
+                <button type="button" onClick={copyPix} className="secondary-btn" style={{fontSize: '11px', padding: '4px 8px', margin: '0 auto', display: 'flex', alignItems: 'center', gap: '4px'}}>
+                  <Copy size={12}/> Copiar Chave Pix
+                </button>
+                <small style={{display: 'block', color: '#888', fontSize: '10px', marginTop: '6px'}}>Pague o Pix e anexe o comprovante na mensagem do WhatsApp.</small>
+              </div>
+            )}
+
+            <button
+              type="button"
+              className="primary-btn full-btn"
+              onClick={handleFinishOrder}
+              style={{background: '#25D366', color: '#000', fontWeight: 'bold', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'}}
+            >
+              <MessageCircle size={18}/> Enviar Pedido no WhatsApp da Loja
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function StoresDirectoryPage({stores, onSelectStore, onRequestQuote}) {
@@ -2051,7 +2415,6 @@ function TrackPage({orders, storeName, pixKey, whatsapp, storeAddress, mapsUrl, 
             <span className={`status-pill ${foundOs.color}`}>{foundOs.status}</span>
           </div>
 
-          {/* LINHA DO TEMPO VISUAL DO REPARO */}
           <div style={{margin: '20px 0 25px', background: '#0a0a0d', padding: '16px', borderRadius: '10px', border: '1px solid #1f1f23'}}>
             <span style={{fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '1px', display: 'block', marginBottom: '12px'}}>
               Progresso do Atendimento
@@ -2087,7 +2450,6 @@ function TrackPage({orders, storeName, pixKey, whatsapp, storeAddress, mapsUrl, 
           <p style={{margin: '5px 0', fontSize: '14px', color: '#aaa'}}><strong>Descrição:</strong> {foundOs.issue}</p>
           <p style={{margin: '5px 0', fontSize: '14px', color: '#aaa'}}><strong>Valor do Serviço:</strong> <span style={{color: '#25D366', fontWeight: 'bold'}}>{foundOs.amount}</span></p>
 
-          {/* BOTÕES DE APROVAÇÃO DE ORÇAMENTO (QUANDO AGUARDANDO APROVAÇÃO) */}
           {foundOs.status === 'Aguardando aprovação' && (
             <div style={{marginTop: '20px', background: '#1c1917', border: '1px solid #78350f', padding: '16px', borderRadius: '10px', textAlign: 'center'}}>
               <span style={{fontSize: '13px', color: '#f59e0b', fontWeight: 'bold', display: 'block', marginBottom: '8px'}}>
@@ -2221,7 +2583,7 @@ function PaymentsPage({pixKey, setPixKey, onShowPayModal}) {
   </div>
 }
 
-function SettingsPage({configured,email,storeName,setStoreName,storeLogo,onLogoUpload,whatsapp,setWhatsapp,pixKey,setPixKey,storeAddress,setStoreAddress,mapsUrl,setMapsUrl,modules,setModules,onLogout,teamMembers,onInviteMember,auditLogs,userAccessLevel,isLifetimeAdmin}) {
+function SettingsPage({configured,email,storeName,setStoreName,storeLogo,onLogoUpload,whatsapp,setWhatsapp,pixKey,setPixKey,storeAddress,setStoreAddress,mapsUrl,setMapsUrl,modules,setModules,onLogout,teamMembers,onInviteMember,auditLogs,userAccessLevel,isLifetimeAdmin,upgradeAssistantEnabled,setUpgradeAssistantEnabled,upgradeDiscounts,setUpgradeDiscounts}) {
   return <div className="page-content">
     <div className="page-heading">
       <div>
@@ -2232,6 +2594,99 @@ function SettingsPage({configured,email,storeName,setStoreName,storeLogo,onLogoU
     </div>
 
     <div className="settings-grid">
+      {/* CONFIGURAÇÃO DO AUXILIAR DE UPGRADE */}
+      <section className="panel settings-panel" style={{background: '#0a0a0d', border: '1px solid #18181b', gridColumn: '1 / -1'}}>
+        <div className="settings-title">
+          <div className="settings-icon"><RefreshCw size={19}/></div>
+          <div>
+            <h3>Auxiliar de Avaliação de Upgrade</h3>
+            <p>Ative para permitir que clientes marquem avarias e peças trocadas, abatendo valores automaticamente.</p>
+          </div>
+          <button
+            className={`secondary-btn ${upgradeAssistantEnabled ? 'primary-btn' : ''}`}
+            onClick={() => setUpgradeAssistantEnabled(!upgradeAssistantEnabled)}
+            style={{fontSize: '12px', padding: '6px 14px'}}
+          >
+            {upgradeAssistantEnabled ? '✓ Ativado' : 'Desativado'}
+          </button>
+        </div>
+
+        {upgradeAssistantEnabled && (
+          <div style={{marginTop: '16px', borderTop: '1px solid #222', paddingTop: '16px'}}>
+            <span style={{fontSize: '12px', color: '#aaa', display: 'block', marginBottom: '12px'}}>
+              Defina o valor em Reais (R$) a ser reduzido do celular do cliente para cada tipo de condição:
+            </span>
+
+            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px'}}>
+              <div className="settings-row" style={{flexDirection: 'column', alignItems: 'flex-start', background: '#121217', padding: '10px', borderRadius: '8px'}}>
+                <span style={{fontSize: '12px'}}>Tela Trocada / Trincada</span>
+                <div style={{display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', width: '100%'}}>
+                  <span style={{color: '#ef4444', fontWeight: 'bold'}}>- R$</span>
+                  <input
+                    type="number"
+                    value={upgradeDiscounts.screenReplaced}
+                    onChange={e => setUpgradeDiscounts({...upgradeDiscounts, screenReplaced: e.target.value})}
+                    style={{background: '#000', color: '#fff', border: '1px solid #333', padding: '6px', borderRadius: '6px', width: '100%'}}
+                  />
+                </div>
+              </div>
+
+              <div className="settings-row" style={{flexDirection: 'column', alignItems: 'flex-start', background: '#121217', padding: '10px', borderRadius: '8px'}}>
+                <span style={{fontSize: '12px'}}>Bateria Trocada / Não Genuína</span>
+                <div style={{display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', width: '100%'}}>
+                  <span style={{color: '#ef4444', fontWeight: 'bold'}}>- R$</span>
+                  <input
+                    type="number"
+                    value={upgradeDiscounts.batteryReplaced}
+                    onChange={e => setUpgradeDiscounts({...upgradeDiscounts, batteryReplaced: e.target.value})}
+                    style={{background: '#000', color: '#fff', border: '1px solid #333', padding: '6px', borderRadius: '6px', width: '100%'}}
+                  />
+                </div>
+              </div>
+
+              <div className="settings-row" style={{flexDirection: 'column', alignItems: 'flex-start', background: '#121217', padding: '10px', borderRadius: '8px'}}>
+                <span style={{fontSize: '12px'}}>Face ID / Biometria Inoperante</span>
+                <div style={{display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', width: '100%'}}>
+                  <span style={{color: '#ef4444', fontWeight: 'bold'}}>- R$</span>
+                  <input
+                    type="number"
+                    value={upgradeDiscounts.faceIdOff}
+                    onChange={e => setUpgradeDiscounts({...upgradeDiscounts, faceIdOff: e.target.value})}
+                    style={{background: '#000', color: '#fff', border: '1px solid #333', padding: '6px', borderRadius: '6px', width: '100%'}}
+                  />
+                </div>
+              </div>
+
+              <div className="settings-row" style={{flexDirection: 'column', alignItems: 'flex-start', background: '#121217', padding: '10px', borderRadius: '8px'}}>
+                <span style={{fontSize: '12px'}}>Carcaça com Arranhões / Marcas</span>
+                <div style={{display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', width: '100%'}}>
+                  <span style={{color: '#ef4444', fontWeight: 'bold'}}>- R$</span>
+                  <input
+                    type="number"
+                    value={upgradeDiscounts.housingScratched}
+                    onChange={e => setUpgradeDiscounts({...upgradeDiscounts, housingScratched: e.target.value})}
+                    style={{background: '#000', color: '#fff', border: '1px solid #333', padding: '6px', borderRadius: '6px', width: '100%'}}
+                  />
+                </div>
+              </div>
+
+              <div className="settings-row" style={{flexDirection: 'column', alignItems: 'flex-start', background: '#121217', padding: '10px', borderRadius: '8px'}}>
+                <span style={{fontSize: '12px'}}>Lente / Vidrinho da Câmera</span>
+                <div style={{display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', width: '100%'}}>
+                  <span style={{color: '#ef4444', fontWeight: 'bold'}}>- R$</span>
+                  <input
+                    type="number"
+                    value={upgradeDiscounts.cameraLensScratched}
+                    onChange={e => setUpgradeDiscounts({...upgradeDiscounts, cameraLensScratched: e.target.value})}
+                    style={{background: '#000', color: '#fff', border: '1px solid #333', padding: '6px', borderRadius: '6px', width: '100%'}}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </section>
+
       {userAccessLevel === 'owner' && (
         <section className="panel settings-panel" style={{background: '#0a0a0d', border: '1px solid #18181b', gridColumn: '1 / -1'}}>
           <div className="settings-title">
