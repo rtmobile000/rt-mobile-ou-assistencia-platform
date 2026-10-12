@@ -82,7 +82,7 @@ function PatternDrawer({ value, onChange }) {
 
   const drawGrid = (ctx) => {
     ctx.fillStyle = '#0a0a0f';
-    ctx.fillRect(0, 0, 160, 160);
+    ctx.fillRect(0, 160, 160, 160);
     ctx.fillStyle = '#444';
     for (let r = 0; r < 3; r++) {
       for (let c = 0; c < 3; c++) {
@@ -264,14 +264,19 @@ function App() {
   const [mapsUrl, setMapsUrl] = useState('https://maps.google.com');
   const [techCommissionRate, setTechCommissionRate] = useState(10);
 
-  // Auxiliar de Upgrade (Configurações)
+  // Auxiliar de Upgrade (Configurações com os 10 itens completos)
   const [upgradeAssistantEnabled, setUpgradeAssistantEnabled] = useState(true);
   const [upgradeDiscounts, setUpgradeDiscounts] = useState({
     screenReplaced: 200,      // Tela trocada/trincada
     batteryReplaced: 100,     // Bateria não original/trocada
     faceIdOff: 250,           // Face ID / Biometria inoperante
-    housingScratched: 80,     // Carcaça arranhada/amassada
-    cameraLensScratched: 120, // Lente/vidro da câmera arranhado
+    cameraFailed: 200,        // Câmera principal ou frontal com defeito/trocada
+    cameraLensScratched: 80,  // Lente/vidrinho da câmera arranhado
+    chargingPortFailed: 120,  // Conector / Dock de Carga com mau contato
+    audioSpeakerFailed: 90,   // Alto-falante ou Auricular chiando/sem som
+    nfcFailed: 110,           // NFC / Pagamento por aproximação não funciona
+    wifiFailed: 180,          // Wi-Fi ou Bluetooth inoperante
+    housingScratched: 90,     // Carcaça ou Vidro Traseiro arranhado/trincado
   });
 
   // Carrinho de Acessórios do Cliente
@@ -339,12 +344,19 @@ function App() {
   const [currentDevice, setCurrentDevice] = useState('');
   const [targetDevice, setTargetDevice] = useState(seminovosList[0]);
   const [capturedPhoto, setCapturedPhoto] = useState(null);
+  
+  // Estado dos 10 defeitos selecionados pelo cliente
   const [selectedDefects, setSelectedDefects] = useState({
     screenReplaced: false,
     batteryReplaced: false,
     faceIdOff: false,
-    housingScratched: false,
+    cameraFailed: false,
     cameraLensScratched: false,
+    chargingPortFailed: false,
+    audioSpeakerFailed: false,
+    nfcFailed: false,
+    wifiFailed: false,
+    housingScratched: false,
   });
 
   const [cashTx, setCashTx] = useState({ type: 'in', description: '', amount: '' });
@@ -667,7 +679,7 @@ function App() {
     notify('Produto removido.');
   };
 
-  // Funções do Carrinho de Compras
+  // Funções do Carrinho
   const addToCart = (product) => {
     setCart(prev => {
       const existing = prev.find(item => item.id === product.id);
@@ -754,14 +766,19 @@ function App() {
     }
   };
 
-  // Cálculo e finalização do Upgrade com Auxiliar de Desconto
+  // Cálculo e finalização do Upgrade com Auxiliar de Desconto (10 itens)
   const calculateTotalUpgradeDiscount = () => {
     let total = 0;
     if (selectedDefects.screenReplaced) total += Number(upgradeDiscounts.screenReplaced || 0);
     if (selectedDefects.batteryReplaced) total += Number(upgradeDiscounts.batteryReplaced || 0);
     if (selectedDefects.faceIdOff) total += Number(upgradeDiscounts.faceIdOff || 0);
-    if (selectedDefects.housingScratched) total += Number(upgradeDiscounts.housingScratched || 0);
+    if (selectedDefects.cameraFailed) total += Number(upgradeDiscounts.cameraFailed || 0);
     if (selectedDefects.cameraLensScratched) total += Number(upgradeDiscounts.cameraLensScratched || 0);
+    if (selectedDefects.chargingPortFailed) total += Number(upgradeDiscounts.chargingPortFailed || 0);
+    if (selectedDefects.audioSpeakerFailed) total += Number(upgradeDiscounts.audioSpeakerFailed || 0);
+    if (selectedDefects.nfcFailed) total += Number(upgradeDiscounts.nfcFailed || 0);
+    if (selectedDefects.wifiFailed) total += Number(upgradeDiscounts.wifiFailed || 0);
+    if (selectedDefects.housingScratched) total += Number(upgradeDiscounts.housingScratched || 0);
     return total;
   };
 
@@ -774,8 +791,13 @@ function App() {
       if (selectedDefects.screenReplaced) list.push(`• Tela Trocada/Trincada (-R$ ${upgradeDiscounts.screenReplaced})`);
       if (selectedDefects.batteryReplaced) list.push(`• Bateria Trocada/Não Original (-R$ ${upgradeDiscounts.batteryReplaced})`);
       if (selectedDefects.faceIdOff) list.push(`• Face ID/Biometria Off (-R$ ${upgradeDiscounts.faceIdOff})`);
-      if (selectedDefects.housingScratched) list.push(`• Carcaça com marcas/arranhões (-R$ ${upgradeDiscounts.housingScratched})`);
-      if (selectedDefects.cameraLensScratched) list.push(`• Lente da Câmera arranhada (-R$ ${upgradeDiscounts.cameraLensScratched})`);
+      if (selectedDefects.cameraFailed) list.push(`• Câmera com falha/trocada (-R$ ${upgradeDiscounts.cameraFailed})`);
+      if (selectedDefects.cameraLensScratched) list.push(`• Lente/Vidro da Câmera arranhado (-R$ ${upgradeDiscounts.cameraLensScratched})`);
+      if (selectedDefects.chargingPortFailed) list.push(`• Conector/Dock de Carga ruim (-R$ ${upgradeDiscounts.chargingPortFailed})`);
+      if (selectedDefects.audioSpeakerFailed) list.push(`• Alto-falante/Auricular com falha (-R$ ${upgradeDiscounts.audioSpeakerFailed})`);
+      if (selectedDefects.nfcFailed) list.push(`• NFC/Aproximação não funciona (-R$ ${upgradeDiscounts.nfcFailed})`);
+      if (selectedDefects.wifiFailed) list.push(`• Wi-Fi/Bluetooth inoperante (-R$ ${upgradeDiscounts.wifiFailed})`);
+      if (selectedDefects.housingScratched) list.push(`• Carcaça/Vidro Traseiro com marcas (-R$ ${upgradeDiscounts.housingScratched})`);
 
       if (list.length > 0) {
         defectDetails = `\n\n🔍 *Estado informado do aparelho atual:*\n${list.join('\n')}\n*Abatimento estimado:* -R$ ${totalDiscount.toFixed(2)}`;
@@ -800,8 +822,13 @@ function App() {
       screenReplaced: false,
       batteryReplaced: false,
       faceIdOff: false,
-      housingScratched: false,
+      cameraFailed: false,
       cameraLensScratched: false,
+      chargingPortFailed: false,
+      audioSpeakerFailed: false,
+      nfcFailed: false,
+      wifiFailed: false,
+      housingScratched: false,
     });
   };
 
@@ -1389,10 +1416,10 @@ function App() {
         </div>
       )}
 
-      {/* MODAL DE UPGRADE COM AUXILIAR DE DESCONTO EDITÁVEL */}
+      {/* MODAL DE UPGRADE COM OS 10 ITENS DO AUXILIAR DE DESCONTO */}
       {showUpgradeModal && (
         <div className="modal-backdrop" onClick={()=>setShowUpgradeModal(false)}>
-          <div className="modal" onClick={e=>e.stopPropagation()} style={{background: '#0f0f12', border: '1px solid #222', maxWidth: '480px'}}>
+          <div className="modal" onClick={e=>e.stopPropagation()} style={{background: '#0f0f12', border: '1px solid #222', maxWidth: '520px'}}>
             <div className="modal-head">
               <div><div className="eyebrow">AVALIAÇÃO DE UPGRADE</div><h2>Troque de Aparelho</h2></div>
               <button type="button" className="icon-btn" onClick={()=>setShowUpgradeModal(false)}><X size={19}/></button>
@@ -1400,12 +1427,12 @@ function App() {
 
             {upgradeStep === 1 ? (
               <div>
-                <p className="muted">Informe o seu modelo atual e tire uma foto do estado do aparelho.</p>
+                <p className="muted">Informe o seu modelo atual e marque o estado real do aparelho.</p>
                 <label style={{marginTop: '10px'}}>Modelo atual que você possui
-                  <input value={currentDevice} onChange={e=>setCurrentDevice(e.target.value)} placeholder="Ex: iPhone 13 Pro Max ou Xiaomi Note 13" required />
+                  <input value={currentDevice} onChange={e=>setCurrentDevice(e.target.value)} placeholder="Ex: iPhone 13 Pro Max ou Redmi Note 13" required />
                 </label>
 
-                {/* PAINEL DO AUXILIAR DE UPGRADE (SE ATIVADO PELO DONO DA LOJA) */}
+                {/* PAINEL DO AUXILIAR DE UPGRADE COMPLETO */}
                 {upgradeAssistantEnabled && (
                   <div style={{marginTop: '16px', background: '#121217', padding: '14px', borderRadius: '10px', border: '1px solid #26262e'}}>
                     <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px'}}>
@@ -1414,13 +1441,18 @@ function App() {
                       </span>
                     </div>
 
-                    <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                    <div style={{display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '240px', overflowY: 'auto', paddingRight: '4px'}}>
                       {[
                         { key: 'screenReplaced', label: 'Tela Trocada ou Trincada', val: upgradeDiscounts.screenReplaced },
                         { key: 'batteryReplaced', label: 'Bateria Trocada / Não Genuína', val: upgradeDiscounts.batteryReplaced },
-                        { key: 'faceIdOff', label: 'Face ID ou Biometria não funciona', val: upgradeDiscounts.faceIdOff },
-                        { key: 'housingScratched', label: 'Carcaça com arranhões / marcas', val: upgradeDiscounts.housingScratched },
+                        { key: 'faceIdOff', label: 'Face ID ou Biometria inoperante', val: upgradeDiscounts.faceIdOff },
+                        { key: 'cameraFailed', label: 'Câmera Principal ou Frontal com falha/trocada', val: upgradeDiscounts.cameraFailed },
                         { key: 'cameraLensScratched', label: 'Lente / Vidrinho da Câmera arranhado', val: upgradeDiscounts.cameraLensScratched },
+                        { key: 'chargingPortFailed', label: 'Conector / Dock de Carga com mau contato', val: upgradeDiscounts.chargingPortFailed },
+                        { key: 'audioSpeakerFailed', label: 'Alto-falante ou Auricular com falha/chiado', val: upgradeDiscounts.audioSpeakerFailed },
+                        { key: 'nfcFailed', label: 'NFC / Pagamento por Aproximação não funciona', val: upgradeDiscounts.nfcFailed },
+                        { key: 'wifiFailed', label: 'Wi-Fi ou Bluetooth inoperante', val: upgradeDiscounts.wifiFailed },
+                        { key: 'housingScratched', label: 'Carcaça ou Vidro Traseiro com marcas/arranhões', val: upgradeDiscounts.housingScratched },
                       ].map(item => (
                         <label key={item.key} style={{
                           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -1957,7 +1989,6 @@ function FinancePage({orders, commissionRate, setCommissionRate}) {
   </div>
 }
 
-// VITRINE DE ACESSÓRIOS DO CLIENTE COM SUPORTE A CARRINHO
 function ClientInventoryPage({inventory, storeName, cart, addToCart, onOpenCart}) {
   const totalCartItems = cart.reduce((acc, item) => acc + item.cartQty, 0);
 
@@ -2016,14 +2047,13 @@ function ClientInventoryPage({inventory, storeName, cart, addToCart, onOpenCart}
   </div>
 }
 
-// MODAL DE CHECKOUT DO CARRINHO (OPÇÃO 2: PIX, QR CODE, ENTREGA/RETIRADA E WHATSAPP)
 function CartModal({cart, onClose, onUpdateQty, onClear, pixKey, storeName, storeAddress, whatsappNumber, notify}) {
-  const [deliveryType, setDeliveryType] = useState('pickup'); // 'pickup' ou 'delivery'
+  const [deliveryType, setDeliveryType] = useState('pickup');
   const [customerName, setCustomerName] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [isThirdPartyPickup, setIsThirdPartyPickup] = useState(false);
   const [pickupPersonName, setPickupPersonName] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('pix'); // 'pix' ou 'card'
+  const [paymentMethod, setPaymentMethod] = useState('pix');
 
   const cartTotal = cart.reduce((acc, item) => acc + (Number(item.price) * item.cartQty), 0);
 
@@ -2085,7 +2115,6 @@ function CartModal({cart, onClose, onUpdateQty, onClear, pixKey, storeName, stor
           </div>
         ) : (
           <div>
-            {/* ITENS NO CARRINHO */}
             <div style={{maxHeight: '160px', overflowY: 'auto', marginBottom: '15px', borderBottom: '1px solid #222', paddingBottom: '10px'}}>
               {cart.map(item => (
                 <div key={item.id} style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '6px 0', fontSize: '13px'}}>
@@ -2105,12 +2134,10 @@ function CartModal({cart, onClose, onUpdateQty, onClear, pixKey, storeName, stor
               <span style={{color: '#25D366'}}>R$ {cartTotal.toFixed(2)}</span>
             </div>
 
-            {/* SEU NOME */}
             <label style={{marginBottom: '10px'}}>Seu Nome Completo
               <input value={customerName} onChange={e=>setCustomerName(e.target.value)} placeholder="Ex: Lucas Gabriel" required />
             </label>
 
-            {/* ESCOLHA: RETIRADA OU ENTREGA */}
             <div style={{display: 'flex', gap: '8px', marginBottom: '12px'}}>
               <button
                 type="button"
@@ -2157,7 +2184,6 @@ function CartModal({cart, onClose, onUpdateQty, onClear, pixKey, storeName, stor
               </div>
             )}
 
-            {/* FORMA DE PAGAMENTO */}
             <div style={{marginBottom: '15px'}}>
               <span style={{fontSize: '12px', color: '#aaa', display: 'block', marginBottom: '6px'}}>Forma de Pagamento:</span>
               <div style={{display: 'flex', gap: '8px'}}>
@@ -2594,7 +2620,7 @@ function SettingsPage({configured,email,storeName,setStoreName,storeLogo,onLogoU
     </div>
 
     <div className="settings-grid">
-      {/* CONFIGURAÇÃO DO AUXILIAR DE UPGRADE */}
+      {/* CONFIGURAÇÃO DO AUXILIAR DE UPGRADE COMPLETO COM OS 10 ITENS */}
       <section className="panel settings-panel" style={{background: '#0a0a0d', border: '1px solid #18181b', gridColumn: '1 / -1'}}>
         <div className="settings-title">
           <div className="settings-icon"><RefreshCw size={19}/></div>
@@ -2617,7 +2643,7 @@ function SettingsPage({configured,email,storeName,setStoreName,storeLogo,onLogoU
               Defina o valor em Reais (R$) a ser reduzido do celular do cliente para cada tipo de condição:
             </span>
 
-            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px'}}>
+            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px'}}>
               <div className="settings-row" style={{flexDirection: 'column', alignItems: 'flex-start', background: '#121217', padding: '10px', borderRadius: '8px'}}>
                 <span style={{fontSize: '12px'}}>Tela Trocada / Trincada</span>
                 <div style={{display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', width: '100%'}}>
@@ -2658,13 +2684,13 @@ function SettingsPage({configured,email,storeName,setStoreName,storeLogo,onLogoU
               </div>
 
               <div className="settings-row" style={{flexDirection: 'column', alignItems: 'flex-start', background: '#121217', padding: '10px', borderRadius: '8px'}}>
-                <span style={{fontSize: '12px'}}>Carcaça com Arranhões / Marcas</span>
+                <span style={{fontSize: '12px'}}>Câmera com Falha / Trocada</span>
                 <div style={{display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', width: '100%'}}>
                   <span style={{color: '#ef4444', fontWeight: 'bold'}}>- R$</span>
                   <input
                     type="number"
-                    value={upgradeDiscounts.housingScratched}
-                    onChange={e => setUpgradeDiscounts({...upgradeDiscounts, housingScratched: e.target.value})}
+                    value={upgradeDiscounts.cameraFailed}
+                    onChange={e => setUpgradeDiscounts({...upgradeDiscounts, cameraFailed: e.target.value})}
                     style={{background: '#000', color: '#fff', border: '1px solid #333', padding: '6px', borderRadius: '6px', width: '100%'}}
                   />
                 </div>
@@ -2678,6 +2704,71 @@ function SettingsPage({configured,email,storeName,setStoreName,storeLogo,onLogoU
                     type="number"
                     value={upgradeDiscounts.cameraLensScratched}
                     onChange={e => setUpgradeDiscounts({...upgradeDiscounts, cameraLensScratched: e.target.value})}
+                    style={{background: '#000', color: '#fff', border: '1px solid #333', padding: '6px', borderRadius: '6px', width: '100%'}}
+                  />
+                </div>
+              </div>
+
+              <div className="settings-row" style={{flexDirection: 'column', alignItems: 'flex-start', background: '#121217', padding: '10px', borderRadius: '8px'}}>
+                <span style={{fontSize: '12px'}}>Conector / Dock de Carga</span>
+                <div style={{display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', width: '100%'}}>
+                  <span style={{color: '#ef4444', fontWeight: 'bold'}}>- R$</span>
+                  <input
+                    type="number"
+                    value={upgradeDiscounts.chargingPortFailed}
+                    onChange={e => setUpgradeDiscounts({...upgradeDiscounts, chargingPortFailed: e.target.value})}
+                    style={{background: '#000', color: '#fff', border: '1px solid #333', padding: '6px', borderRadius: '6px', width: '100%'}}
+                  />
+                </div>
+              </div>
+
+              <div className="settings-row" style={{flexDirection: 'column', alignItems: 'flex-start', background: '#121217', padding: '10px', borderRadius: '8px'}}>
+                <span style={{fontSize: '12px'}}>Alto-falante / Auricular</span>
+                <div style={{display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', width: '100%'}}>
+                  <span style={{color: '#ef4444', fontWeight: 'bold'}}>- R$</span>
+                  <input
+                    type="number"
+                    value={upgradeDiscounts.audioSpeakerFailed}
+                    onChange={e => setUpgradeDiscounts({...upgradeDiscounts, audioSpeakerFailed: e.target.value})}
+                    style={{background: '#000', color: '#fff', border: '1px solid #333', padding: '6px', borderRadius: '6px', width: '100%'}}
+                  />
+                </div>
+              </div>
+
+              <div className="settings-row" style={{flexDirection: 'column', alignItems: 'flex-start', background: '#121217', padding: '10px', borderRadius: '8px'}}>
+                <span style={{fontSize: '12px'}}>NFC / Pagamento por Aproximação</span>
+                <div style={{display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', width: '100%'}}>
+                  <span style={{color: '#ef4444', fontWeight: 'bold'}}>- R$</span>
+                  <input
+                    type="number"
+                    value={upgradeDiscounts.nfcFailed}
+                    onChange={e => setUpgradeDiscounts({...upgradeDiscounts, nfcFailed: e.target.value})}
+                    style={{background: '#000', color: '#fff', border: '1px solid #333', padding: '6px', borderRadius: '6px', width: '100%'}}
+                  />
+                </div>
+              </div>
+
+              <div className="settings-row" style={{flexDirection: 'column', alignItems: 'flex-start', background: '#121217', padding: '10px', borderRadius: '8px'}}>
+                <span style={{fontSize: '12px'}}>Wi-Fi ou Bluetooth Inoperante</span>
+                <div style={{display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', width: '100%'}}>
+                  <span style={{color: '#ef4444', fontWeight: 'bold'}}>- R$</span>
+                  <input
+                    type="number"
+                    value={upgradeDiscounts.wifiFailed}
+                    onChange={e => setUpgradeDiscounts({...upgradeDiscounts, wifiFailed: e.target.value})}
+                    style={{background: '#000', color: '#fff', border: '1px solid #333', padding: '6px', borderRadius: '6px', width: '100%'}}
+                  />
+                </div>
+              </div>
+
+              <div className="settings-row" style={{flexDirection: 'column', alignItems: 'flex-start', background: '#121217', padding: '10px', borderRadius: '8px'}}>
+                <span style={{fontSize: '12px'}}>Carcaça / Vidro Traseiro com Marcas</span>
+                <div style={{display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', width: '100%'}}>
+                  <span style={{color: '#ef4444', fontWeight: 'bold'}}>- R$</span>
+                  <input
+                    type="number"
+                    value={upgradeDiscounts.housingScratched}
+                    onChange={e => setUpgradeDiscounts({...upgradeDiscounts, housingScratched: e.target.value})}
                     style={{background: '#000', color: '#fff', border: '1px solid #333', padding: '6px', borderRadius: '6px', width: '100%'}}
                   />
                 </div>
