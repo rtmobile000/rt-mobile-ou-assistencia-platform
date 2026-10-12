@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity, ArrowUpRight, Bell, Camera, Check, ChevronDown, CircleHelp,
   ClipboardList, Clock3, CreditCard, Gauge, LogOut, Menu, MessageCircle,
-  Plus, RefreshCw, Search, Settings, ShieldCheck, Smartphone, Sparkles, Store, Users, Wrench, X, Upload, PhoneCall, QrCode, Package, Sliders, Trash2, CheckSquare, Printer, Star, DollarSign, Send, Calendar, Clock, Lock, UserPlus, AlertTriangle, History, Wallet, MapPin, Copy, FileText, HeartHandshake, Key, CheckCircle2, XCircle, Eraser, ShoppingCart, Truck, UserCheck, CheckCircle
+  Plus, RefreshCw, Search, Settings, ShieldCheck, Smartphone, Sparkles, Store, Users, Wrench, X, Upload, PhoneCall, QrCode, Package, Sliders, Trash2, CheckSquare, Printer, Star, DollarSign, Send, Calendar, Clock, Lock, UserPlus, AlertTriangle, History, Wallet, MapPin, Copy, FileText, HeartHandshake, Key, CheckCircle2, XCircle, Eraser, ShoppingCart, Truck, UserCheck, CheckCircle, Image
 } from 'lucide-react';
 import { supabase, supabaseConfigured } from './lib/supabase';
 
@@ -82,7 +82,7 @@ function PatternDrawer({ value, onChange }) {
 
   const drawGrid = (ctx) => {
     ctx.fillStyle = '#0a0a0f';
-    ctx.fillRect(0, 160, 160, 160);
+    ctx.fillRect(0, 0, 160, 160);
     ctx.fillStyle = '#444';
     for (let r = 0; r < 3; r++) {
       for (let c = 0; c < 3; c++) {
@@ -664,6 +664,19 @@ function App() {
     }
   };
 
+  // Upload/captura da foto do celular no Upgrade
+  const handleUpgradePhotoUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCapturedPhoto(reader.result);
+        notify('Foto do aparelho anexada com sucesso!');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const updateProductQty = (id, delta) => {
     setInventory(prev => prev.map(p => {
       if (p.id === id) {
@@ -806,10 +819,13 @@ function App() {
       }
     }
 
+    const photoNote = capturedPhoto ? '\n📸 *Foto do aparelho:* Capturada pelo cliente no app' : '';
+
     const text = encodeURIComponent(
       `Olá! Gostaria de fazer uma simulação de *UPGRADE* na ${storeName}.\n\n` +
       `📱 *Aparelho atual:* ${currentDevice || 'Não especificado'}\n` +
       `✨ *Aparelho desejado:* ${targetDevice}` +
+      photoNote +
       defectDetails +
       `\n\nPodemos avaliar a diferença de valores final?`
     );
@@ -1416,7 +1432,7 @@ function App() {
         </div>
       )}
 
-      {/* MODAL DE UPGRADE COM OS 10 ITENS DO AUXILIAR DE DESCONTO */}
+      {/* MODAL DE UPGRADE COM FOTO (CÂMERA/GALERIA) + MODELO + 10 ITENS DE DESCONTO */}
       {showUpgradeModal && (
         <div className="modal-backdrop" onClick={()=>setShowUpgradeModal(false)}>
           <div className="modal" onClick={e=>e.stopPropagation()} style={{background: '#0f0f12', border: '1px solid #222', maxWidth: '520px'}}>
@@ -1427,21 +1443,63 @@ function App() {
 
             {upgradeStep === 1 ? (
               <div>
-                <p className="muted">Informe o seu modelo atual e marque o estado real do aparelho.</p>
+                <p className="muted">Informe seu aparelho, anexe/tire foto e marque o estado real para avaliação.</p>
+                
                 <label style={{marginTop: '10px'}}>Modelo atual que você possui
                   <input value={currentDevice} onChange={e=>setCurrentDevice(e.target.value)} placeholder="Ex: iPhone 13 Pro Max ou Redmi Note 13" required />
                 </label>
 
+                {/* BOTÃO E PREVIEW DA FOTO DO APARELHO (CÂMERA OU GALERIA) */}
+                <div style={{marginTop: '12px', background: '#121217', padding: '12px', borderRadius: '8px', border: '1px solid #26262e'}}>
+                  <span style={{fontSize: '12px', color: '#aaa', display: 'block', marginBottom: '8px'}}>
+                    📸 Foto do Aparelho Atual (Câmera ou Galeria):
+                  </span>
+
+                  {capturedPhoto ? (
+                    <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
+                      <div style={{width: '70px', height: '70px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #25D366'}}>
+                        <img src={capturedPhoto} alt="Foto do aparelho" style={{width: '100%', height: '100%', objectFit: 'cover'}}/>
+                      </div>
+                      <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
+                        <span style={{fontSize: '12px', color: '#25D366', fontWeight: 'bold'}}>✓ Foto anexada com sucesso</span>
+                        <button
+                          type="button"
+                          className="secondary-btn"
+                          onClick={() => setCapturedPhoto(null)}
+                          style={{fontSize: '11px', padding: '3px 8px', width: 'fit-content', color: '#ef4444', borderColor: '#ef4444'}}
+                        >
+                          <Trash2 size={12}/> Remover / Trocar Foto
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <label className="secondary-btn full-btn" style={{
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      gap: '8px', padding: '10px', background: '#1a1a22', border: '1px dashed #444', borderRadius: '8px'
+                    }}>
+                      <Camera size={18} color="#25D366"/>
+                      <span style={{fontSize: '13px', fontWeight: '500'}}>Tirar Foto ou Escolher da Galeria</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={handleUpgradePhotoUpload}
+                        style={{display: 'none'}}
+                      />
+                    </label>
+                  )}
+                </div>
+
                 {/* PAINEL DO AUXILIAR DE UPGRADE COMPLETO */}
                 {upgradeAssistantEnabled && (
-                  <div style={{marginTop: '16px', background: '#121217', padding: '14px', borderRadius: '10px', border: '1px solid #26262e'}}>
+                  <div style={{marginTop: '14px', background: '#121217', padding: '14px', borderRadius: '10px', border: '1px solid #26262e'}}>
                     <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px'}}>
                       <span style={{fontSize: '12px', fontWeight: 'bold', color: '#25D366'}}>
                         ⚡ Auxiliar de Avaliação: Marque se o seu aparelho tem:
                       </span>
                     </div>
 
-                    <div style={{display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '240px', overflowY: 'auto', paddingRight: '4px'}}>
+                    <div style={{display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '220px', overflowY: 'auto', paddingRight: '4px'}}>
                       {[
                         { key: 'screenReplaced', label: 'Tela Trocada ou Trincada', val: upgradeDiscounts.screenReplaced },
                         { key: 'batteryReplaced', label: 'Bateria Trocada / Não Genuína', val: upgradeDiscounts.batteryReplaced },
@@ -2620,7 +2678,6 @@ function SettingsPage({configured,email,storeName,setStoreName,storeLogo,onLogoU
     </div>
 
     <div className="settings-grid">
-      {/* CONFIGURAÇÃO DO AUXILIAR DE UPGRADE COMPLETO COM OS 10 ITENS */}
       <section className="panel settings-panel" style={{background: '#0a0a0d', border: '1px solid #18181b', gridColumn: '1 / -1'}}>
         <div className="settings-title">
           <div className="settings-icon"><RefreshCw size={19}/></div>
