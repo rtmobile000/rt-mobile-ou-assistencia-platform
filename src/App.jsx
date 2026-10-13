@@ -173,69 +173,7 @@ function PatternDrawer({ value, onChange }) {
   );
 }
 
-function BrandSplash({ onFinish }) {
-  const [fadingOut, setFadingOut] = useState(false);
-
-  useEffect(() => {
-    const tFade = setTimeout(() => setFadingOut(true), 1800);
-    const tEnd = setTimeout(() => onFinish(), 2200);
-    return () => { clearTimeout(tFade); clearTimeout(tEnd); };
-  }, [onFinish]);
-
-  return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 99999, background: '#000000',
-      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      opacity: fadingOut ? 0 : 1, transition: 'opacity 0.4s ease-out',
-      maxWidth: '100vw', overflow: 'hidden'
-    }}>
-      <div style={{
-        position: 'absolute', width: '320px', height: '320px', borderRadius: '50%',
-        background: 'radial-gradient(circle, #25D366 0%, transparent 70%)',
-        opacity: 0.18, filter: 'blur(50px)'
-      }} />
-
-      <div style={{
-        position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center',
-        animation: 'logoEntry 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards'
-      }}>
-        <div style={{
-          width: '84px', height: '84px', borderRadius: '18px', background: '#000000',
-          border: '1.5px solid #333', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 0 35px rgba(37, 211, 102, 0.25)', marginBottom: '16px'
-        }}>
-          <span style={{ fontSize: '34px', fontWeight: 900, color: '#ffffff', letterSpacing: '-1px' }}>
-            RT
-          </span>
-        </div>
-
-        <h1 style={{
-          fontSize: '26px', fontWeight: 900, color: '#ffffff', letterSpacing: '6px', margin: 0,
-          textShadow: '0 4px 15px rgba(0,0,0,0.8)'
-        }}>
-          RT MOBILE
-        </h1>
-        <span style={{
-          fontSize: '10px', color: '#25D366', letterSpacing: '3px', textTransform: 'uppercase',
-          fontWeight: 700, marginTop: '8px'
-        }}>
-          SISTEMA DE GESTÃO PROFISSIONAL
-        </span>
-      </div>
-
-      <style>{`
-        @keyframes logoEntry {
-          0% { opacity: 0; transform: scale(0.85); }
-          50% { opacity: 1; }
-          100% { opacity: 1; transform: scale(1); }
-        }
-      `}</style>
-    </div>
-  );
-}
-
 function App() {
-  const [showSplash, setShowSplash] = useState(() => !sessionStorage.getItem('rt_splash_shown'));
   const [userRole, setUserRole] = useState(() => localStorage.getItem('rt_user_role') || 'client');
   const [userAccessLevel, setUserAccessLevel] = useState('owner');
   const [active, setActive] = useState(() => userRole === 'tech' ? 'overview' : 'stores_directory');
@@ -265,22 +203,22 @@ function App() {
   const [mapsUrl, setMapsUrl] = useState('https://maps.google.com');
   const [techCommissionRate, setTechCommissionRate] = useState(10);
 
-  // Auxiliar de Upgrade (Configurações com os 10 itens completos)
+  // Auxiliar de Upgrade (Configurações)
   const [upgradeAssistantEnabled, setUpgradeAssistantEnabled] = useState(true);
   const [upgradeDiscounts, setUpgradeDiscounts] = useState({
-    screenReplaced: 200,      // Tela trocada/trincada
-    batteryReplaced: 100,     // Bateria não original/trocada
-    faceIdOff: 250,           // Face ID / Biometria inoperante
-    cameraFailed: 200,        // Câmera principal ou frontal com defeito/trocada
-    cameraLensScratched: 80,  // Lente/vidrinho da câmera arranhado
-    chargingPortFailed: 120,  // Conector / Dock de Carga com mau contato
-    audioSpeakerFailed: 90,   // Alto-falante ou Auricular chiando/sem som
-    nfcFailed: 110,           // NFC / Pagamento por aproximação não funciona
-    wifiFailed: 180,          // Wi-Fi ou Bluetooth inoperante
-    housingScratched: 90,     // Carcaça ou Vidro Traseiro arranhado/trincado
+    screenReplaced: 200,
+    batteryReplaced: 100,
+    faceIdOff: 250,
+    cameraFailed: 200,
+    cameraLensScratched: 80,
+    chargingPortFailed: 120,
+    audioSpeakerFailed: 90,
+    nfcFailed: 110,
+    wifiFailed: 180,
+    housingScratched: 90,
   });
 
-  // Carrinho de Acessórios do Cliente
+  // Carrinho de Acessórios
   const [cart, setCart] = useState([]);
   const [showCartModal, setShowCartModal] = useState(false);
 
@@ -346,7 +284,6 @@ function App() {
   const [targetDevice, setTargetDevice] = useState(seminovosList[0]);
   const [capturedPhoto, setCapturedPhoto] = useState(null);
 
-  // Estado dos 10 defeitos selecionados pelo cliente
   const [selectedDefects, setSelectedDefects] = useState({
     screenReplaced: false,
     batteryReplaced: false,
@@ -891,16 +828,16 @@ function App() {
 
   return (
     <>
-      {/* TRAVA DEFINITIVA DE ARRASTO LATERAL NO CELULAR */}
+      {/* BLOQUEIO TOTAL E DEFINITIVO DE DESLIZE LATERAL NO CELULAR */}
       <style>{`
         html, body, #root {
           max-width: 100vw !important;
           overflow-x: hidden !important;
           margin: 0 !important;
           padding: 0 !important;
-          position: relative !important;
           width: 100% !important;
           box-sizing: border-box !important;
+          touch-action: pan-y !important;
         }
         *, *::before, *::after {
           box-sizing: border-box !important;
@@ -915,12 +852,7 @@ function App() {
         }
       `}</style>
 
-      {showSplash ? (
-        <BrandSplash onFinish={() => {
-          setShowSplash(false);
-          sessionStorage.setItem('rt_splash_shown', 'true');
-        }} />
-      ) : !authChecked ? (
+      {!authChecked ? (
         <div className="loading-screen" style={{background: '#050505'}}><div className="brand-mark"><Smartphone size={22}/></div><span>Iniciando ambiente seguro...</span></div>
       ) : supabaseConfigured && !session ? (
         <div className="auth-shell" style={{background: '#050505'}}>
@@ -1299,11 +1231,11 @@ function App() {
                   <div style={{margin: '6px 0', background: '#eee', padding: '6px', borderRadius: '4px'}}>
                     <p style={{margin: 0}}><strong>🔑 SENHA:</strong> {showPrintModal.devicePassword || 'Sem Senha'}</p>
                     {showPrintModal.patternDrawing && (
-                      <div style={{marginTop: '6px', textAlign: 'center'}}>
-                        <span style={{fontSize: '10px', display: 'block', color: '#555', marginBottom: '4px'}}>PADRÃO DE DESENHO:</span>
-                        <img src={showPrintModal.patternDrawing} alt="Padrão" style={{width: '90px', height: '90px', border: '1px solid #000', background: '#000', borderRadius: '4px'}}/>
-                      </div>
-                    )}
+                  <div style={{marginTop: '6px', textAlign: 'center'}}>
+                    <span style={{fontSize: '10px', display: 'block', color: '#555', marginBottom: '4px'}}>PADRÃO DE DESENHO:</span>
+                    <img src={showPrintModal.patternDrawing} alt="Padrão" style={{width: '90px', height: '90px', border: '1px solid #000', background: '#000', borderRadius: '4px'}}/>
+                  </div>
+                )}
                   </div>
 
                   <p style={{margin: '4px 0'}}><strong>DEFEITO:</strong> {showPrintModal.issue}</p>
