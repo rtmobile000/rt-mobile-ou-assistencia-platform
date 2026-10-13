@@ -2,42 +2,176 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity, ArrowUpRight, Bell, Camera, Check, ChevronDown, CircleHelp,
   ClipboardList, Clock3, CreditCard, Gauge, LogOut, Menu, MessageCircle,
-  Plus, RefreshCw, Search, Settings, ShieldCheck, Sparkles, Store, Users, Wrench, X, Upload, PhoneCall, QrCode, Package, Sliders, Trash2, CheckSquare, Printer, Star, DollarSign, Send, Calendar, Clock, Lock, UserPlus, AlertTriangle, History, Wallet, MapPin, Copy, FileText, HeartHandshake, Key, CheckCircle2, XCircle, ShoppingCart, Truck, UserCheck, CheckCircle, Scissors
+  Plus, RefreshCw, Search, Settings, ShieldCheck, Smartphone, Sparkles, Store, Users, Wrench, X, Upload, PhoneCall, QrCode, Package, Sliders, Trash2, CheckSquare, Printer, Star, DollarSign, Send, Calendar, Clock, Lock, UserPlus, AlertTriangle, History, Wallet, MapPin, Copy, FileText, HeartHandshake, Key, CheckCircle2, XCircle, Eraser, ShoppingCart, Truck, UserCheck, CheckCircle
 } from 'lucide-react';
 import { supabase, supabaseConfigured } from './lib/supabase';
 
 const ADMIN_EMAIL = 'roberthaelley75@gmail.com';
 
-const servicesList = [
-  { name: 'Corte Degradê / Fade', defaultPrice: '35.00', duration: '40 min' },
-  { name: 'Corte Social / Clássico', defaultPrice: '30.00', duration: '30 min' },
-  { name: 'Barba Completa / Modelada', defaultPrice: '25.00', duration: '30 min' },
-  { name: 'Combo Cabelo + Barba', defaultPrice: '55.00', duration: '60 min' },
-  { name: 'Barboterapia com Toalha Quente', defaultPrice: '35.00', duration: '40 min' },
-  { name: 'Design de Sobrancelha na Navalha', defaultPrice: '15.00', duration: '15 min' },
-  { name: 'Pigmentação Cabelo / Barba', defaultPrice: '25.00', duration: '30 min' },
-  { name: 'Platinado / Nevou', defaultPrice: '120.00', duration: '120 min' },
-  { name: 'Selagem / Alinhamento Capilar', defaultPrice: '80.00', duration: '60 min' },
-  { name: 'Pezinho / Acabamento', defaultPrice: '15.00', duration: '15 min' },
+const seminovosList = [
+  'iPhone 11', 'iPhone 11 Pro', 'iPhone 11 Pro Max',
+  'iPhone 12', 'iPhone 12 Pro', 'iPhone 12 Pro Max',
+  'iPhone 13', 'iPhone 13 Pro', 'iPhone 13 Pro Max',
+  'iPhone 14', 'iPhone 14 Plus', 'iPhone 14 Pro', 'iPhone 14 Pro Max',
+  'iPhone 15', 'iPhone 15 Plus', 'iPhone 15 Pro', 'iPhone 15 Pro Max',
+  'iPhone 16', 'iPhone 16 Plus', 'iPhone 16 Pro', 'iPhone 16 Pro Max',
 ];
+
+const lacradosList = [
+  'iPhone 13', 'iPhone 13 Pro', 'iPhone 13 Pro Max',
+  'iPhone 14', 'iPhone 14 Pro', 'iPhone 14 Pro Max',
+  'iPhone 15', 'iPhone 15 Pro', 'iPhone 15 Pro Max',
+  'iPhone 16', 'iPhone 16 Pro', 'iPhone 16 Pro Max',
+  'iPhone 17', 'iPhone 17 Pro', 'iPhone 17 Pro Max',
+  'iPhone 18', 'iPhone 18 Pro', 'iPhone 18 Pro Max',
+];
+
+const xiaomiList = [
+  'Redmi A5 4G', 'Redmi 15 4G', 'Redmi 15C 4G',
+  'Redmi Note 15 Pro 5G', 'Redmi Note 15 Pro Plus 5G',
+  'Redmi 17 4G', 'Redmi Note 17 4G',
+  'Poco C71 4G', 'Poco C81 Pro 4G',
+  'Poco X7 Pro 5G', 'Poco X8 Pro 5G', 'Poco X8 Pro Max 5G',
+  'Poco F9 Pro 5G', 'Xiaomi 14 Ultra', 'Xiaomi 15 Pro'
+];
+
+const realmeList = [
+  'Realme Note 70 4G', 'Realme C75 5G', 'Realme C85 4G NFC'
+];
+
+const imgSeminovo = 'https://images.unsplash.com/photo-1510557880182-3d4d3cba35a5?w=300&auto=format&fit=crop&q=80';
+const imgLacrado = 'https://images.unsplash.com/photo-1592750475338-74b7b21085ab?w=300&auto=format&fit=crop&q=80';
+const imgXiaomi = 'https://images.unsplash.com/photo-1598327105666-5b89351aff97?w=300&auto=format&fit=crop&q=80';
+const imgRealme = 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=300&auto=format&fit=crop&q=80';
 
 const adminWhatsapp = '5591989117332';
 const adminPixKey = '91989117332';
 
+const defaultChecklist = {
+  screen: 'ok',
+  faceId: 'ok',
+  cameras: 'ok',
+  charging: 'ok',
+  audio: 'ok',
+  wifi: 'ok',
+  housing: 'ok',
+};
+
 const statusClass = (status) => ({
-  'Em atendimento': 'blue',
-  'Aguardando pagamento': 'amber',
-  'Agendado': 'violet',
-  'Finalizado': 'green',
-  'Cancelado': 'neutral',
+  'Em manutenção': 'blue',
+  'Aguardando peça': 'amber',
+  'Em diagnóstico': 'violet',
+  'Pronto para retirada': 'green',
+  'Recebido': 'neutral',
+  'Aguardando aprovação': 'amber',
+  'Entregue': 'green',
 }[status] || 'neutral');
 
-const appointmentSteps = [
-  'Agendado',
-  'Em atendimento',
-  'Aguardando pagamento',
-  'Finalizado'
+const orderSteps = [
+  'Recebido',
+  'Em diagnóstico',
+  'Aguardando peça',
+  'Em manutenção',
+  'Pronto para retirada',
+  'Entregue'
 ];
+
+function PatternDrawer({ value, onChange }) {
+  const canvasRef = useRef(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+
+  const drawGrid = (ctx) => {
+    ctx.fillStyle = '#0a0a0f';
+    ctx.fillRect(0, 0, 160, 160);
+    ctx.fillStyle = '#444';
+    for (let r = 0; r < 3; r++) {
+      for (let c = 0; c < 3; c++) {
+        ctx.beginPath();
+        ctx.arc(30 + c * 50, 30 + r * 50, 6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  };
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (value) {
+      const img = new Image();
+      img.onload = () => ctx.drawImage(img, 0, 0);
+      img.src = value;
+    } else {
+      drawGrid(ctx);
+    }
+  }, [value]);
+
+  const startDraw = (e) => {
+    e.preventDefault();
+    setIsDrawing(true);
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+    const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+    ctx.strokeStyle = '#25D366';
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(clientX - rect.left, clientY - rect.top);
+  };
+
+  const draw = (e) => {
+    if (!isDrawing) return;
+    e.preventDefault();
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+    const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+    ctx.lineTo(clientX - rect.left, clientY - rect.top);
+    ctx.stroke();
+  };
+
+  const endDraw = (e) => {
+    if (!isDrawing) return;
+    e.preventDefault();
+    setIsDrawing(false);
+    const canvas = canvasRef.current;
+    onChange(canvas.toDataURL());
+  };
+
+  const clear = (e) => {
+    e.preventDefault();
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    drawGrid(ctx);
+    onChange('');
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+      <div style={{ position: 'relative', border: '1px solid #333', borderRadius: '10px', overflow: 'hidden', width: '160px', height: '160px', touchAction: 'none' }}>
+        <canvas
+          ref={canvasRef}
+          width={160}
+          height={160}
+          onMouseDown={startDraw}
+          onMouseMove={draw}
+          onMouseUp={endDraw}
+          onTouchStart={startDraw}
+          onTouchMove={draw}
+          onTouchEnd={endDraw}
+          style={{ cursor: 'crosshair', display: 'block' }}
+        />
+      </div>
+      <button type="button" onClick={clear} className="secondary-btn" style={{ fontSize: '11px', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+        <Eraser size={12}/> Limpar Padrão
+      </button>
+    </div>
+  );
+}
 
 function BrandSplash({ onFinish }) {
   const [fadingOut, setFadingOut] = useState(false);
@@ -52,7 +186,8 @@ function BrandSplash({ onFinish }) {
     <div style={{
       position: 'fixed', inset: 0, zIndex: 99999, background: '#000000',
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      opacity: fadingOut ? 0 : 1, transition: 'opacity 0.4s ease-out'
+      opacity: fadingOut ? 0 : 1, transition: 'opacity 0.4s ease-out',
+      maxWidth: '100vw', overflow: 'hidden'
     }}>
       <div style={{
         position: 'absolute', width: '320px', height: '320px', borderRadius: '50%',
@@ -69,20 +204,22 @@ function BrandSplash({ onFinish }) {
           border: '1.5px solid #333', display: 'flex', alignItems: 'center', justifyContent: 'center',
           boxShadow: '0 0 35px rgba(37, 211, 102, 0.25)', marginBottom: '16px'
         }}>
-          <Scissors size={38} color="#25D366" />
+          <span style={{ fontSize: '34px', fontWeight: 900, color: '#ffffff', letterSpacing: '-1px' }}>
+            RT
+          </span>
         </div>
 
         <h1 style={{
           fontSize: '26px', fontWeight: 900, color: '#ffffff', letterSpacing: '6px', margin: 0,
           textShadow: '0 4px 15px rgba(0,0,0,0.8)'
         }}>
-          RT BARBER
+          RT MOBILE
         </h1>
         <span style={{
           fontSize: '10px', color: '#25D366', letterSpacing: '3px', textTransform: 'uppercase',
           fontWeight: 700, marginTop: '8px'
         }}>
-          SISTEMA DE GESTÃO PARA BARBEARIAS
+          SISTEMA DE GESTÃO PROFISSIONAL
         </span>
       </div>
 
@@ -98,14 +235,14 @@ function BrandSplash({ onFinish }) {
 }
 
 function App() {
-  const [showSplash, setShowSplash] = useState(() => !sessionStorage.getItem('rt_barber_splash'));
-  const [userRole, setUserRole] = useState(() => localStorage.getItem('rt_barber_role') || 'client');
+  const [showSplash, setShowSplash] = useState(() => !sessionStorage.getItem('rt_splash_shown'));
+  const [userRole, setUserRole] = useState(() => localStorage.getItem('rt_user_role') || 'client');
   const [userAccessLevel, setUserAccessLevel] = useState('owner');
-  const [active, setActive] = useState(() => userRole === 'barber' ? 'overview' : 'stores_directory');
+  const [active, setActive] = useState(() => userRole === 'tech' ? 'overview' : 'stores_directory');
 
   const [modules, setModules] = useState({
-    appointments: true,
-    services: true,
+    orders: true,
+    iphones: true,
     inventory: true,
     finance: true,
     cashRegister: true,
@@ -119,34 +256,49 @@ function App() {
   const [isAccountExpired, setIsAccountExpired] = useState(false);
   const [expiredReason, setExpiredReason] = useState('trial');
 
-  // Configurações da Barbearia
-  const [storeName, setStoreName] = useState('BARBEARIA RT');
+  // Configurações da Loja
+  const [storeName, setStoreName] = useState('RT MOBILE');
   const [storeLogo, setStoreLogo] = useState(null);
   const [whatsappNumber, setWhatsappNumber] = useState('5591989117332');
   const [pixKey, setPixKey] = useState('91989117332');
   const [storeAddress, setStoreAddress] = useState('Santa Izabel do Pará - PA');
   const [mapsUrl, setMapsUrl] = useState('https://maps.google.com');
-  const [barberCommissionRate, setBarberCommissionRate] = useState(50); // 50% padrão de barbearia
+  const [techCommissionRate, setTechCommissionRate] = useState(10);
 
-  // Carrinho de Produtos do Cliente (Pomadas, Shampoos, Cervejas, etc.)
+  // Auxiliar de Upgrade (Configurações com os 10 itens completos)
+  const [upgradeAssistantEnabled, setUpgradeAssistantEnabled] = useState(true);
+  const [upgradeDiscounts, setUpgradeDiscounts] = useState({
+    screenReplaced: 200,      // Tela trocada/trincada
+    batteryReplaced: 100,     // Bateria não original/trocada
+    faceIdOff: 250,           // Face ID / Biometria inoperante
+    cameraFailed: 200,        // Câmera principal ou frontal com defeito/trocada
+    cameraLensScratched: 80,  // Lente/vidrinho da câmera arranhado
+    chargingPortFailed: 120,  // Conector / Dock de Carga com mau contato
+    audioSpeakerFailed: 90,   // Alto-falante ou Auricular chiando/sem som
+    nfcFailed: 110,           // NFC / Pagamento por aproximação não funciona
+    wifiFailed: 180,          // Wi-Fi ou Bluetooth inoperante
+    housingScratched: 90,     // Carcaça ou Vidro Traseiro arranhado/trincado
+  });
+
+  // Carrinho de Acessórios do Cliente
   const [cart, setCart] = useState([]);
   const [showCartModal, setShowCartModal] = useState(false);
 
-  // Caixa da Barbearia
+  // Caixa da Loja
   const [cashRegister, setCashRegister] = useState({
     isOpen: true,
     openingBalance: 0.00,
     entries: []
   });
 
-  // Equipe de Barbeiros
+  // Equipe
   const [teamMembers, setTeamMembers] = useState([]);
 
   // Auditoria
   const [auditLogs, setAuditLogs] = useState([]);
 
   const addAuditLog = (action) => {
-    const logUser = userAccessLevel === 'owner' ? 'Dono (Admin)' : 'Barbeiro (Equipe)';
+    const logUser = userAccessLevel === 'owner' ? 'Dono (Admin)' : 'Técnico (Bancada)';
     const newLog = {
       id: String(Date.now()),
       action,
@@ -158,16 +310,10 @@ function App() {
 
   const [orders, setOrders] = useState([]);
   const [customers, setCustomers] = useState([]);
-  const [inventory, setInventory] = useState([
-    { id: '1', name: 'Pomada Modeladora Efeito Matte', category: 'Finalizadores', price: '35.00', qty: 12, photo: null },
-    { id: '2', name: 'Óleo para Barba Hidratante 30ml', category: 'Cuidados com a Barba', price: '40.00', qty: 8, photo: null },
-    { id: '3', name: 'Balm Modelador de Barba', category: 'Cuidados com a Barba', price: '38.00', qty: 6, photo: null },
-    { id: '4', name: 'Shampoo Anticaspa Mentolado', category: 'Cabelo', price: '45.00', qty: 5, photo: null },
-    { id: '5', name: 'Cerveja Artesanal Long Neck', category: 'Bebidas & Bar', price: '12.00', qty: 24, photo: null }
-  ]);
+  const [inventory, setInventory] = useState([]);
 
   const [allStores, setAllStores] = useState([
-    { id: '1', name: 'BARBEARIA RT', phone: '5591989117332', status: 'active', desc: 'Cortes Clássicos, Degradê, Barboterapia & Bar', address: 'Santa Izabel do Pará - PA', rating: 5.0, reviewsCount: 38 }
+    { id: '1', name: 'RT MOBILE', phone: '5591989117332', status: 'active', desc: 'Especialista Apple, Xiaomi & Multimarcas', address: 'Santa Izabel do Pará - PA', rating: 5.0, reviewsCount: 1 }
   ]);
 
   const activeStores = useMemo(() => allStores.filter(s => s.status === 'active'), [allStores]);
@@ -177,6 +323,7 @@ function App() {
   const [showNewCustomer, setShowNewCustomer] = useState(false);
   const [showNewProduct, setShowNewProduct] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showChecklistModal, setShowChecklistModal] = useState(null);
   const [showPrintModal, setShowPrintModal] = useState(null);
   const [showQuoteModal, setShowQuoteModal] = useState(null);
   const [showCashTransactionModal, setShowCashTransactionModal] = useState(false);
@@ -192,40 +339,61 @@ function App() {
   const [authError, setAuthError] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const [cashTx, setCashTx] = useState({ type: 'in', description: '', amount: '' });
-  const [newMember, setNewMember] = useState({ name: '', email: '', role: 'barber' });
+  // Modal de Upgrade
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [upgradeStep, setUpgradeStep] = useState(1);
+  const [currentDevice, setCurrentDevice] = useState('');
+  const [targetDevice, setTargetDevice] = useState(seminovosList[0]);
+  const [capturedPhoto, setCapturedPhoto] = useState(null);
 
-  // Novo Agendamento / Comanda
+  // Estado dos 10 defeitos selecionados pelo cliente
+  const [selectedDefects, setSelectedDefects] = useState({
+    screenReplaced: false,
+    batteryReplaced: false,
+    faceIdOff: false,
+    cameraFailed: false,
+    cameraLensScratched: false,
+    chargingPortFailed: false,
+    audioSpeakerFailed: false,
+    nfcFailed: false,
+    wifiFailed: false,
+    housingScratched: false,
+  });
+
+  const [cashTx, setCashTx] = useState({ type: 'in', description: '', amount: '' });
+  const [newMember, setNewMember] = useState({ name: '', email: '', role: 'technician' });
+
+  const [passwordType, setPasswordType] = useState('text');
   const [newOrder, setNewOrder] = useState({
-    customer: '', service: servicesList[0].name, barberName: 'Qualquer Barbeiro', scheduledDate: new Date().toISOString().split('T')[0],
-    scheduledTime: '14:00', phone: '', status: 'Agendado', amount: servicesList[0].defaultPrice, costProduct: '0.00', notes: ''
+    customer: '', device: 'iPhone 13', devicePassword: '', patternDrawing: '', issue: '', phone: '', status: 'Recebido', amount: '', partCost: '0.00', warrantyDays: 90,
+    checklist: { ...defaultChecklist }
   });
   const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', email: '' });
-  const [newProduct, setNewProduct] = useState({ name: '', category: 'Finalizadores', price: '', qty: '1', photo: null });
+  const [newProduct, setNewProduct] = useState({ name: '', category: 'Capas', price: '', qty: '1', photo: null });
 
   const isSuperAdmin = useMemo(() => {
     return session?.user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
   }, [session]);
 
-  const navBarber = useMemo(() => {
-    const list = [{ id: 'overview', label: 'Visão Geral', icon: Gauge }];
-    if (modules.appointments) list.push({ id: 'appointments', label: 'Agendamentos & Comandas', icon: Calendar });
+  const navTech = useMemo(() => {
+    const list = [{ id: 'overview', label: 'Visão geral', icon: Gauge }];
+    if (modules.orders) list.push({ id: 'orders', label: 'Ordens de serviço', icon: ClipboardList });
     list.push({ id: 'customers', label: 'Clientes', icon: Users });
-    if (modules.crm) list.push({ id: 'crm', label: 'Pós-Atendimento & Retorno', icon: HeartHandshake });
-    if (modules.cashRegister) list.push({ id: 'cash', label: 'Caixa do Balcão', icon: Wallet });
-    if (modules.inventory) list.push({ id: 'inventory', label: 'Estoque de Produtos', icon: Package });
-    if (modules.services) list.push({ id: 'services_menu', label: 'Cardápio de Serviços', icon: Scissors });
+    if (modules.crm) list.push({ id: 'crm', label: 'Pós-Venda & Cuidado', icon: HeartHandshake });
+    if (modules.cashRegister) list.push({ id: 'cash', label: 'Caixa da Loja', icon: Wallet });
+    if (modules.inventory) list.push({ id: 'inventory', label: 'Estoque de Acessórios', icon: Package });
+    if (modules.iphones) list.push({ id: 'store', label: 'Comprar & Upgrade', icon: Smartphone });
     if (modules.finance && userAccessLevel === 'owner') list.push({ id: 'finance', label: 'Financeiro & Comissões', icon: DollarSign });
-    list.push({ id: 'payments', label: 'Pix & Pagamentos', icon: CreditCard });
+    list.push({ id: 'payments', label: 'Pagamentos & Pix', icon: CreditCard });
     list.push({ id: 'settings', label: 'Configurações', icon: Settings });
     return list;
   }, [modules, userAccessLevel]);
 
   const navClient = useMemo(() => {
-    const list = [{ id: 'stores_directory', label: 'Barbearias Disponíveis', icon: Store }];
-    if (modules.services) list.push({ id: 'client_services', label: 'Serviços & Preços', icon: Scissors });
-    if (modules.inventory) list.push({ id: 'client_inventory', label: 'Produtos da Barbearia', icon: Package });
-    if (modules.appointments) list.push({ id: 'track', label: 'Consultar Agendamento', icon: Search });
+    const list = [{ id: 'stores_directory', label: 'Buscar Lojas Ativas', icon: Store }];
+    if (modules.iphones) list.push({ id: 'store', label: 'Vitrine de Aparelhos', icon: Smartphone });
+    if (modules.inventory) list.push({ id: 'client_inventory', label: 'Acessórios', icon: Package });
+    if (modules.orders) list.push({ id: 'track', label: 'Rastreio de OS', icon: Search });
     return list;
   }, [modules]);
 
@@ -239,7 +407,7 @@ function App() {
       setSession(nextSession);
       if (!nextSession) {
         setUserRole('client');
-        localStorage.setItem('rt_barber_role', 'client');
+        localStorage.setItem('rt_user_role', 'client');
       }
     });
     return () => listener.subscription.unsubscribe();
@@ -261,8 +429,8 @@ function App() {
       .eq('owner_user_id', session.user.id)
       .limit(1);
 
-    if ((!orgData || orgData.length === 0) && userRole === 'barber' && !isOwnerByEmail) {
-      const defaultName = `Barbearia ${session.user.email.split('@')[0].toUpperCase()}`;
+    if ((!orgData || orgData.length === 0) && userRole === 'tech' && !isOwnerByEmail) {
+      const defaultName = `Loja ${session.user.email.split('@')[0].toUpperCase()}`;
       const { data: createdOrg } = await supabase.from('organizations').insert({
         owner_user_id: session.user.id,
         Nome: defaultName,
@@ -332,33 +500,37 @@ function App() {
     }
 
     const { data: oData } = await supabase.from('repair_orders')
-      .select('*')
+      .select('id, order_number, customer_name, customer_phone, device_brand, device_model, issue_description, status, total_amount, created_at')
       .order('created_at', { ascending: false }).limit(50);
     if (oData) {
       setOrders(oData.map((o) => ({
         rawId: o.id,
-        id: o.order_number || `CMD-${String(o.id).slice(0, 5)}`,
+        id: o.order_number || `OS-${String(o.id).slice(0, 6)}`,
         customer: o.customer_name,
         phone: o.customer_phone || '',
-        service: o.device_model || 'Corte Degradê',
-        barberName: o.device_brand || 'Barbeiro da Casa',
-        notes: o.issue_description || '',
-        status: o.status === 'Recebido' ? 'Agendado' : (o.status === 'Pronto para retirada' ? 'Aguardando pagamento' : o.status),
-        amount: o.total_amount ? `R$ ${Number(o.total_amount).toFixed(2)}` : 'R$ 35.00',
-        costProduct: '0.00',
+        device: [o.device_brand, o.device_model].filter(Boolean).join(' '),
+        devicePassword: 'Sem senha',
+        patternDrawing: '',
+        issue: o.issue_description || 'Sem descrição',
+        status: o.status,
+        amount: o.total_amount ? `R$ ${Number(o.total_amount).toFixed(2)}` : 'R$ 0.00',
+        partCost: '0.00',
+        warrantyDays: 90,
         time: new Date(o.created_at).toLocaleDateString('pt-BR'),
-        color: statusClass(o.status)
+        createdAt: o.created_at,
+        color: statusClass(o.status),
+        checklist: { ...defaultChecklist }
       })));
     }
 
-    const { data: cData } = await supabase.from('customers').select('*').order('name', { ascending: true });
+    const { data: cData } = await supabase.from('customers').select('id, name, phone, email, created_at').order('name', { ascending: true });
     if (cData) setCustomers(cData);
   };
 
   useEffect(() => { fetchData(); }, [session]);
 
   const filteredOrders = useMemo(() => orders.filter((o) =>
-    [o.id, o.customer, o.service, o.barberName, o.status].join(' ').toLowerCase().includes(search.toLowerCase())
+    [o.id, o.customer, o.device, o.issue, o.status].join(' ').toLowerCase().includes(search.toLowerCase())
   ), [orders, search]);
 
   const notify = (message) => { setToast(message); window.setTimeout(() => setToast(''), 3000); };
@@ -372,9 +544,9 @@ function App() {
         : await supabase.auth.signUp({ email, password });
       if (result.error) throw result.error;
 
-      localStorage.setItem('rt_barber_role', userRole);
+      localStorage.setItem('rt_user_role', userRole);
 
-      if (userRole === 'barber') {
+      if (userRole === 'tech') {
         setActive('overview');
       } else {
         setActive('stores_directory');
@@ -385,12 +557,12 @@ function App() {
 
   async function handleCreateOrder(e) {
     e.preventDefault();
-    if (!newOrder.customer.trim() || !newOrder.service.trim()) {
-      notify('Preencha o cliente e o serviço.'); return;
+    if (!newOrder.customer.trim() || !newOrder.device.trim() || !newOrder.issue.trim()) {
+      notify('Preencha cliente, aparelho e defeito.'); return;
     }
     setSaving(true);
     try {
-      const generatedId = `CMD-${Math.floor(1000 + Math.random() * 9000)}`;
+      const generatedId = `OS-${Math.floor(1000 + Math.random() * 9000)}`;
       if (supabaseConfigured && session) {
         const { data: memberships } = await supabase.from('organization_members').select('organization_id').eq('user_id', session.user.id).limit(1);
         const orgId = memberships?.[0]?.organization_id;
@@ -399,11 +571,11 @@ function App() {
           created_by: session.user.id,
           customer_name: newOrder.customer.trim(),
           customer_phone: newOrder.phone.trim() || null,
-          device_brand: newOrder.barberName.trim(),
-          device_model: newOrder.service.trim(),
-          issue_description: `${newOrder.scheduledDate} às ${newOrder.scheduledTime} - ${newOrder.notes}`,
+          device_brand: newOrder.device.toLowerCase().includes('iphone') ? 'Apple' : 'Outro',
+          device_model: newOrder.device.trim(),
+          issue_description: newOrder.issue.trim(),
           status: newOrder.status,
-          total_amount: newOrder.amount ? parseFloat(String(newOrder.amount).replace(',', '.')) : 35.00
+          total_amount: newOrder.amount ? parseFloat(newOrder.amount.replace(',', '.')) : 0.00
         });
         if (error) throw error;
         await fetchData();
@@ -413,27 +585,28 @@ function App() {
           id: generatedId,
           customer: newOrder.customer.trim(),
           phone: newOrder.phone.trim(),
-          service: newOrder.service.trim(),
-          barberName: newOrder.barberName.trim(),
-          notes: `${newOrder.scheduledDate} às ${newOrder.scheduledTime} - ${newOrder.notes}`,
+          device: newOrder.device.trim(),
+          devicePassword: passwordType === 'pattern' ? 'Padrão Desenho' : (newOrder.devicePassword.trim() || 'Sem Senha'),
+          patternDrawing: passwordType === 'pattern' ? newOrder.patternDrawing : '',
+          issue: newOrder.issue.trim(),
           status: newOrder.status,
-          amount: newOrder.amount ? `R$ ${parseFloat(String(newOrder.amount).replace(',', '.')).toFixed(2)}` : 'R$ 35.00',
-          costProduct: newOrder.costProduct ? parseFloat(String(newOrder.costProduct).replace(',', '.')).toFixed(2) : '0.00',
+          amount: newOrder.amount ? `R$ ${parseFloat(newOrder.amount.replace(',', '.')).toFixed(2)}` : 'R$ 0.00',
+          partCost: newOrder.partCost ? parseFloat(newOrder.partCost.replace(',', '.')).toFixed(2) : '0.00',
+          warrantyDays: parseInt(newOrder.warrantyDays) || 90,
           time: new Date().toLocaleDateString('pt-BR'),
           createdAt: new Date().toISOString(),
-          color: statusClass(newOrder.status)
+          color: statusClass(newOrder.status),
+          checklist: newOrder.checklist
         };
         setOrders(prev => [localOs, ...prev]);
       }
 
-      addAuditLog(`Agendou comanda ${generatedId} para ${newOrder.customer.trim()}`);
+      addAuditLog(`Criou a ${generatedId} para o cliente ${newOrder.customer.trim()}`);
       setShowNewOrder(false);
-      setNewOrder({
-        customer: '', service: servicesList[0].name, barberName: 'Qualquer Barbeiro', scheduledDate: new Date().toISOString().split('T')[0],
-        scheduledTime: '14:00', phone: '', status: 'Agendado', amount: servicesList[0].defaultPrice, costProduct: '0.00', notes: ''
-      });
-      notify('Agendamento registrado com sucesso!');
-    } catch (err) { notify(err.message || 'Erro ao registrar.'); }
+      setNewOrder({ customer: '', device: 'iPhone 13', devicePassword: '', patternDrawing: '', issue: '', phone: '', status: 'Recebido', amount: '', partCost: '0.00', warrantyDays: 90, checklist: { ...defaultChecklist } });
+      setPasswordType('text');
+      notify('Ordem salva com sucesso!');
+    } catch (err) { notify(err.message || 'Erro ao salvar ordem.'); }
     finally { setSaving(false); }
   }
 
@@ -478,7 +651,7 @@ function App() {
     setInventory(prev => [item, ...prev]);
     addAuditLog(`Adicionou ${item.name} ao estoque`);
     setShowNewProduct(false);
-    setNewProduct({ name: '', category: 'Finalizadores', price: '', qty: '1', photo: null });
+    setNewProduct({ name: '', category: 'Capas', price: '', qty: '1', photo: null });
     notify('Produto adicionado ao estoque!');
   };
 
@@ -487,6 +660,18 @@ function App() {
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => setNewProduct(prev => ({ ...prev, photo: reader.result }));
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleUpgradePhotoUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCapturedPhoto(reader.result);
+        notify('Foto do aparelho anexada com sucesso!');
+      };
       reader.readAsDataURL(file);
     }
   };
@@ -537,7 +722,7 @@ function App() {
       }
       const targetOrder = orders.find(o => o.rawId === rawId);
       setOrders(prev => prev.map(o => o.rawId === rawId ? { ...o, status: newStatus, color: statusClass(newStatus) } : o));
-      if (targetOrder) addAuditLog(`Alterou status da comanda ${targetOrder.id} para "${newStatus}"`);
+      if (targetOrder) addAuditLog(`Alterou status da ${targetOrder.id} para "${newStatus}"`);
       notify(`Status alterado para "${newStatus}".`);
     } catch (err) { notify('Erro ao atualizar status.'); }
   }
@@ -554,13 +739,13 @@ function App() {
       description: cashTx.description,
       amount: val,
       time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-      user: userAccessLevel === 'owner' ? 'Dono' : 'Barbeiro'
+      user: userAccessLevel === 'owner' ? 'Dono' : 'Técnico'
     };
     setCashRegister(prev => ({ ...prev, entries: [newEntry, ...prev.entries] }));
-    addAuditLog(`Lançamento no Caixa: R$ ${val.toFixed(2)} (${cashTx.description})`);
+    addAuditLog(`Registrou ${cashTx.type === 'in' ? 'Entrada' : 'Sangria/Saída'} no caixa da loja: R$ ${val.toFixed(2)} (${cashTx.description})`);
     setShowCashTransactionModal(false);
     setCashTx({ type: 'in', description: '', amount: '' });
-    notify('Lançamento registrado no caixa!');
+    notify('Lançamento registrado no caixa da loja!');
   };
 
   const handleInviteMember = (e) => {
@@ -574,10 +759,10 @@ function App() {
       status: 'Ativo'
     };
     setTeamMembers(prev => [...prev, member]);
-    addAuditLog(`Adicionou ${newMember.name} à equipe de barbeiros`);
+    addAuditLog(`Adicionou o membro ${newMember.name} à equipe`);
     setShowInviteMemberModal(false);
-    setNewMember({ name: '', email: '', role: 'barber' });
-    notify('Barbeiro adicionado à equipe com sucesso!');
+    setNewMember({ name: '', email: '', role: 'technician' });
+    notify('Membro convidado com sucesso!');
   };
 
   const handleLogoUpload = (e) => {
@@ -592,27 +777,106 @@ function App() {
     }
   };
 
-  const shareAppointmentWhatsapp = (order) => {
-    let msg = '';
-    if (order.status === 'Agendado') {
-      msg = `Fala ${order.customer}! Seu agendamento para *${order.service}* na ${storeName} está confirmado!\n\n💈 Código da Comanda: *${order.id}*\nValor: *${order.amount}*\n\nTe esperamos na cadeira!`;
-    } else if (order.status === 'Em atendimento') {
-      msg = `Fala ${order.customer}! Seu atendimento de *${order.service}* acabou de iniciar na ${storeName}.`;
-    } else if (order.status === 'Aguardando pagamento') {
-      msg = `Fala ${order.customer}! Serviço finalizado! O valor total da sua comanda (${order.id}) é *${order.amount}*. Chave Pix para pagamento: ${pixKey}`;
-    } else if (order.status === 'Finalizado') {
-      msg = `Obrigado pela preferência na ${storeName}, ${order.customer}! Esperamos que tenha curtido o resultado do *${order.service}*. Até a próxima! ✂️`;
-    } else {
-      msg = `Olá ${order.customer}! Atualização do seu agendamento ${order.id}: Status atual é ${order.status}.`;
+  const calculateTotalUpgradeDiscount = () => {
+    let total = 0;
+    if (selectedDefects.screenReplaced) total += Number(upgradeDiscounts.screenReplaced || 0);
+    if (selectedDefects.batteryReplaced) total += Number(upgradeDiscounts.batteryReplaced || 0);
+    if (selectedDefects.faceIdOff) total += Number(upgradeDiscounts.faceIdOff || 0);
+    if (selectedDefects.cameraFailed) total += Number(upgradeDiscounts.cameraFailed || 0);
+    if (selectedDefects.cameraLensScratched) total += Number(upgradeDiscounts.cameraLensScratched || 0);
+    if (selectedDefects.chargingPortFailed) total += Number(upgradeDiscounts.chargingPortFailed || 0);
+    if (selectedDefects.audioSpeakerFailed) total += Number(upgradeDiscounts.audioSpeakerFailed || 0);
+    if (selectedDefects.nfcFailed) total += Number(upgradeDiscounts.nfcFailed || 0);
+    if (selectedDefects.wifiFailed) total += Number(upgradeDiscounts.wifiFailed || 0);
+    if (selectedDefects.housingScratched) total += Number(upgradeDiscounts.housingScratched || 0);
+    return total;
+  };
+
+  const finishUpgradeToWhatsapp = () => {
+    let defectDetails = '';
+    const totalDiscount = calculateTotalUpgradeDiscount();
+
+    if (upgradeAssistantEnabled) {
+      const list = [];
+      if (selectedDefects.screenReplaced) list.push(`• Tela Trocada/Trincada (-R$ ${upgradeDiscounts.screenReplaced})`);
+      if (selectedDefects.batteryReplaced) list.push(`• Bateria Trocada/Não Original (-R$ ${upgradeDiscounts.batteryReplaced})`);
+      if (selectedDefects.faceIdOff) list.push(`• Face ID/Biometria Off (-R$ ${upgradeDiscounts.faceIdOff})`);
+      if (selectedDefects.cameraFailed) list.push(`• Câmera com falha/trocada (-R$ ${upgradeDiscounts.cameraFailed})`);
+      if (selectedDefects.cameraLensScratched) list.push(`• Lente/Vidro da Câmera arranhado (-R$ ${upgradeDiscounts.cameraLensScratched})`);
+      if (selectedDefects.chargingPortFailed) list.push(`• Conector/Dock de Carga ruim (-R$ ${upgradeDiscounts.chargingPortFailed})`);
+      if (selectedDefects.audioSpeakerFailed) list.push(`• Alto-falante/Auricular com falha (-R$ ${upgradeDiscounts.audioSpeakerFailed})`);
+      if (selectedDefects.nfcFailed) list.push(`• NFC/Aproximação não funciona (-R$ ${upgradeDiscounts.nfcFailed})`);
+      if (selectedDefects.wifiFailed) list.push(`• Wi-Fi/Bluetooth inoperante (-R$ ${upgradeDiscounts.wifiFailed})`);
+      if (selectedDefects.housingScratched) list.push(`• Carcaça/Vidro Traseiro com marcas (-R$ ${upgradeDiscounts.housingScratched})`);
+
+      if (list.length > 0) {
+        defectDetails = `\n\n🔍 *Estado informado do aparelho atual:*\n${list.join('\n')}\n*Abatimento estimado:* -R$ ${totalDiscount.toFixed(2)}`;
+      } else {
+        defectDetails = `\n\n🔍 *Estado informado do aparelho atual:* 100% Impecável (Sem detalhes/peças trocadas)`;
+      }
     }
+
+    const photoNote = capturedPhoto ? '\n📸 *Foto do aparelho:* Capturada pelo cliente no app' : '';
+
+    const text = encodeURIComponent(
+      `Olá! Gostaria de fazer uma simulação de *UPGRADE* na ${storeName}.\n\n` +
+      `📱 *Aparelho atual:* ${currentDevice || 'Não especificado'}\n` +
+      `✨ *Aparelho desejado:* ${targetDevice}` +
+      photoNote +
+      defectDetails +
+      `\n\nPodemos avaliar a diferença de valores final?`
+    );
+    window.open(`https://wa.me/${whatsappNumber}?text=${text}`, '_blank');
+    setShowUpgradeModal(false);
+    setUpgradeStep(1);
+    setCapturedPhoto(null);
+    setCurrentDevice('');
+    setSelectedDefects({
+      screenReplaced: false,
+      batteryReplaced: false,
+      faceIdOff: false,
+      cameraFailed: false,
+      cameraLensScratched: false,
+      chargingPortFailed: false,
+      audioSpeakerFailed: false,
+      nfcFailed: false,
+      wifiFailed: false,
+      housingScratched: false,
+    });
+  };
+
+  const shareOsStatusWhatsapp = (order) => {
+    let msg = '';
+    if (order.status === 'Recebido') msg = `Olá ${order.customer}! Seu ${order.device} foi recebido em nossa assistência (${storeName}). Código para acompanhar: ${order.id}`;
+    else if (order.status === 'Em manutenção') msg = `Olá ${order.customer}! Seu ${order.device} (${order.id}) já entrou em bancada de testes e reparo na ${storeName}.`;
+    else if (order.status === 'Pronto para retirada') msg = `Oba ${order.customer}! Seu ${order.device} (${order.id}) está PRONTO para retirada na ${storeName}! Valor: ${order.amount}`;
+    else if (order.status === 'Aguardando aprovação') msg = `Olá ${order.customer}! O orçamento do seu ${order.device} (${order.id}) foi gerado: ${order.amount}. Podemos iniciar o reparo?`;
+    else if (order.status === 'Aguardando peça') msg = `Olá ${order.customer}! O reparo do seu ${order.device} (${order.id}) está aguardando a chegada da peça de reposição. Logo te avisamos!`;
+    else msg = `Olá ${order.customer}! Atualização da sua OS ${order.id} (${order.device}): Status atual é ${order.status}.`;
 
     const text = encodeURIComponent(msg);
     const targetPhone = order.phone || whatsappNumber;
     window.open(`https://wa.me/${targetPhone}?text=${text}`, '_blank');
   };
 
-  const sendHaircutReminder = (order) => {
-    const msg = encodeURIComponent(`Fala ${order.customer}, tudo certo? Passando para avisar que já faz quase 20 dias desde o seu último corte na ${storeName}! Que tal renovar o degradê e alinhar a barba essa semana? Manda aqui o melhor horário pra você! 💈✂️`);
+  const sendWarrantyTermWhatsapp = (order) => {
+    const msg = encodeURIComponent(`📜 *TERMO DE GARANTIA & CONDIÇÕES TÉCNICAS* - ${storeName.toUpperCase()}\n\n` +
+      `Ordem de Serviço: *${order.id}*\n` +
+      `Aparelho: *${order.device}*\n` +
+      `Garantia: *${order.warrantyDays} Dias*\n\n` +
+      `⚠️ *CONDIÇÕES LEGAIS DE GARANTIA:*\n` +
+      `1. A garantia cobre exclusivamente o serviço realizado e a peça substituída.\n` +
+      `2. A garantia será *ANULADA* em casos de: Danos físicos, tela trincada/quebrada, contato com líquidos/umidade, selo de garantia violado ou intervenção por terceiros.\n` +
+      `3. Aparelhos não retirados em até 90 dias poderão ser vendidos para custeio de peças.\n\n` +
+      `Endereço da Loja: ${storeAddress}\n` +
+      `Agradecemos a confiança!`);
+
+    const targetPhone = order.phone || whatsappNumber;
+    window.open(`https://wa.me/${targetPhone}?text=${msg}`, '_blank');
+  };
+
+  const sendPellicleReminder = (order) => {
+    const msg = encodeURIComponent(`Olá ${order.customer}! Faz alguns meses que realizamos a manutenção do seu ${order.device} na ${storeName}. Que tal passar aqui para fazer uma revisão preventiva da bateria ou trocar sua película de vidro com 20% de desconto especial? 😊`);
     const targetPhone = order.phone || whatsappNumber;
     window.open(`https://wa.me/${targetPhone}?text=${msg}`, '_blank');
   };
@@ -621,560 +885,819 @@ function App() {
     if (supabaseConfigured) await supabase.auth.signOut();
     setSession(null);
     setUserRole('client');
-    localStorage.setItem('rt_barber_role', 'client');
+    localStorage.setItem('rt_user_role', 'client');
     setActive('stores_directory');
   }
 
-  if (showSplash) {
-    return <BrandSplash onFinish={() => {
-      setShowSplash(false);
-      sessionStorage.setItem('rt_barber_splash', 'true');
-    }} />;
-  }
-
-  if (!authChecked) return <div className="loading-screen" style={{background: '#050505'}}><div className="brand-mark"><Scissors size={22} color="#25D366"/></div><span>Iniciando ambiente da Barbearia...</span></div>;
-
-  if (supabaseConfigured && !session) return (
-    <div className="auth-shell" style={{background: '#050505'}}>
-      <div className="auth-visual">
-        <div className="auth-orb orb-one"></div><div className="auth-orb orb-two"></div>
-        <div className="auth-brand"><div className="brand-mark" style={{background: '#000', border: '1px solid #222'}}>{storeLogo ? <img src={storeLogo} alt="Logo" style={{width: '100%', height: '100%', borderRadius: '6px', objectFit: 'cover'}}/> : <Scissors size={18} color="#25D366"/>}</div><span>RT BARBER<span className="brand-light"> / SYSTEMS</span></span></div>
-        <div className="auth-hero-copy"><div className="eyebrow"><Sparkles size={14}/> GESTÃO PROFISSIONAL PARA BARBEARIAS</div><h1>O Sistema Completo<br/><span>para a sua Barbearia.</span></h1><p>Agendamentos, comandas, caixa diário, comissão dos barbeiros e venda de produtos em um só lugar.</p></div>
-        <div className="auth-visual-footer"><span>RT BARBER PLATFORM</span><span>v1.0</span></div>
-      </div>
-
-      <form className="auth-card" onSubmit={handleAuth} style={{background: '#0a0a0c', border: '1px solid #1f1f23'}}>
-        <div style={{display: 'flex', gap: '8px', marginBottom: '20px', background: '#111', padding: '4px', borderRadius: '8px', border: '1px solid #222'}}>
-          <button type="button" className={`secondary-btn ${userRole === 'client' ? 'primary-btn' : ''}`} style={{flex: 1, fontSize: '13px'}} onClick={() => setUserRole('client')}>
-            Portal do Cliente
-          </button>
-          <button type="button" className={`secondary-btn ${userRole === 'barber' ? 'primary-btn' : ''}`} style={{flex: 1, fontSize: '13px'}} onClick={() => setUserRole('barber')}>
-            Painel da Barbearia
-          </button>
-        </div>
-
-        <div className="auth-card-top"><div className="small-icon"><ShieldCheck size={20}/></div><span className="micro-label">{userRole === 'barber' ? 'ÁREA RESTRITA DA BARBEARIA' : 'PORTAL DE AGENDAMENTO'}</span></div>
-        <h2>{userRole === 'barber' ? (authMode === 'login' ? 'Entrar no Painel' : 'Cadastrar Barbearia (48h Grátis)') : 'Acessar Barbearia'}</h2>
-        <p className="muted">{userRole === 'barber' ? 'Acesse sua agenda, comissões e fluxo de caixa.' : 'Consulte seus horários agendados e produtos da barbearia.'}</p>
-
-        <label>E-mail<input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="seu@email.com" required/></label>
-        <label>Senha<input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Mínimo de 6 caracteres" minLength="6" required/></label>
-        {authError && <div className="form-error">{authError}</div>}
-
-        <button className="primary-btn full-btn" disabled={saving}>{saving ? 'Aguarde...' : authMode === 'login' ? (userRole === 'barber' ? 'Entrar no Painel' : 'Acessar Portal') : (userRole === 'barber' ? 'Iniciar Teste Grátis de 48 horas' : 'Criar Conta')}<ArrowUpRight size={16}/></button>
-        <button type="button" className="text-btn auth-switch" onClick={()=>{setAuthMode(authMode==='login'?'signup':'login');setAuthError('')}}>{authMode==='login'?'Ainda não tem conta? Testar 48h Grátis':'Já tem conta? Entrar'}</button>
-
-        {userRole === 'barber' && (
-          <button type="button" className="secondary-btn full-btn" style={{marginTop: '15px', border: '1px solid #25D366', color: '#25D366'}} onClick={() => setShowPaymentModal(true)}>
-            <QrCode size={16}/> Pagar / Renovar Assinatura (R$ 50,00/mês)
-          </button>
-        )}
-
-        <div className="auth-note"><ShieldCheck size={14}/> Plataforma protegida por RT Systems</div>
-      </form>
-
-      {showPaymentModal && (
-        <div className="modal-backdrop" onClick={()=>setShowPaymentModal(false)}>
-          <div className="modal" onClick={e=>e.stopPropagation()} style={{background: '#0f0f12', border: '1px solid #222', maxWidth: '450px', textAlign: 'center'}}>
-            <div className="modal-head"><div><div className="eyebrow">ASSINATURA DA PLATAFORMA</div><h2>Plano Barbearia — R$ 50,00/mês</h2></div><button type="button" className="icon-btn" onClick={()=>setShowPaymentModal(false)}><X size={19}/></button></div>
-            <p className="muted" style={{fontSize: '13px'}}>Pague o Pix para manter sua barbearia ativa e liberar o painel sem limites para você e todos os seus barbeiros.</p>
-
-            <div style={{margin: '20px 0', background: '#000', padding: '15px', borderRadius: '12px', border: '1px solid #333', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px'}}>
-              <QrCode size={120} color="#25D366" />
-              <span style={{fontSize: '12px', color: '#aaa'}}>Chave Pix (PicPay / Telefone):</span>
-              <strong style={{fontSize: '16px', color: '#fff', background: '#18181f', padding: '8px 14px', borderRadius: '6px', border: '1px solid #444'}}>{adminPixKey}</strong>
-              <button 
-                type="button" 
-                onClick={() => { navigator.clipboard.writeText(adminPixKey); notify('Chave Pix copiada!'); }}
-                className="secondary-btn" 
-                style={{fontSize: '11px', padding: '4px 8px', display: 'flex', alignItems: 'center', gap: '4px'}}
-              >
-                <Copy size={12}/> Copiar Chave Pix
-              </button>
-              <small style={{color: '#888'}}>Titular: Robert (RT Systems)</small>
-            </div>
-
-            <a href={`https://wa.me/${adminWhatsapp}?text=${encodeURIComponent(`Olá Robert! Efetuei o Pix de R$ 50,00 para ativar/renovar a assinatura da minha Barbearia (${email}). Pode liberar meu acesso?`)}`} target="_blank" rel="noreferrer" className="primary-btn full-btn" style={{background: '#25D366', color: '#000', fontWeight: 'bold', textDecoration: 'none'}}>
-              <MessageCircle size={16}/> Enviar Comprovante no WhatsApp (Desenvolvedor)
-            </a>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-
-  const activeNav = userRole === 'barber' ? navBarber : navClient;
-
   return (
-    <div className="app-shell" style={{background: '#08080a', color: '#f0f0f0'}}>
-      <aside className={`sidebar ${mobileNav ? 'sidebar-open' : ''}`} style={{background: '#0a0a0c', borderRight: '1px solid #18181b'}}>
-        <div className="brand-lockup">
-          <div className="brand-mark" style={{background: '#000', width: '38px', height: '38px', borderRadius: '8px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #222'}}>
-            {storeLogo ? (
-              <img src={storeLogo} alt="Logo" style={{width: '100%', height: '100%', objectFit: 'cover'}} />
-            ) : (
-              <Scissors size={20} color="#25D366"/>
+    <>
+      {/* TRAVA DEFINITIVA DE ARRASTO LATERAL NO CELULAR */}
+      <style>{`
+        html, body, #root {
+          max-width: 100vw !important;
+          overflow-x: hidden !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          position: relative !important;
+          width: 100% !important;
+          box-sizing: border-box !important;
+        }
+        *, *::before, *::after {
+          box-sizing: border-box !important;
+        }
+        .auth-shell, .auth-card, .auth-visual, .app-shell, .main-area {
+          max-width: 100vw !important;
+          overflow-x: hidden !important;
+          width: 100% !important;
+        }
+        .auth-hero-copy h1, .auth-hero-copy p {
+          word-break: break-word !important;
+        }
+      `}</style>
+
+      {showSplash ? (
+        <BrandSplash onFinish={() => {
+          setShowSplash(false);
+          sessionStorage.setItem('rt_splash_shown', 'true');
+        }} />
+      ) : !authChecked ? (
+        <div className="loading-screen" style={{background: '#050505'}}><div className="brand-mark"><Smartphone size={22}/></div><span>Iniciando ambiente seguro...</span></div>
+      ) : supabaseConfigured && !session ? (
+        <div className="auth-shell" style={{background: '#050505'}}>
+          <div className="auth-visual">
+            <div className="auth-orb orb-one"></div><div className="auth-orb orb-two"></div>
+            <div className="auth-brand"><div className="brand-mark" style={{background: '#000', border: '1px solid #222'}}>{storeLogo ? <img src={storeLogo} alt="Logo" style={{width: '100%', height: '100%', borderRadius: '6px', objectFit: 'cover'}}/> : <span style={{fontWeight: 900, color: '#fff', fontSize: '13px'}}>RT</span>}</div><span>RT MOBILE<span className="brand-light"> / SYSTEMS</span></span></div>
+            <div className="auth-hero-copy"><div className="eyebrow"><Sparkles size={14}/> GESTÃO PROFISSIONAL PARA ESTABELECIMENTOS</div><h1>Sistema de Gestão<br/><span>para o seu Negócio.</span></h1><p>Organize ordens de serviço, caixa, estoque e atendimento em um só lugar.</p></div>
+            <div className="auth-visual-footer"><span>RT MOBILE PLATFORM</span><span>v1.0</span></div>
+          </div>
+
+          <form className="auth-card" onSubmit={handleAuth} style={{background: '#0a0a0c', border: '1px solid #1f1f23'}}>
+            <div style={{display: 'flex', gap: '8px', marginBottom: '20px', background: '#111', padding: '4px', borderRadius: '8px', border: '1px solid #222', flexWrap: 'wrap'}}>
+              <button type="button" className={`secondary-btn ${userRole === 'client' ? 'primary-btn' : ''}`} style={{flex: 1, minWidth: '130px', fontSize: '13px'}} onClick={() => setUserRole('client')}>
+                Área do Cliente (Portal)
+              </button>
+              <button type="button" className={`secondary-btn ${userRole === 'tech' ? 'primary-btn' : ''}`} style={{flex: 1, minWidth: '130px', fontSize: '13px'}} onClick={() => setUserRole('tech')}>
+                Painel do Estabelecimento
+              </button>
+            </div>
+
+            <div className="auth-card-top"><div className="small-icon"><ShieldCheck size={20}/></div><span className="micro-label">{userRole === 'tech' ? 'ÁREAS DE ACESSO DO LOJISTA' : 'PORTAL DE CONSULTAS'}</span></div>
+            <h2>{userRole === 'tech' ? (authMode === 'login' ? 'Entrar no Painel' : 'Cadastrar Estabelecimento (48h Grátis)') : 'Entrar para Consultar OS'}</h2>
+            <p className="muted">{userRole === 'tech' ? 'Acesse sua bancada, caixa e fluxo de atendimento.' : 'Consulte o status do seu atendimento e serviços em andamento.'}</p>
+
+            <label>E-mail<input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="seu@email.com" required/></label>
+            <label>Senha<input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Mínimo de 6 caracteres" minLength="6" required/></label>
+            {authError && <div className="form-error">{authError}</div>}
+
+            <button className="primary-btn full-btn" disabled={saving}>{saving ? 'Aguarde...' : authMode === 'login' ? (userRole === 'tech' ? 'Entrar no Painel' : 'Acessar Portal') : (userRole === 'tech' ? 'Iniciar Teste Grátis de 48 horas' : 'Criar Conta')}<ArrowUpRight size={16}/></button>
+            <button type="button" className="text-btn auth-switch" onClick={()=>{setAuthMode(authMode==='login'?'signup':'login');setAuthError('')}}>{authMode==='login'?'Ainda não tem conta? Testar 48h Grátis':'Já tem conta? Entrar'}</button>
+
+            {userRole === 'tech' && (
+              <button type="button" className="secondary-btn full-btn" style={{marginTop: '15px', border: '1px solid #25D366', color: '#25D366'}} onClick={() => setShowPaymentModal(true)}>
+                <QrCode size={16}/> Pagar / Renovar Assinatura (R$ 50,00/mês)
+              </button>
             )}
-          </div>
-          <div>
-            <div className="brand-name" style={{fontSize: '15px', fontWeight: 'bold'}}>{userRole === 'barber' ? storeName : 'RT Barber'}</div>
-            <div className="brand-sub" style={{color: '#666', fontSize: '10px'}}>{userRole === 'barber' ? 'PAINEL DA BARBEARIA' : 'PORTAL DO CLIENTE'}</div>
-          </div>
-          <button className="mobile-close icon-btn" onClick={()=>setMobileNav(false)}><X size={18}/></button>
-        </div>
 
-        {userRole === 'barber' && !isAccountExpired && (
-          <div style={{padding: '8px 12px', background: '#111', borderRadius: '8px', margin: '10px 12px', border: '1px solid #222', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-            <span style={{fontSize: '11px', color: '#888'}}>Nível de Acesso:</span>
-            <select 
-              value={userAccessLevel} 
-              onChange={e => {
-                setUserAccessLevel(e.target.value);
-                notify(e.target.value === 'owner' ? 'Modo Proprietário (Acesso Total)' : 'Modo Barbeiro (Acesso Restrito)');
-              }}
-              style={{background: '#000', color: '#fff', border: '1px solid #333', borderRadius: '4px', padding: '2px 6px', fontSize: '11px'}}
-            >
-              <option value="owner">👑 Dono (Admin)</option>
-              <option value="barber">✂️ Barbeiro (Equipe)</option>
-            </select>
-          </div>
-        )}
+            <div className="auth-note"><ShieldCheck size={14}/> Conexão protegida por RT Mobile</div>
+          </form>
 
-        {isSuperAdmin && (
-          <div 
-            className="workspace-switch" 
-            onClick={() => {
-              const nextRole = userRole === 'barber' ? 'client' : 'barber';
-              setUserRole(nextRole);
-              localStorage.setItem('rt_barber_role', nextRole);
-              setActive(nextRole === 'barber' ? 'overview' : 'stores_directory');
-              notify(nextRole === 'barber' ? 'Alternado para MODO BARBEARIA' : 'Alternado para VISÃO DO CLIENTE');
-            }}
-            style={{background: '#121215', border: '1px solid #222', cursor: 'pointer'}}
-          >
-            <div className="workspace-avatar" style={{background: userRole === 'barber' ? '#25D366' : '#3b82f6', color: '#000', fontWeight: 'bold'}}>
-              {userRole === 'barber' ? 'B' : 'C'}
-            </div>
-            <div className="workspace-info">
-              <strong>{userRole === 'barber' ? 'Painel Barbearia' : 'Visão do Cliente'}</strong>
-              <span style={{color: '#25D366'}}>Super Admin ⚡</span>
-            </div>
-            <ChevronDown size={15}/>
-          </div>
-        )}
+          {showPaymentModal && (
+            <div className="modal-backdrop" onClick={()=>setShowPaymentModal(false)}>
+              <div className="modal" onClick={e=>e.stopPropagation()} style={{background: '#0f0f12', border: '1px solid #222', maxWidth: '450px', textAlign: 'center'}}>
+                <div className="modal-head"><div><div className="eyebrow">ATIVAÇÃO / RENOVAÇÃO</div><h2>Plano Profissional — R$ 50,00/mês</h2></div><button type="button" className="icon-btn" onClick={()=>setShowPaymentModal(false)}><X size={19}/></button></div>
+                <p className="muted" style={{fontSize: '13px'}}>Pague o Pix para manter seu estabelecimento ativo e liberar o painel sem limites para você e sua equipe.</p>
 
-        <div className="nav-caption">NAVEGAÇÃO</div>
-        <nav>{activeNav.map(item => <button key={item.id} className={`nav-item ${active===item.id?'active':''}`} onClick={()=>{setActive(item.id);setMobileNav(false)}}><item.icon size={18}/><span>{item.label}</span>{item.id==='appointments' && <span className="nav-count">{orders.length}</span>}{item.id==='customers' && <span className="nav-count">{customers.length}</span>}{item.id==='inventory' && <span className="nav-count">{inventory.length}</span>}</button>)}</nav>
+                <div style={{margin: '20px 0', background: '#000', padding: '15px', borderRadius: '12px', border: '1px solid #333', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px'}}>
+                  <QrCode size={120} color="#25D366" />
+                  <span style={{fontSize: '12px', color: '#aaa'}}>Chave Pix (PicPay / Telefone):</span>
+                  <strong style={{fontSize: '16px', color: '#fff', background: '#18181f', padding: '8px 14px', borderRadius: '6px', border: '1px solid #444'}}>{adminPixKey}</strong>
+                  <button 
+                    type="button" 
+                    onClick={() => { navigator.clipboard.writeText(adminPixKey); notify('Chave Pix copiada!'); }}
+                    className="secondary-btn" 
+                    style={{fontSize: '11px', padding: '4px 8px', display: 'flex', alignItems: 'center', gap: '4px'}}
+                  >
+                    <Copy size={12}/> Copiar Chave Pix
+                  </button>
+                  <small style={{color: '#888'}}>Titular: Robert (RT Mobile)</small>
+                </div>
 
-        <div className="sidebar-bottom">
-          {userRole === 'barber' && !isAccountExpired && (
-            <div className="plan-card" style={{background: '#111', border: '1px solid #222'}}>
-              <div className="plan-icon"><Sparkles size={16}/></div>
-              <strong>RT Barber PRO</strong>
-              <p>Sua barbearia organizada e produtiva.</p>
-              <div className="plan-progress"><span style={{width: '100%', background: '#25D366'}}/></div>
-              <small style={{color: '#25D366'}}>• {isLifetimeAdmin ? '👑 Licença Vitalícia Ativa' : (isTrialActive ? `Teste Grátis (${trialTimeLeft}h restantes)` : `Plano Barbearia (${planDaysLeft} dias restantes)`)}</small>
+                <a href={`https://wa.me/${adminWhatsapp}?text=${encodeURIComponent(`Olá Robert! Efetuei o Pix de R$ 50,00 para renovar/ativar meu estabelecimento (${email}). Pode liberar meu acesso?`)}`} target="_blank" rel="noreferrer" className="primary-btn full-btn" style={{background: '#25D366', color: '#000', fontWeight: 'bold', textDecoration: 'none'}}>
+                  <MessageCircle size={16}/> Enviar Comprovante no WhatsApp (Desenvolvedor)
+                </a>
+              </div>
             </div>
           )}
-          <button className="profile-row" onClick={()=>userRole === 'barber' ? setActive('settings') : logout()} style={{background: '#121215'}}>
-            <div className="profile-avatar">{userRole === 'barber' ? storeName.slice(0, 1).toUpperCase() : 'C'}</div>
-            <div className="profile-info">
-              <strong>{userRole === 'barber' ? (userAccessLevel === 'owner' ? 'Dono (Admin)' : 'Barbeiro') : 'Cliente'}</strong>
-              <span>{session?.user?.email || 'Conectado'}</span>
-            </div>
-            <span style={{letterSpacing: '2px', color: '#666'}}>•••</span>
-          </button>
         </div>
-      </aside>
-
-      {mobileNav && <div className="nav-overlay" onClick={()=>setMobileNav(false)} />}
-
-      <main className="main-area" style={{background: '#08080a', position: 'relative'}}>
-        {userRole === 'barber' && isAccountExpired && !isLifetimeAdmin ? (
-          <div style={{
-            position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', minHeight: '100vh',
-            background: 'radial-gradient(circle at center, #111116 0%, #050507 100%)',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            padding: '24px', textAlign: 'center', zIndex: 99
-          }}>
-            <div style={{
-              background: '#0d0d12', border: '1px solid #27272a', padding: '36px', borderRadius: '16px',
-              maxWidth: '480px', width: '100%', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)'
-            }}>
-              <div style={{width: '64px', height: '64px', background: '#27272a', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', color: '#f59e0b'}}>
-                <Lock size={32}/>
+      ) : (
+        <div className="app-shell" style={{background: '#08080a', color: '#f0f0f0'}}>
+          <aside className={`sidebar ${mobileNav ? 'sidebar-open' : ''}`} style={{background: '#0a0a0c', borderRight: '1px solid #18181b'}}>
+            <div className="brand-lockup">
+              <div className="brand-mark" style={{background: '#000', width: '38px', height: '38px', borderRadius: '8px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #222'}}>
+                {storeLogo ? (
+                  <img src={storeLogo} alt="Logo" style={{width: '100%', height: '100%', objectFit: 'cover'}} />
+                ) : (
+                  <span style={{fontWeight: 900, color: '#fff', fontSize: '13px', letterSpacing: '-0.5px'}}>RT</span>
+                )}
               </div>
-              <h2 style={{fontSize: '22px', fontWeight: 'bold', margin: '0 0 10px', color: '#fff'}}>
-                {expiredReason === 'monthly' ? 'Assinatura Mensal Vencida' : 'Período de Teste Finalizado'}
-              </h2>
-              <p style={{fontSize: '14px', color: '#a1a1aa', lineHeight: '1.5', margin: '0 0 24px'}}>
-                {expiredReason === 'monthly'
-                  ? 'Seu plano mensal de 30 dias na RT Barber encerrou. Renove sua assinatura para continuar usando o sistema.'
-                  : 'Suas 48 horas de teste gratuito na RT Barber se esgotaram. Seus agendamentos, clientes, comissões e estoque continuam salvos com segurança.'}
-              </p>
+              <div>
+                <div className="brand-name" style={{fontSize: '15px', fontWeight: 'bold'}}>{userRole === 'tech' ? storeName : 'RT Mobile'}</div>
+                <div className="brand-sub" style={{color: '#666', fontSize: '10px'}}>{userRole === 'tech' ? 'PAINEL DO ESTABELECIMENTO' : 'PORTAL DO CLIENTE'}</div>
+              </div>
+              <button className="mobile-close icon-btn" onClick={()=>setMobileNav(false)}><X size={18}/></button>
+            </div>
 
-              <div style={{background: '#000', border: '1px solid #333', borderRadius: '12px', padding: '20px', margin: '0 0 24px'}}>
-                <QrCode size={130} color="#25D366" style={{margin: '0 auto 12px', display: 'block'}} />
-                <span style={{fontSize: '12px', color: '#888'}}>Chave Pix (Telefone / PicPay):</span>
-                <div style={{fontSize: '16px', fontWeight: 'bold', color: '#fff', background: '#18181f', padding: '8px', borderRadius: '6px', margin: '6px 0', border: '1px solid #444'}}>
-                  {adminPixKey}
+            {userRole === 'tech' && !isAccountExpired && (
+              <div style={{padding: '8px 12px', background: '#111', borderRadius: '8px', margin: '10px 12px', border: '1px solid #222', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                <span style={{fontSize: '11px', color: '#888'}}>Nível de Acesso:</span>
+                <select 
+                  value={userAccessLevel} 
+                  onChange={e => {
+                    setUserAccessLevel(e.target.value);
+                    notify(e.target.value === 'owner' ? 'Modo Administrador (Dono)' : 'Modo Operador / Técnico');
+                  }}
+                  style={{background: '#000', color: '#fff', border: '1px solid #333', borderRadius: '4px', padding: '2px 6px', fontSize: '11px'}}
+                >
+                  <option value="owner">👑 Dono (Admin)</option>
+                  <option value="technician">🛠️ Operador / Técnico</option>
+                </select>
+              </div>
+            )}
+
+            {isSuperAdmin && (
+              <div 
+                className="workspace-switch" 
+                onClick={() => {
+                  const nextRole = userRole === 'tech' ? 'client' : 'tech';
+                  setUserRole(nextRole);
+                  localStorage.setItem('rt_user_role', nextRole);
+                  setActive(nextRole === 'tech' ? 'overview' : 'stores_directory');
+                  notify(nextRole === 'tech' ? 'Alternado para MODO ESTABELECIMENTO' : 'Alternado para VISÃO DE CLIENTE');
+                }}
+                style={{background: '#121215', border: '1px solid #222', cursor: 'pointer'}}
+              >
+                <div className="workspace-avatar" style={{background: userRole === 'tech' ? '#25D366' : '#3b82f6', color: '#000', fontWeight: 'bold'}}>
+                  {userRole === 'tech' ? 'E' : 'C'}
                 </div>
-                <button 
-                  type="button" 
-                  onClick={() => { navigator.clipboard.writeText(adminPixKey); notify('Chave Pix copiada com sucesso!'); }}
-                  className="secondary-btn" 
-                  style={{fontSize: '11px', padding: '4px 10px', margin: '6px auto 0', display: 'flex', alignItems: 'center', gap: '4px'}}
-                >
-                  <Copy size={12}/> Copiar Chave Pix
-                </button>
-                <small style={{color: '#aaa', fontSize: '11px', display: 'block', marginTop: '6px'}}>Valor: R$ 50,00/mês | Titular: Robert (RT Systems)</small>
-              </div>
-
-              <a 
-                href={`https://wa.me/${adminWhatsapp}?text=${encodeURIComponent(`Olá Robert! A assinatura da minha Barbearia (${session?.user?.email}) encerrou. Acabei de realizar o Pix de R$ 50,00 para renovar por 30 dias, pode liberar meu acesso?`)}`}
-                target="_blank" 
-                rel="noreferrer"
-                className="primary-btn full-btn"
-                style={{background: '#25D366', color: '#000', fontWeight: 'bold', textDecoration: 'none', padding: '12px', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'}}
-              >
-                <MessageCircle size={18}/> Enviar Comprovante no WhatsApp
-              </a>
-
-              <button 
-                onClick={logout}
-                className="secondary-btn full-btn"
-                style={{marginTop: '12px', padding: '10px', fontSize: '13px'}}
-              >
-                Sair da conta
-              </button>
-            </div>
-          </div>
-        ) : (
-          <>
-            {userRole === 'barber' && isTrialActive && !isLifetimeAdmin && (
-              <div style={{background: 'linear-gradient(90deg, #1e3a8a, #0284c7)', color: '#fff', padding: '8px 16px', fontSize: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: '500'}}>
-                <span style={{display: 'flex', alignItems: 'center', gap: '6px'}}>
-                  <Clock size={15}/> ⏳ PERÍODO DE TESTE GRÁTIS ATIVO: Você tem <strong>{trialTimeLeft} horas restantes</strong> para usar todas as funções da barbearia!
-                </span>
-                <button onClick={()=>setShowPaymentModal(true)} style={{background: '#fff', color: '#000', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px'}}>
-                  Ativar R$ 50/mês
-                </button>
+                <div className="workspace-info">
+                  <strong>{userRole === 'tech' ? 'Modo Estabelecimento' : 'Visão do Cliente'}</strong>
+                  <span style={{color: '#25D366'}}>Painel ADM Geral ⚡</span>
+                </div>
+                <ChevronDown size={15}/>
               </div>
             )}
 
-            {userRole === 'barber' && !isTrialActive && !isLifetimeAdmin && planDaysLeft <= 5 && (
-              <div style={{background: 'linear-gradient(90deg, #b45309, #d97706)', color: '#fff', padding: '8px 16px', fontSize: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: '500'}}>
-                <span style={{display: 'flex', alignItems: 'center', gap: '6px'}}>
-                  <AlertTriangle size={15}/> ⚠️ ATENÇÃO: Sua assinatura expira em <strong>{planDaysLeft} dias</strong>! Renove para não perder o acesso ao caixa e comandas.
-                </span>
-                <button onClick={()=>setShowPaymentModal(true)} style={{background: '#fff', color: '#000', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px'}}>
-                  Renovar Pix (R$ 50)
-                </button>
-              </div>
-            )}
+            <div className="nav-caption">NAVEGAÇÃO</div>
+            <nav>{activeNav.map(item => <button key={item.id} className={`nav-item ${active===item.id?'active':''}`} onClick={()=>{setActive(item.id);setMobileNav(false)}}><item.icon size={18}/><span>{item.label}</span>{item.id==='orders' && <span className="nav-count">{orders.length}</span>}{item.id==='customers' && <span className="nav-count">{customers.length}</span>}{item.id==='inventory' && <span className="nav-count">{inventory.length}</span>}</button>)}</nav>
 
-            <header className="topbar" style={{background: '#0a0a0c', borderBottom: '1px solid #18181b'}}>
-              <div className="topbar-left">
-                <button className="icon-btn menu-trigger" onClick={()=>setMobileNav(true)}><Menu size={20}/></button>
-                <div className="breadcrumb">{storeName} <span>/</span> <strong>{activeNav.find(n=>n.id===active)?.label || 'Visão Geral'}</strong></div>
-              </div>
-              <div className="topbar-actions">
-                <div className="system-status"><span className="status-dot" style={{background: '#25D366'}}/> RT Barber v1.0</div>
-                <button className="icon-btn notification-btn" onClick={()=>notify('Sua barbearia está em dia!')}><Bell size={18}/><i/></button>
-                <button className="top-avatar" onClick={()=>userRole === 'barber' ? setActive('settings') : logout()}>
-                  {userRole === 'barber' ? storeName.slice(0, 1).toUpperCase() : 'C'}
-                </button>
-              </div>
-            </header>
-
-            {active==='overview' && userRole === 'barber' && <Overview orders={orders} storeName={storeName} onNew={()=>setShowNewOrder(true)} onNavigate={setActive} modules={modules} inventory={inventory} />}
-            {active==='appointments' && userRole === 'barber' && <AppointmentsPage orders={filteredOrders} search={search} setSearch={setSearch} onNew={()=>setShowNewOrder(true)} onStatus={handleUpdateStatus} onShare={shareAppointmentWhatsapp} onPrint={(o) => setShowPrintModal(o)} onHaircutReminder={sendHaircutReminder} />}
-            {active==='customers' && userRole === 'barber' && <CustomersPage customers={customers} onNew={()=>setShowNewCustomer(true)} />}
-            {active==='crm' && userRole === 'barber' && <CrmPage customers={customers} storeName={storeName} whatsapp={whatsappNumber} />}
-            {active==='cash' && userRole === 'barber' && <CashPage cashRegister={cashRegister} onNewTransaction={() => setShowCashTransactionModal(true)} />}
-            {active==='inventory' && userRole === 'barber' && <InventoryPage inventory={inventory} onNew={()=>setShowNewProduct(true)} onUpdateQty={updateProductQty} onDelete={deleteProduct} />}
-            {active==='services_menu' && userRole === 'barber' && <ServicesMenuPage services={servicesList} onNewAppointment={() => setShowNewOrder(true)} />}
-            {active==='client_services' && <ClientServicesPage services={servicesList} whatsapp={whatsappNumber} storeName={storeName} />}
-            {active==='client_inventory' && <ClientInventoryPage inventory={inventory} storeName={storeName} cart={cart} addToCart={addToCart} onOpenCart={() => setShowCartModal(true)} />}
-            {active==='stores_directory' && <StoresDirectoryPage stores={activeStores} onSelectStore={(s) => { setStoreName(s.name); setWhatsappNumber(s.phone); notify(`Barbearia "${s.name}" selecionada!`); setActive('client_services'); }} onRequestQuote={(s) => setShowQuoteModal(s)} />}
-            {active==='track' && <TrackPage orders={orders} storeName={storeName} pixKey={pixKey} whatsapp={whatsappNumber} storeAddress={storeAddress} mapsUrl={mapsUrl} notify={notify} />}
-            {active==='finance' && userRole === 'barber' && userAccessLevel === 'owner' && <FinancePage orders={orders} commissionRate={barberCommissionRate} setCommissionRate={setBarberCommissionRate} />}
-            {active==='payments' && userRole === 'barber' && <PaymentsPage pixKey={pixKey} setPixKey={setPixKey} onShowPayModal={() => setShowPaymentModal(true)} />}
-            {active==='settings' && userRole === 'barber' && <SettingsPage configured={supabaseConfigured} email={session?.user?.email} storeName={storeName} setStoreName={setStoreName} storeLogo={storeLogo} onLogoUpload={handleLogoUpload} whatsapp={whatsappNumber} setWhatsapp={setWhatsappNumber} pixKey={pixKey} setPixKey={setPixKey} storeAddress={storeAddress} setStoreAddress={setStoreAddress} mapsUrl={mapsUrl} setMapsUrl={setMapsUrl} modules={modules} setModules={setModules} onLogout={logout} teamMembers={teamMembers} onInviteMember={() => setShowInviteMemberModal(true)} auditLogs={auditLogs} userAccessLevel={userAccessLevel} isLifetimeAdmin={isLifetimeAdmin} />}
-
-            <footer className="footer" style={{borderTop: '1px solid #18181b', color: '#666', padding: '20px', fontSize: '11px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px'}}>
-              <span>{storeName.toUpperCase()} <span className="footer-dot">•</span> GESTÃO PROFISSIONAL DE BARBEARIA</span>
-              <span>
-                DESENVOLVIDO POR <strong style={{color: '#aaa'}}>RT SYSTEMS</strong> 
-                <span style={{margin: '0 8px', color: '#444'}}>|</span> 
-                Quer este sistema na sua barbearia?{' '}
-                <a 
-                  href={`https://wa.me/${adminWhatsapp}?text=${encodeURIComponent('Olá! Vi o sistema RT Barber e gostaria de saber como ter na minha barbearia.')}`} 
-                  target="_blank" 
-                  rel="noreferrer" 
-                  style={{color: '#25D366', fontWeight: 'bold', textDecoration: 'none'}}
-                >
-                  Falar com Desenvolvedor ↗
-                </a>
-              </span>
-            </footer>
-          </>
-        )}
-      </main>
-
-      {/* MODAL DO CARRINHO DE PRODUTOS DA BARBEARIA */}
-      {showCartModal && (
-        <CartModal
-          cart={cart}
-          onClose={() => setShowCartModal(false)}
-          onUpdateQty={updateCartQty}
-          onClear={clearCart}
-          pixKey={pixKey}
-          storeName={storeName}
-          storeAddress={storeAddress}
-          whatsappNumber={whatsappNumber}
-          notify={notify}
-        />
-      )}
-
-      {/* MODAL LANÇAMENTO NO CAIXA */}
-      {showCashTransactionModal && (
-        <div className="modal-backdrop" onClick={()=>setShowCashTransactionModal(false)}>
-          <form className="modal" onClick={e=>e.stopPropagation()} onSubmit={handleCashTransaction} style={{background: '#0f0f12', border: '1px solid #222', maxWidth: '420px'}}>
-            <div className="modal-head"><div><div className="eyebrow">FLUXO DE CAIXA</div><h2>Novo Lançamento no Balcão</h2></div><button type="button" className="icon-btn" onClick={()=>setShowCashTransactionModal(false)}><X size={19}/></button></div>
-
-            <label>Tipo de Lançamento
-              <select value={cashTx.type} onChange={e=>setCashTx({...cashTx, type: e.target.value})}>
-                <option value="in">➕ Entrada / Recebimento de Serviço</option>
-                <option value="out">➖ Sangria / Saída (Despesa / Insumos)</option>
-              </select>
-            </label>
-
-            <label style={{marginTop: '10px'}}>Descrição do Lançamento
-              <input value={cashTx.description} onChange={e=>setCashTx({...cashTx, description: e.target.value})} placeholder="Ex: Pagamento Fornecedor Lâminas / Venda Pomada" required />
-            </label>
-
-            <label style={{marginTop: '10px'}}>Valor (R$)
-              <input type="number" step="0.01" value={cashTx.amount} onChange={e=>setCashTx({...cashTx, amount: e.target.value})} placeholder="0.00" required />
-            </label>
-
-            <div className="modal-foot" style={{marginTop: '20px'}}>
-              <button type="button" className="secondary-btn" onClick={()=>setShowCashTransactionModal(false)}>Cancelar</button>
-              <button className="primary-btn">Salvar Lançamento <ArrowUpRight size={16}/></button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* MODAL CONVIDAR BARBEIRO / MEMBRO */}
-      {showInviteMemberModal && (
-        <div className="modal-backdrop" onClick={()=>setShowInviteMemberModal(false)}>
-          <form className="modal" onClick={e=>e.stopPropagation()} onSubmit={handleInviteMember} style={{background: '#0f0f12', border: '1px solid #222', maxWidth: '420px'}}>
-            <div className="modal-head"><div><div className="eyebrow">EQUIPE DA BARBEARIA</div><h2>Adicionar Barbeiro à Equipe</h2></div><button type="button" className="icon-btn" onClick={()=>setShowInviteMemberModal(false)}><X size={19}/></button></div>
-
-            <p className="muted">O barbeiro cadastrado terá acesso com a conta dele para atender clientes e ver sua produção.</p>
-
-            <label style={{marginTop: '10px'}}>Nome do Barbeiro
-              <input value={newMember.name} onChange={e=>setNewMember({...newMember, name: e.target.value})} placeholder="Ex: Felipe Navalha" required />
-            </label>
-
-            <label style={{marginTop: '10px'}}>E-mail do Barbeiro
-              <input type="email" value={newMember.email} onChange={e=>setNewMember({...newMember, email: e.target.value})} placeholder="barbeiro@seuestabelecimento.com" required />
-            </label>
-
-            <label style={{marginTop: '10px'}}>Função / Cargo
-              <select value={newMember.role} onChange={e=>setNewMember({...newMember, role: e.target.value})}>
-                <option value="barber">✂️ Barbeiro (Acesso à Cadeira & Agenda)</option>
-                <option value="owner">👑 Administrador / Dono (Acesso Total)</option>
-              </select>
-            </label>
-
-            <div className="modal-foot" style={{marginTop: '20px'}}>
-              <button type="button" className="secondary-btn" onClick={()=>setShowInviteMemberModal(false)}>Cancelar</button>
-              <button className="primary-btn">Adicionar à Barbearia <ArrowUpRight size={16}/></button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* IMPRESSÃO DE COMANDA TÉRMICA */}
-      {showPrintModal && (
-        <div className="modal-backdrop" onClick={()=>setShowPrintModal(null)}>
-          <div className="modal" onClick={e=>e.stopPropagation()} style={{background: '#fff', color: '#000', fontFamily: 'monospace', maxWidth: '380px', padding: '15px', borderRadius: '0'}}>
-            <div style={{textAlign: 'center', borderBottom: '1px dashed #000', paddingBottom: '10px', marginBottom: '10px'}}>
-              <h2 style={{fontSize: '18px', margin: 0}}>{storeName.toUpperCase()}</h2>
-              <p style={{fontSize: '10px', margin: '2px 0'}}>{storeAddress}</p>
-              <p style={{fontSize: '11px', margin: '4px 0'}}>COMANDA: {showPrintModal.id}</p>
-              <small>{new Date().toLocaleString('pt-BR')}</small>
-            </div>
-
-            <div style={{fontSize: '12px', lineHeight: '1.4'}}>
-              <p style={{margin: '4px 0'}}><strong>CLIENTE:</strong> {showPrintModal.customer}</p>
-              <p style={{margin: '4px 0'}}><strong>TEL:</strong> {showPrintModal.phone || 'Não informado'}</p>
-              <p style={{margin: '4px 0'}}><strong>SERVIÇO:</strong> {showPrintModal.service}</p>
-              <p style={{margin: '4px 0'}}><strong>PROFISSIONAL:</strong> {showPrintModal.barberName}</p>
-              <p style={{margin: '4px 0'}}><strong>STATUS:</strong> {showPrintModal.status}</p>
-              <p style={{margin: '4px 0'}}><strong>VALOR TOTAL:</strong> {showPrintModal.amount}</p>
-            </div>
-
-            <div style={{borderTop: '1px dashed #000', marginTop: '10px', paddingTop: '10px', textAlign: 'center', fontSize: '9px'}}>
-              <p style={{margin: 0}}>Obrigado pela preferência! Volte sempre.</p>
-              <br/>
-              <p>___________________________________<br/>Assinatura</p>
-            </div>
-
-            <div style={{marginTop: '15px', display: 'flex', gap: '8px'}} className="no-print">
-              <button className="primary-btn full-btn" onClick={() => window.print()} style={{background: '#000', color: '#fff'}}>
-                <Printer size={16}/> Imprimir Comanda Térmica
+            <div className="sidebar-bottom">
+              {userRole === 'tech' && !isAccountExpired && (
+                <div className="plan-card" style={{background: '#111', border: '1px solid #222'}}>
+                  <div className="plan-icon"><Sparkles size={16}/></div>
+                  <strong>RT Mobile OS</strong>
+                  <p>Seu estabelecimento organizado e produtivo.</p>
+                  <div className="plan-progress"><span style={{width: '100%', background: '#25D366'}}/></div>
+                  <small style={{color: '#25D366'}}>• {isLifetimeAdmin ? '👑 Licença Vitalícia Ativa' : (isTrialActive ? `Teste Grátis (${trialTimeLeft}h restantes)` : `Plano Profissional (${planDaysLeft} dias restantes)`)}</small>
+                </div>
+              )}
+              <button className="profile-row" onClick={()=>userRole === 'tech' ? setActive('settings') : logout()} style={{background: '#121215'}}>
+                <div className="profile-avatar">{userRole === 'tech' ? storeName.slice(0, 1).toUpperCase() : 'C'}</div>
+                <div className="profile-info">
+                  <strong>{userRole === 'tech' ? (userAccessLevel === 'owner' ? 'Dono (Admin)' : 'Operador') : 'Cliente'}</strong>
+                  <span>{session?.user?.email || 'Conectado'}</span>
+                </div>
+                <span style={{letterSpacing: '2px', color: '#666'}}>•••</span>
               </button>
-              <button className="secondary-btn" onClick={()=>setShowPrintModal(null)} style={{background: '#eee', color: '#000'}}>Fechar</button>
             </div>
-          </div>
-        </div>
-      )}
+          </aside>
 
-      {/* MODAL NOVO AGENDAMENTO / COMANDA */}
-      {showNewOrder && (
-        <div className="modal-backdrop" onClick={()=>setShowNewOrder(false)}>
-          <form className="modal" onClick={e=>e.stopPropagation()} onSubmit={handleCreateOrder} style={{background: '#0f0f12', border: '1px solid #222'}}>
-            <div className="modal-head"><div><div className="eyebrow">NOVA COMANDA</div><h2>Novo Agendamento / Atendimento</h2></div><button type="button" className="icon-btn" onClick={()=>setShowNewOrder(false)}><X size={19}/></button></div>
-            <p className="muted">Registre o cliente, o serviço escolhido e o profissional responsável.</p>
+          {mobileNav && <div className="nav-overlay" onClick={()=>setMobileNav(false)} />}
 
-            <label>Cliente
-              <input list="customers-list" value={newOrder.customer} onChange={e=>{
-                  const val = e.target.value;
-                  const found = customers.find(c => c.name === val);
-                  setNewOrder({...newOrder, customer: val, phone: found?.phone || newOrder.phone});
-                }} placeholder="Nome do cliente" required/>
-              <datalist id="customers-list">
-                {customers.map(c => <option key={c.id} value={c.name}>{c.phone ? `(${c.phone})` : ''}</option>)}
-              </datalist>
-            </label>
-
-            <div className="form-grid">
-              <label>Telefone / WhatsApp<input value={newOrder.phone} onChange={e=>setNewOrder({...newOrder, phone: e.target.value})} placeholder="(91) 99999-9999"/></label>
-              <label>Barbeiro Responsável
-                <input value={newOrder.barberName} onChange={e=>setNewOrder({...newOrder, barberName: e.target.value})} placeholder="Nome do barbeiro"/>
-              </label>
-            </div>
-
-            <div className="form-grid">
-              <label>Serviço Principal
-                <select value={newOrder.service} onChange={e=>{
-                  const selected = servicesList.find(s => s.name === e.target.value);
-                  setNewOrder({...newOrder, service: e.target.value, amount: selected?.defaultPrice || newOrder.amount});
+          <main className="main-area" style={{background: '#08080a', position: 'relative'}}>
+            {userRole === 'tech' && isAccountExpired && !isLifetimeAdmin ? (
+              <div style={{
+                position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', minHeight: '100vh',
+                background: 'radial-gradient(circle at center, #111116 0%, #050507 100%)',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                padding: '24px', textAlign: 'center', zIndex: 99
+              }}>
+                <div style={{
+                  background: '#0d0d12', border: '1px solid #27272a', padding: '36px', borderRadius: '16px',
+                  maxWidth: '480px', width: '100%', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)'
                 }}>
-                  {servicesList.map(s => <option key={s.name} value={s.name}>{s.name} (R$ {s.defaultPrice})</option>)}
-                </select>
-              </label>
-              <label>Valor Total (R$)
-                <input type="number" step="0.01" value={newOrder.amount} onChange={e=>setNewOrder({...newOrder, amount: e.target.value})} placeholder="0.00" required/>
-              </label>
-            </div>
+                  <div style={{width: '64px', height: '64px', background: '#27272a', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', color: '#f59e0b'}}>
+                    <Lock size={32}/>
+                  </div>
+                  <h2 style={{fontSize: '22px', fontWeight: 'bold', margin: '0 0 10px', color: '#fff'}}>
+                    {expiredReason === 'monthly' ? 'Assinatura Mensal Vencida' : 'Período de Teste Finalizado'}
+                  </h2>
+                  <p style={{fontSize: '14px', color: '#a1a1aa', lineHeight: '1.5', margin: '0 0 24px'}}>
+                    {expiredReason === 'monthly'
+                      ? 'Seu plano mensal de 30 dias na RT Mobile encerrou. Renove sua assinatura para continuar usando o sistema.'
+                      : 'Suas 48 horas de teste gratuito na RT Mobile se esgotaram. Seus dados, ordens de serviço, clientes e estoque continuam salvos e seguros.'}
+                  </p>
 
-            <div className="form-grid">
-              <label>Data do Agendamento
-                <input type="date" value={newOrder.scheduledDate} onChange={e=>setNewOrder({...newOrder, scheduledDate: e.target.value})} required/>
-              </label>
-              <label>Horário
-                <input type="time" value={newOrder.scheduledTime} onChange={e=>setNewOrder({...newOrder, scheduledTime: e.target.value})} required/>
-              </label>
-            </div>
+                  <div style={{background: '#000', border: '1px solid #333', borderRadius: '12px', padding: '20px', margin: '0 0 24px'}}>
+                    <QrCode size={130} color="#25D366" style={{margin: '0 auto 12px', display: 'block'}} />
+                    <span style={{fontSize: '12px', color: '#888'}}>Chave Pix (Telefone / PicPay):</span>
+                    <div style={{fontSize: '16px', fontWeight: 'bold', color: '#fff', background: '#18181f', padding: '8px', borderRadius: '6px', margin: '6px 0', border: '1px solid #444'}}>
+                      {adminPixKey}
+                    </div>
+                    <button 
+                      type="button" 
+                      onClick={() => { navigator.clipboard.writeText(adminPixKey); notify('Chave Pix copiada com sucesso!'); }}
+                      className="secondary-btn" 
+                      style={{fontSize: '11px', padding: '4px 10px', margin: '6px auto 0', display: 'flex', alignItems: 'center', gap: '4px'}}
+                    >
+                      <Copy size={12}/> Copiar Chave Pix
+                    </button>
+                    <small style={{color: '#aaa', fontSize: '11px', display: 'block', marginTop: '6px'}}>Valor: R$ 50,00/mês | Titular: Robert (RT Mobile)</small>
+                  </div>
 
-            <div className="form-grid">
-              <label>Status Inicial
-                <select value={newOrder.status} onChange={e=>setNewOrder({...newOrder, status: e.target.value})}>
-                  {['Agendado', 'Em atendimento', 'Aguardando pagamento', 'Finalizado'].map(s=><option key={s}>{s}</option>)}
-                </select>
-              </label>
-              <label>Custo de Insumos/Produtos (R$)
-                <input type="number" step="0.01" value={newOrder.costProduct} onChange={e=>setNewOrder({...newOrder, costProduct: e.target.value})} placeholder="0.00"/>
-              </label>
-            </div>
+                  <a 
+                    href={`https://wa.me/${adminWhatsapp}?text=${encodeURIComponent(`Olá Robert! Minha assinatura da loja (${session?.user?.email}) encerrou. Acabei de realizar o Pix de R$ 50,00 para renovar por 30 dias, pode liberar meu acesso?`)}`}
+                    target="_blank" 
+                    rel="noreferrer"
+                    className="primary-btn full-btn"
+                    style={{background: '#25D366', color: '#000', fontWeight: 'bold', textDecoration: 'none', padding: '12px', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'}}
+                  >
+                    <MessageCircle size={18}/> Enviar Comprovante no WhatsApp
+                  </a>
 
-            <label>Observações / Estilo do Corte
-              <input value={newOrder.notes} onChange={e=>setNewOrder({...newOrder, notes: e.target.value})} placeholder="Ex: Degradê navalhado alto, barba com pigmentação"/>
-            </label>
+                  <button 
+                    onClick={logout}
+                    className="secondary-btn full-btn"
+                    style={{marginTop: '12px', padding: '10px', fontSize: '13px'}}
+                  >
+                    Sair da conta
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                {userRole === 'tech' && isTrialActive && !isLifetimeAdmin && (
+                  <div style={{background: 'linear-gradient(90deg, #1e3a8a, #0284c7)', color: '#fff', padding: '8px 16px', fontSize: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: '500'}}>
+                    <span style={{display: 'flex', alignItems: 'center', gap: '6px'}}>
+                      <Clock size={15}/> ⏳ PERÍODO DE TESTE GRÁTIS ATIVO: Você tem <strong>{trialTimeLeft} horas restantes</strong> para usar todas as funções!
+                    </span>
+                    <button onClick={()=>setShowPaymentModal(true)} style={{background: '#fff', color: '#000', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px'}}>
+                      Ativar R$ 50/mês
+                    </button>
+                  </div>
+                )}
 
-            <div className="modal-foot">
-              <button type="button" className="secondary-btn" onClick={()=>setShowNewOrder(false)}>Cancelar</button>
-              <button className="primary-btn" disabled={saving}>{saving ? 'Salvando...' : 'Confirmar Comanda'}<ArrowUpRight size={16}/></button>
-            </div>
-          </form>
-        </div>
-      )}
+                {userRole === 'tech' && !isTrialActive && !isLifetimeAdmin && planDaysLeft <= 5 && (
+                  <div style={{background: 'linear-gradient(90deg, #b45309, #d97706)', color: '#fff', padding: '8px 16px', fontSize: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: '500'}}>
+                    <span style={{display: 'flex', alignItems: 'center', gap: '6px'}}>
+                      <AlertTriangle size={15}/> ⚠️ ATENÇÃO: Sua assinatura expira em <strong>{planDaysLeft} dias</strong>! Renove para não perder o acesso ao caixa e ordens.
+                    </span>
+                    <button onClick={()=>setShowPaymentModal(true)} style={{background: '#fff', color: '#000', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px'}}>
+                      Renovar Pix (R$ 50)
+                    </button>
+                  </div>
+                )}
 
-      {/* MODAL NOVO CLIENTE */}
-      {showNewCustomer && (
-        <div className="modal-backdrop" onClick={()=>setShowNewCustomer(false)}>
-          <form className="modal" onClick={e=>e.stopPropagation()} onSubmit={handleCreateCustomer} style={{background: '#0f0f12', border: '1px solid #222'}}>
-            <div className="modal-head"><div><div className="eyebrow">BASE DE CLIENTES</div><h2>Cadastrar Cliente</h2></div><button type="button" className="icon-btn" onClick={()=>setShowNewCustomer(false)}><X size={19}/></button></div>
-            <label>Nome Completo<input value={newCustomer.name} onChange={e=>setNewCustomer({...newCustomer, name: e.target.value})} placeholder="Nome do cliente" required/></label>
-            <div className="form-grid">
-              <label>Telefone / WhatsApp<input value={newCustomer.phone} onChange={e=>setNewCustomer({...newCustomer, phone: e.target.value})} placeholder="(91) 99999-9999"/></label>
-              <label>E-mail<input type="email" value={newCustomer.email} onChange={e=>setNewCustomer({...newCustomer, email: e.target.value})} placeholder="cliente@email.com"/></label>
-            </div>
-            <div className="modal-foot"><button type="button" className="secondary-btn" onClick={()=>setShowNewCustomer(false)}>Cancelar</button><button className="primary-btn" disabled={saving}>{saving ? 'Salvando...' : 'Salvar Cliente'}<ArrowUpRight size={16}/></button></div>
-          </form>
-        </div>
-      )}
+                <header className="topbar" style={{background: '#0a0a0c', borderBottom: '1px solid #18181b'}}>
+                  <div className="topbar-left">
+                    <button className="icon-btn menu-trigger" onClick={()=>setMobileNav(true)}><Menu size={20}/></button>
+                    <div className="breadcrumb">{storeName} <span>/</span> <strong>{activeNav.find(n=>n.id===active)?.label || 'Visão geral'}</strong></div>
+                  </div>
+                  <div className="topbar-actions">
+                    <div className="system-status"><span className="status-dot" style={{background: '#25D366'}}/> RT Mobile v1.0</div>
+                    <button className="icon-btn notification-btn" onClick={()=>notify('Você está em dia.')}><Bell size={18}/><i/></button>
+                    <button className="top-avatar" onClick={()=>userRole === 'tech' ? setActive('settings') : logout()}>
+                      {userRole === 'tech' ? storeName.slice(0, 1).toUpperCase() : 'C'}
+                    </button>
+                  </div>
+                </header>
 
-      {/* MODAL NOVO PRODUTO NO ESTOQUE */}
-      {showNewProduct && (
-        <div className="modal-backdrop" onClick={()=>setShowNewProduct(false)}>
-          <form className="modal" onClick={e=>e.stopPropagation()} onSubmit={handleCreateProduct} style={{background: '#0f0f12', border: '1px solid #222'}}>
-            <div className="modal-head"><div><div className="eyebrow">PRODUTOS DA BARBEARIA</div><h2>Cadastrar Produto</h2></div><button type="button" className="icon-btn" onClick={()=>setShowNewProduct(false)}><X size={19}/></button></div>
+                {active==='overview' && userRole === 'tech' && <Overview orders={orders} storeName={storeName} onNew={()=>setShowNewOrder(true)} onNavigate={setActive} modules={modules} inventory={inventory} />}
+                {active==='orders' && userRole === 'tech' && <OrdersPage orders={filteredOrders} search={search} setSearch={setSearch} onNew={()=>setShowNewOrder(true)} onStatus={handleUpdateStatus} onShare={shareOsStatusWhatsapp} onSendWarranty={sendWarrantyTermWhatsapp} onOpenChecklist={(o) => setShowChecklistModal(o)} onPrint={(o) => setShowPrintModal(o)} onPellicleReminder={sendPellicleReminder} />}
+                {active==='customers' && userRole === 'tech' && <CustomersPage customers={customers} onNew={()=>setShowNewCustomer(true)} />}
+                {active==='crm' && userRole === 'tech' && <CrmPage customers={customers} storeName={storeName} whatsapp={whatsappNumber} />}
+                {active==='cash' && userRole === 'tech' && <CashPage cashRegister={cashRegister} onNewTransaction={() => setShowCashTransactionModal(true)} />}
+                {active==='inventory' && userRole === 'tech' && <InventoryPage inventory={inventory} onNew={()=>setShowNewProduct(true)} onUpdateQty={updateProductQty} onDelete={deleteProduct} />}
+                {active==='client_inventory' && <ClientInventoryPage inventory={inventory} storeName={storeName} cart={cart} addToCart={addToCart} onOpenCart={() => setShowCartModal(true)} />}
+                {active==='stores_directory' && <StoresDirectoryPage stores={activeStores} onSelectStore={(s) => { setStoreName(s.name); setWhatsappNumber(s.phone); notify(`Estabelecimento "${s.name}" selecionado!`); setActive('store'); }} onRequestQuote={(s) => setShowQuoteModal(s)} />}
+                {active==='store' && <StorePage whatsapp={whatsappNumber} storeName={storeName} onUpgrade={() => setShowUpgradeModal(true)} />}
+                {active==='track' && <TrackPage orders={orders} storeName={storeName} pixKey={pixKey} whatsapp={whatsappNumber} storeAddress={storeAddress} mapsUrl={mapsUrl} setOrders={setOrders} notify={notify} />}
+                {active==='finance' && userRole === 'tech' && userAccessLevel === 'owner' && <FinancePage orders={orders} commissionRate={techCommissionRate} setCommissionRate={setTechCommissionRate} />}
+                {active==='payments' && userRole === 'tech' && <PaymentsPage pixKey={pixKey} setPixKey={setPixKey} onShowPayModal={() => setShowPaymentModal(true)} />}
+                {active==='settings' && userRole === 'tech' && <SettingsPage configured={supabaseConfigured} email={session?.user?.email} storeName={storeName} setStoreName={setStoreName} storeLogo={storeLogo} onLogoUpload={handleLogoUpload} whatsapp={whatsappNumber} setWhatsapp={setWhatsappNumber} pixKey={pixKey} setPixKey={setPixKey} storeAddress={storeAddress} setStoreAddress={setStoreAddress} mapsUrl={mapsUrl} setMapsUrl={setMapsUrl} modules={modules} setModules={setModules} onLogout={logout} teamMembers={teamMembers} onInviteMember={() => setShowInviteMemberModal(true)} auditLogs={auditLogs} userAccessLevel={userAccessLevel} isLifetimeAdmin={isLifetimeAdmin} upgradeAssistantEnabled={upgradeAssistantEnabled} setUpgradeAssistantEnabled={setUpgradeAssistantEnabled} upgradeDiscounts={upgradeDiscounts} setUpgradeDiscounts={setUpgradeDiscounts} />}
 
-            <label>Nome do Produto
-              <input value={newProduct.name} onChange={e=>setNewProduct({...newProduct, name: e.target.value})} placeholder="Ex: Pomada Efeito Matte 150g" required />
-            </label>
+                <footer className="footer" style={{borderTop: '1px solid #18181b', color: '#666', padding: '20px', fontSize: '11px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px'}}>
+                  <span>{storeName.toUpperCase()} <span className="footer-dot">•</span> GESTÃO PROFISSIONAL</span>
+                  <span>
+                    DESENVOLVIDO POR <strong style={{color: '#aaa'}}>RT MOBILE</strong> 
+                    <span style={{margin: '0 8px', color: '#444'}}>|</span> 
+                    Quer este sistema no seu estabelecimento?{' '}
+                    <a 
+                      href={`https://wa.me/${adminWhatsapp}?text=${encodeURIComponent('Olá! Vi o sistema RT Mobile rodando em um estabelecimento e gostaria de saber como ter no meu negócio.')}`} 
+                      target="_blank" 
+                      rel="noreferrer" 
+                      style={{color: '#25D366', fontWeight: 'bold', textDecoration: 'none'}}
+                    >
+                      Falar com Desenvolvedor ↗
+                    </a>
+                  </span>
+                </footer>
+              </>
+            )}
+          </main>
 
-            <div className="form-grid">
-              <label>Categoria
-                <select value={newProduct.category} onChange={e=>setNewProduct({...newProduct, category: e.target.value})}>
-                  {['Finalizadores', 'Cuidados com a Barba', 'Cabelo', 'Bebidas & Bar', 'Outros'].map(c => <option key={c}>{c}</option>)}
-                </select>
-              </label>
-              <label>Preço de Venda (R$)
-                <input value={newProduct.price} onChange={e=>setNewProduct({...newProduct, price: e.target.value})} placeholder="0.00" required />
-              </label>
-            </div>
+          {/* MODAL DO CARRINHO DE COMPRAS & CHECKOUT PIX */}
+          {showCartModal && (
+            <CartModal
+              cart={cart}
+              onClose={() => setShowCartModal(false)}
+              onUpdateQty={updateCartQty}
+              onClear={clearCart}
+              pixKey={pixKey}
+              storeName={storeName}
+              storeAddress={storeAddress}
+              whatsappNumber={whatsappNumber}
+              notify={notify}
+            />
+          )}
 
-            <div className="form-grid">
-              <label>Quantidade em Estoque
-                <input type="number" min="0" value={newProduct.qty} onChange={e=>setNewProduct({...newProduct, qty: e.target.value})} required />
-              </label>
-              <label>Foto do Produto (Opcional)
-                <label className="secondary-btn" style={{cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', height: '38px', marginTop: '4px'}}>
-                  <Camera size={16}/> {newProduct.photo ? 'Foto Selecionada' : 'Enviar Foto'}
-                  <input type="file" accept="image/*" onChange={handleProductPhotoUpload} style={{display: 'none'}} />
+          {/* MODAL LANÇAMENTO NO CAIXA DA LOJA */}
+          {showCashTransactionModal && (
+            <div className="modal-backdrop" onClick={()=>setShowCashTransactionModal(false)}>
+              <form className="modal" onClick={e=>e.stopPropagation()} onSubmit={handleCashTransaction} style={{background: '#0f0f12', border: '1px solid #222', maxWidth: '420px'}}>
+                <div className="modal-head"><div><div className="eyebrow">FLUXO DE CAIXA</div><h2>Nova Movimentação no Caixa</h2></div><button type="button" className="icon-btn" onClick={()=>setShowCashTransactionModal(false)}><X size={19}/></button></div>
+
+                <label>Tipo de Lançamento
+                  <select value={cashTx.type} onChange={e=>setCashTx({...cashTx, type: e.target.value})}>
+                    <option value="in">➕ Entrada / Suprimento (Troco/Venda)</option>
+                    <option value="out">➖ Sangria / Saída (Despesas/Insumos)</option>
+                  </select>
                 </label>
-              </label>
-            </div>
 
-            <div className="modal-foot">
-              <button type="button" className="secondary-btn" onClick={()=>setShowNewProduct(false)}>Cancelar</button>
-              <button className="primary-btn">Salvar Produto <ArrowUpRight size={16}/></button>
+                <label style={{marginTop: '10px'}}>Descrição do Lançamento
+                  <input value={cashTx.description} onChange={e=>setCashTx({...cashTx, description: e.target.value})} placeholder="Ex: Pagamento Fornecedor / Venda Balcão" required />
+                </label>
+
+                <label style={{marginTop: '10px'}}>Valor (R$)
+                  <input type="number" step="0.01" value={cashTx.amount} onChange={e=>setCashTx({...cashTx, amount: e.target.value})} placeholder="0.00" required />
+                </label>
+
+                <div className="modal-foot" style={{marginTop: '20px'}}>
+                  <button type="button" className="secondary-btn" onClick={()=>setShowCashTransactionModal(false)}>Cancelar</button>
+                  <button className="primary-btn">Salvar Lançamento <ArrowUpRight size={16}/></button>
+                </div>
+              </form>
             </div>
-          </form>
+          )}
+
+          {/* MODAL CONVIDAR MEMBRO */}
+          {showInviteMemberModal && (
+            <div className="modal-backdrop" onClick={()=>setShowInviteMemberModal(false)}>
+              <form className="modal" onClick={e=>e.stopPropagation()} onSubmit={handleInviteMember} style={{background: '#0f0f12', border: '1px solid #222', maxWidth: '420px'}}>
+                <div className="modal-head"><div><div className="eyebrow">EQUIPE DO ESTABELECIMENTO</div><h2>Adicionar Operador / Técnico</h2></div><button type="button" className="icon-btn" onClick={()=>setShowInviteMemberModal(false)}><X size={19}/></button></div>
+
+                <p className="muted">O membro convidado usará o e-mail cadastrado para acessar o mesmo estabelecimento sem pagar assinatura extra.</p>
+
+                <label style={{marginTop: '10px'}}>Nome Completo
+                  <input value={newMember.name} onChange={e=>setNewMember({...newMember, name: e.target.value})} placeholder="Ex: João Silva" required />
+                </label>
+
+                <label style={{marginTop: '10px'}}>E-mail do Membro
+                  <input type="email" value={newMember.email} onChange={e=>setNewMember({...newMember, email: e.target.value})} placeholder="membro@seuestabelecimento.com" required />
+                </label>
+
+                <label style={{marginTop: '10px'}}>Função / Cargo
+                  <select value={newMember.role} onChange={e=>setNewMember({...newMember, role: e.target.value})}>
+                    <option value="technician">🛠️ Operador / Técnico (Acesso Restrito)</option>
+                    <option value="owner">👑 Administrador (Acesso Total)</option>
+                  </select>
+                </label>
+
+                <div className="modal-foot" style={{marginTop: '20px'}}>
+                  <button type="button" className="secondary-btn" onClick={()=>setShowInviteMemberModal(false)}>Cancelar</button>
+                  <button className="primary-btn">Convidar para Estabelecimento <ArrowUpRight size={16}/></button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* IMPRESSÃO DE COMPROVANTE TÉRMICO */}
+          {showPrintModal && (
+            <div className="modal-backdrop" onClick={()=>setShowPrintModal(null)}>
+              <div className="modal" onClick={e=>e.stopPropagation()} style={{background: '#fff', color: '#000', fontFamily: 'monospace', maxWidth: '380px', padding: '15px', borderRadius: '0'}}>
+                <div style={{textAlign: 'center', borderBottom: '1px dashed #000', paddingBottom: '10px', marginBottom: '10px'}}>
+                  <h2 style={{fontSize: '18px', margin: 0}}>{storeName.toUpperCase()}</h2>
+                  <p style={{fontSize: '10px', margin: '2px 0'}}>{storeAddress}</p>
+                  <p style={{fontSize: '11px', margin: '4px 0'}}>ORDEM DE SERVIÇO: {showPrintModal.id}</p>
+                  <small>{new Date().toLocaleString('pt-BR')}</small>
+                </div>
+
+                <div style={{fontSize: '12px', lineHeight: '1.4'}}>
+                  <p style={{margin: '4px 0'}}><strong>CLIENTE:</strong> {showPrintModal.customer}</p>
+                  <p style={{margin: '4px 0'}}><strong>TEL:</strong> {showPrintModal.phone || 'Não informado'}</p>
+                  <p style={{margin: '4px 0'}}><strong>APARELHO:</strong> {showPrintModal.device}</p>
+
+                  <div style={{margin: '6px 0', background: '#eee', padding: '6px', borderRadius: '4px'}}>
+                    <p style={{margin: 0}}><strong>🔑 SENHA:</strong> {showPrintModal.devicePassword || 'Sem Senha'}</p>
+                    {showPrintModal.patternDrawing && (
+                      <div style={{marginTop: '6px', textAlign: 'center'}}>
+                        <span style={{fontSize: '10px', display: 'block', color: '#555', marginBottom: '4px'}}>PADRÃO DE DESENHO:</span>
+                        <img src={showPrintModal.patternDrawing} alt="Padrão" style={{width: '90px', height: '90px', border: '1px solid #000', background: '#000', borderRadius: '4px'}}/>
+                      </div>
+                    )}
+                  </div>
+
+                  <p style={{margin: '4px 0'}}><strong>DEFEITO:</strong> {showPrintModal.issue}</p>
+                  <p style={{margin: '4px 0'}}><strong>STATUS:</strong> {showPrintModal.status}</p>
+                  <p style={{margin: '4px 0'}}><strong>VALOR TOTAL:</strong> {showPrintModal.amount}</p>
+                  <p style={{margin: '4px 0'}}><strong>GARANTIA:</strong> {showPrintModal.warrantyDays} Dias</p>
+                </div>
+
+                <div style={{borderTop: '1px dashed #000', marginTop: '10px', paddingTop: '10px', textAlign: 'center', fontSize: '9px'}}>
+                  <p style={{margin: 0}}>TERMOS DE GARANTIA: A garantia não cobre danos físicos, líquidos ou selo violado. Aparelhos não retirados em 90 dias serão vendidos.</p>
+                  <br/>
+                  <p>___________________________________<br/>Assinatura do Cliente</p>
+                </div>
+
+                <div style={{marginTop: '15px', display: 'flex', gap: '8px'}} className="no-print">
+                  <button className="primary-btn full-btn" onClick={() => window.print()} style={{background: '#000', color: '#fff'}}>
+                    <Printer size={16}/> Imprimir Cupom Térmico
+                  </button>
+                  <button className="secondary-btn" onClick={()=>setShowPrintModal(null)} style={{background: '#eee', color: '#000'}}>Fechar</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* MODAL PEDIR ORÇAMENTO */}
+          {showQuoteModal && (
+            <div className="modal-backdrop" onClick={()=>setShowQuoteModal(null)}>
+              <div className="modal" onClick={e=>e.stopPropagation()} style={{background: '#0f0f12', border: '1px solid #222', maxWidth: '420px'}}>
+                <div className="modal-head"><div><div className="eyebrow">SOLICITAR ORÇAMENTO</div><h2>{showQuoteModal.name}</h2></div><button type="button" className="icon-btn" onClick={()=>setShowQuoteModal(null)}><X size={19}/></button></div>
+                <p className="muted">Descreva sua solicitação para receber um orçamento prévio no WhatsApp do estabelecimento.</p>
+                <label style={{marginTop: '10px'}}>Detalhes do pedido / serviço
+                  <textarea placeholder="Ex: Preciso de orçamento para..." rows="3" id="quoteDesc" style={{background: '#111', color: '#fff', border: '1px solid #333', padding: '10px', borderRadius: '8px', width: '100%', marginTop: '6px'}}/>
+                </label>
+                <button className="primary-btn full-btn" style={{marginTop: '15px', background: '#25D366', color: '#000', fontWeight: 'bold'}} onClick={() => {
+                  const val = document.getElementById('quoteDesc').value;
+                  const text = encodeURIComponent(`Olá ${showQuoteModal.name}! Gostaria de solicitar um orçamento para o seguinte:\n\n"${val}"`);
+                  window.open(`https://wa.me/${showQuoteModal.phone}?text=${text}`, '_blank');
+                  setShowQuoteModal(null);
+                }}>
+                  <MessageCircle size={16}/> Enviar Pedido no WhatsApp da Loja
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* MODAL DE CHECKLIST */}
+          {showChecklistModal && (
+            <div className="modal-backdrop" onClick={()=>setShowChecklistModal(null)}>
+              <div className="modal" onClick={e=>e.stopPropagation()} style={{background: '#0f0f12', border: '1px solid #222', maxWidth: '500px'}}>
+                <div className="modal-head">
+                  <div><div className="eyebrow">RELATÓRIO DE VISTORIA</div><h2>Checklist de Entrada ({showChecklistModal.id})</h2></div>
+                  <button type="button" className="icon-btn" onClick={()=>setShowChecklistModal(null)}><X size={19}/></button>
+                </div>
+
+                <p className="muted">Aparelho: <strong>{showChecklistModal.device}</strong> | Senha: <strong style={{color: '#25D366'}}>{showChecklistModal.devicePassword || 'Sem Senha'}</strong></p>
+
+                <div style={{display: 'flex', flexDirection: 'column', gap: '10px', margin: '15px 0'}}>
+                  {[
+                    { key: 'screen', label: 'Tela / Touchscreen & Display' },
+                    { key: 'faceId', label: 'Face ID / Touch ID (Biometria)' },
+                    { key: 'cameras', label: 'Câmeras Traseira & Frontal' },
+                    { key: 'charging', label: 'Conector de Carga & Bateria' },
+                    { key: 'audio', label: 'Alto-falante, Auricular & Microfone' },
+                    { key: 'wifi', label: 'Wi-Fi, Bluetooth & Sinal de Chip' },
+                    { key: 'housing', label: 'Carcaça Estética & Vidro Traseiro' },
+                  ].map(item => (
+                    <div key={item.key} style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#121215', padding: '10px 14px', borderRadius: '8px', border: '1px solid #222'}}>
+                      <span style={{fontSize: '13px'}}>{item.label}</span>
+                      <div style={{display: 'flex', gap: '6px'}}>
+                        <button 
+                          type="button"
+                          className={`secondary-btn ${showChecklistModal.checklist?.[item.key] === 'ok' ? 'primary-btn' : ''}`}
+                          style={{fontSize: '11px', padding: '4px 10px', background: showChecklistModal.checklist?.[item.key] === 'ok' ? '#25D366' : '#222', color: showChecklistModal.checklist?.[item.key] === 'ok' ? '#000' : '#888'}}
+                          onClick={() => {
+                            const updated = { ...showChecklistModal.checklist, [item.key]: 'ok' };
+                            setOrders(prev => prev.map(o => o.id === showChecklistModal.id ? { ...o, checklist: updated } : o));
+                            setShowChecklistModal({ ...showChecklistModal, checklist: updated });
+                          }}
+                        >
+                          ✓ 100% OK
+                        </button>
+                        <button 
+                          type="button"
+                          className={`secondary-btn ${showChecklistModal.checklist?.[item.key] === 'issue' ? 'primary-btn' : ''}`}
+                          style={{fontSize: '11px', padding: '4px 10px', background: showChecklistModal.checklist?.[item.key] === 'issue' ? '#ff4d4d' : '#222', color: '#fff'}}
+                          onClick={() => {
+                            const updated = { ...showChecklistModal.checklist, [item.key]: 'issue' };
+                            setOrders(prev => prev.map(o => o.id === showChecklistModal.id ? { ...o, checklist: updated } : o));
+                            setShowChecklistModal({ ...showChecklistModal, checklist: updated });
+                          }}
+                        >
+                          ⚠ Defeito / Danificado
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="modal-foot">
+                  <button className="primary-btn full-btn" onClick={()=>{ notify('Vistoria salva com sucesso!'); setShowChecklistModal(null); }}>Salvar Relatório de Vistoria</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {showNewProduct && (
+            <div className="modal-backdrop" onClick={()=>setShowNewProduct(false)}>
+              <form className="modal" onClick={e=>e.stopPropagation()} onSubmit={handleCreateProduct} style={{background: '#0f0f12', border: '1px solid #222'}}>
+                <div className="modal-head"><div><div className="eyebrow">ESTOQUE & PRODUTOS</div><h2>Cadastrar Produto</h2></div><button type="button" className="icon-btn" onClick={()=>setShowNewProduct(false)}><X size={19}/></button></div>
+
+                <label>Nome do Produto / Item
+                  <input value={newProduct.name} onChange={e=>setNewProduct({...newProduct, name: e.target.value})} placeholder="Ex: Capa MagSafe iPhone 15 Pro" required />
+                </label>
+
+                <div className="form-grid">
+                  <label>Categoria
+                    <select value={newProduct.category} onChange={e=>setNewProduct({...newProduct, category: e.target.value})}>
+                      {['Capas', 'Películas', 'Carregadores', 'Fones', 'Caixinhas de Som', 'Outros'].map(c => <option key={c}>{c}</option>)}
+                    </select>
+                  </label>
+                  <label>Preço de Venda (R$)
+                    <input value={newProduct.price} onChange={e=>setNewProduct({...newProduct, price: e.target.value})} placeholder="0,00" required />
+                  </label>
+                </div>
+
+                <div className="form-grid">
+                  <label>Quantidade em Estoque
+                    <input type="number" min="0" value={newProduct.qty} onChange={e=>setNewProduct({...newProduct, qty: e.target.value})} required />
+                  </label>
+                  <label>Foto do Produto (Opcional)
+                    <label className="secondary-btn" style={{cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', height: '38px', marginTop: '4px'}}>
+                      <Camera size={16}/> {newProduct.photo ? 'Foto Selecionada' : 'Enviar Foto'}
+                      <input type="file" accept="image/*" onChange={handleProductPhotoUpload} style={{display: 'none'}} />
+                    </label>
+                  </label>
+                </div>
+
+                <div className="modal-foot">
+                  <button type="button" className="secondary-btn" onClick={()=>setShowNewProduct(false)}>Cancelar</button>
+                  <button className="primary-btn">Salvar no Estoque <ArrowUpRight size={16}/></button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* MODAL DE UPGRADE COM FOTO (CÂMERA/GALERIA) + MODELO + 10 ITENS DE DESCONTO */}
+          {showUpgradeModal && (
+            <div className="modal-backdrop" onClick={()=>setShowUpgradeModal(false)}>
+              <div className="modal" onClick={e=>e.stopPropagation()} style={{background: '#0f0f12', border: '1px solid #222', maxWidth: '520px'}}>
+                <div className="modal-head">
+                  <div><div className="eyebrow">AVALIAÇÃO DE UPGRADE</div><h2>Troque de Aparelho</h2></div>
+                  <button type="button" className="icon-btn" onClick={()=>setShowUpgradeModal(false)}><X size={19}/></button>
+                </div>
+
+                {upgradeStep === 1 ? (
+                  <div>
+                    <p className="muted">Informe seu aparelho, anexe/tire foto e marque o estado real para avaliação.</p>
+
+                    <label style={{marginTop: '10px'}}>Modelo atual que você possui
+                      <input value={currentDevice} onChange={e=>setCurrentDevice(e.target.value)} placeholder="Ex: iPhone 13 Pro Max ou Redmi Note 13" required />
+                    </label>
+
+                    {/* BOTÃO E PREVIEW DA FOTO DO APARELHO (CÂMERA OU GALERIA) */}
+                    <div style={{marginTop: '12px', background: '#121217', padding: '12px', borderRadius: '8px', border: '1px solid #26262e'}}>
+                      <span style={{fontSize: '12px', color: '#aaa', display: 'block', marginBottom: '8px'}}>
+                        📸 Foto do Aparelho Atual (Câmera ou Galeria):
+                      </span>
+
+                      {capturedPhoto ? (
+                        <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
+                          <div style={{width: '70px', height: '70px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #25D366'}}>
+                            <img src={capturedPhoto} alt="Foto do aparelho" style={{width: '100%', height: '100%', objectFit: 'cover'}}/>
+                          </div>
+                          <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
+                            <span style={{fontSize: '12px', color: '#25D366', fontWeight: 'bold'}}>✓ Foto anexada com sucesso</span>
+                            <button
+                              type="button"
+                              className="secondary-btn"
+                              onClick={() => setCapturedPhoto(null)}
+                              style={{fontSize: '11px', padding: '3px 8px', width: 'fit-content', color: '#ef4444', borderColor: '#ef4444'}}
+                            >
+                              <Trash2 size={12}/> Remover / Trocar Foto
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <label className="secondary-btn full-btn" style={{
+                          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          gap: '8px', padding: '10px', background: '#1a1a22', border: '1px dashed #444', borderRadius: '8px'
+                        }}>
+                          <Camera size={18} color="#25D366"/>
+                          <span style={{fontSize: '13px', fontWeight: '500'}}>Tirar Foto ou Escolher da Galeria</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            onChange={handleUpgradePhotoUpload}
+                            style={{display: 'none'}}
+                          />
+                        </label>
+                      )}
+                    </div>
+
+                    {/* PAINEL DO AUXILIAR DE UPGRADE COMPLETO */}
+                    {upgradeAssistantEnabled && (
+                      <div style={{marginTop: '14px', background: '#121217', padding: '14px', borderRadius: '10px', border: '1px solid #26262e'}}>
+                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px'}}>
+                          <span style={{fontSize: '12px', fontWeight: 'bold', color: '#25D366'}}>
+                            ⚡ Auxiliar de Avaliação: Marque se o seu aparelho tem:
+                          </span>
+                        </div>
+
+                        <div style={{display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '220px', overflowY: 'auto', paddingRight: '4px'}}>
+                          {[
+                            { key: 'screenReplaced', label: 'Tela Trocada ou Trincada', val: upgradeDiscounts.screenReplaced },
+                            { key: 'batteryReplaced', label: 'Bateria Trocada / Não Genuína', val: upgradeDiscounts.batteryReplaced },
+                            { key: 'faceIdOff', label: 'Face ID ou Biometria inoperante', val: upgradeDiscounts.faceIdOff },
+                            { key: 'cameraFailed', label: 'Câmera Principal ou Frontal com falha/trocada', val: upgradeDiscounts.cameraFailed },
+                            { key: 'cameraLensScratched', label: 'Lente / Vidrinho da Câmera arranhado', val: upgradeDiscounts.cameraLensScratched },
+                            { key: 'chargingPortFailed', label: 'Conector / Dock de Carga com mau contato', val: upgradeDiscounts.chargingPortFailed },
+                            { key: 'audioSpeakerFailed', label: 'Alto-falante ou Auricular com falha/chiado', val: upgradeDiscounts.audioSpeakerFailed },
+                            { key: 'nfcFailed', label: 'NFC / Pagamento por Aproximação não funciona', val: upgradeDiscounts.nfcFailed },
+                            { key: 'wifiFailed', label: 'Wi-Fi ou Bluetooth inoperante', val: upgradeDiscounts.wifiFailed },
+                            { key: 'housingScratched', label: 'Carcaça ou Vidro Traseiro com marcas/arranhões', val: upgradeDiscounts.housingScratched },
+                          ].map(item => (
+                            <label key={item.key} style={{
+                              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                              padding: '8px 10px', background: selectedDefects[item.key] ? '#1e1414' : '#18181f',
+                              border: `1px solid ${selectedDefects[item.key] ? '#ef4444' : '#2a2a35'}`,
+                              borderRadius: '6px', cursor: 'pointer', margin: 0
+                            }}>
+                              <span style={{fontSize: '12px', color: '#ddd', display: 'flex', alignItems: 'center', gap: '8px'}}>
+                                <input
+                                  type="checkbox"
+                                  checked={selectedDefects[item.key]}
+                                  onChange={e => setSelectedDefects({...selectedDefects, [item.key]: e.target.checked})}
+                                  style={{accentColor: '#ef4444', width: '15px', height: '15px'}}
+                                />
+                                {item.label}
+                              </span>
+                              <span style={{fontSize: '11px', color: '#ef4444', fontWeight: 'bold'}}>
+                                - R$ {Number(item.val).toFixed(2)}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+
+                        {calculateTotalUpgradeDiscount() > 0 && (
+                          <div style={{marginTop: '10px', textAlign: 'right', fontSize: '12px', color: '#ef4444', fontWeight: 'bold'}}>
+                            Abatimento Estimado: - R$ {calculateTotalUpgradeDiscount().toFixed(2)}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <div style={{marginTop: '15px', textAlign: 'center'}}>
+                      <button className="primary-btn full-btn" onClick={()=>setUpgradeStep(2)}>
+                        Avançar e Escolher Novo Aparelho →
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="muted">Qual modelo você gostaria de pegar na troca?</p>
+                    <label style={{marginTop: '10px'}}>Selecione o novo modelo desejado
+                      <select value={targetDevice} onChange={e=>setTargetDevice(e.target.value)}>
+                        <optgroup label="Apple (Seminovos)">
+                          {seminovosList.map(item => <option key={item} value={`${item} (Seminovo)`}>{item} (Seminovo)</option>)}
+                        </optgroup>
+                        <optgroup label="Apple (Lacrados)">
+                          {lacradosList.map(item => <option key={item} value={`${item} (Lacrado)`}>{item} (Lacrado)</option>)}
+                        </optgroup>
+                        <optgroup label="Xiaomi & Poco">
+                          {xiaomiList.map(item => <option key={item} value={item}>{item}</option>)}
+                        </optgroup>
+                        <optgroup label="Realme">
+                          {realmeList.map(item => <option key={item} value={item}>{item}</option>)}
+                        </optgroup>
+                      </select>
+                    </label>
+
+                    {upgradeAssistantEnabled && calculateTotalUpgradeDiscount() > 0 && (
+                      <div style={{marginTop: '12px', padding: '10px', background: '#1c1414', border: '1px solid #7f1d1d', borderRadius: '8px', fontSize: '12px', color: '#fca5a5'}}>
+                        ⚠️ Foi considerado um abatimento prévio de <strong>- R$ {calculateTotalUpgradeDiscount().toFixed(2)}</strong> pelos detalhes informados no seu aparelho atual.
+                      </div>
+                    )}
+
+                    <div className="modal-foot" style={{marginTop: '20px'}}>
+                      <button type="button" className="secondary-btn" onClick={()=>setUpgradeStep(1)}>Voltar</button>
+                      <button type="button" className="primary-btn" onClick={finishUpgradeToWhatsapp} style={{background: '#25D366', color: '#000', fontWeight: 'bold'}}>
+                        <MessageCircle size={16}/> Enviar Proposta no WhatsApp da Loja
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {showNewOrder && (
+            <div className="modal-backdrop" onClick={()=>setShowNewOrder(false)}>
+              <form className="modal" onClick={e=>e.stopPropagation()} onSubmit={handleCreateOrder} style={{background: '#0f0f12', border: '1px solid #222'}}>
+                <div className="modal-head"><div><div className="eyebrow">NOVA ENTRADA</div><h2>Criar ordem de serviço</h2></div><button type="button" className="icon-btn" onClick={()=>setShowNewOrder(false)}><X size={19}/></button></div><p className="muted">Registre os dados principais e a senha do aparelho para os testes.</p>
+                <label>Cliente
+                  <input list="customers-list" value={newOrder.customer} onChange={e=>{
+                      const val = e.target.value;
+                      const found = customers.find(c => c.name === val);
+                      setNewOrder({...newOrder, customer: val, phone: found?.phone || newOrder.phone});
+                    }} placeholder="Selecione ou digite o nome do cliente" required/>
+                  <datalist id="customers-list">
+                    {customers.map(c => <option key={c.id} value={c.name}>{c.phone ? `(${c.phone})` : ''}</option>)}
+                  </datalist>
+                </label>
+                <div className="form-grid">
+                  <label>Telefone / WhatsApp<input value={newOrder.phone} onChange={e=>setNewOrder({...newOrder,phone:e.target.value})} placeholder="(91) 99999-9999"/></label>
+                  <label>Modelo do aparelho<input value={newOrder.device} onChange={e=>setNewOrder({...newOrder,device:e.target.value})} placeholder="Ex.: iPhone 15 Pro ou Redmi Note 15" required/></label>
+                </div>
+
+                <div style={{background: '#121216', padding: '12px', borderRadius: '10px', border: '1px solid #25252d', margin: '10px 0'}}>
+                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px'}}>
+                    <span style={{fontSize: '12px', color: '#f59e0b', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px'}}>
+                      <Key size={14}/> Senha de Desbloqueio
+                    </span>
+                    <div style={{display: 'flex', gap: '4px'}}>
+                      <button
+                        type="button"
+                        onClick={()=>setPasswordType('text')}
+                        className={`secondary-btn ${passwordType === 'text' ? 'primary-btn' : ''}`}
+                        style={{fontSize: '11px', padding: '3px 8px'}}
+                      >
+                        PIN / Texto
+                      </button>
+                      <button
+                        type="button"
+                        onClick={()=>setPasswordType('pattern')}
+                        className={`secondary-btn ${passwordType === 'pattern' ? 'primary-btn' : ''}`}
+                        style={{fontSize: '11px', padding: '3px 8px'}}
+                      >
+                        Padrão Desenho (Android)
+                      </button>
+                    </div>
+                  </div>
+
+                  {passwordType === 'text' ? (
+                    <input value={newOrder.devicePassword} onChange={e=>setNewOrder({...newOrder, devicePassword: e.target.value})} placeholder="Ex: 123456 ou Sem Senha" />
+                  ) : (
+                    <PatternDrawer value={newOrder.patternDrawing} onChange={(drawing) => setNewOrder({...newOrder, patternDrawing: drawing})} />
+                  )}
+                </div>
+
+                <div className="form-grid">
+                  <label>Garantia (Dias)
+                    <select value={newOrder.warrantyDays} onChange={e=>setNewOrder({...newOrder,warrantyDays:e.target.value})}>
+                      <option value="30">30 Dias</option>
+                      <option value="90">90 Dias (3 Meses)</option>
+                      <option value="180">180 Dias (6 Meses)</option>
+                      <option value="365">365 Dias (1 Ano)</option>
+                    </select>
+                  </label>
+                  <label>Status inicial
+                    <select value={newOrder.status} onChange={e=>setNewOrder({...newOrder,status:e.target.value})}>
+                      {['Recebido','Em diagnóstico','Aguardando aprovação','Aguardando peça','Em manutenção','Pronto para retirada','Entregue'].map(s=><option key={s}>{s}</option>)}
+                    </select>
+                  </label>
+                </div>
+                <div className="form-grid">
+                  <label>Valor cobrado (R$)<input type="number" step="0.01" value={newOrder.amount} onChange={e=>setNewOrder({...newOrder,amount:e.target.value})} placeholder="0,00"/></label>
+                  <label>Custo da Peça (R$)<input type="number" step="0.01" value={newOrder.partCost} onChange={e=>setNewOrder({...newOrder,partCost:e.target.value})} placeholder="0,00"/></label>
+                </div>
+                <label>Defeito informado<textarea value={newOrder.issue} onChange={e=>setNewOrder({...newOrder,issue:e.target.value})} placeholder="Descreva o problema relatado..." rows="2" required/></label>
+                <div className="modal-foot"><button type="button" className="secondary-btn" onClick={()=>setShowNewOrder(false)}>Cancelar</button><button className="primary-btn" disabled={saving}>{saving?'Salvando...':'Salvar OS & Vistoria'}<ArrowUpRight size={16}/></button></div>
+              </form>
+            </div>
+          )}
+
+          {showNewCustomer && <div className="modal-backdrop" onClick={()=>setShowNewCustomer(false)}><form className="modal" onClick={e=>e.stopPropagation()} onSubmit={handleCreateCustomer} style={{background: '#0f0f12', border: '1px solid #222'}}><div className="modal-head"><div><div className="eyebrow">NOVO CADASTRO</div><h2>Cadastrar cliente</h2></div><button type="button" className="icon-btn" onClick={()=>setShowNewCustomer(false)}><X size={19}/></button></div><p className="muted">Adicione os dados de contato do cliente.</p><label>Nome completo<input value={newCustomer.name} onChange={e=>setNewCustomer({...newCustomer,name:e.target.value})} placeholder="Nome do cliente" required/></label><div className="form-grid"><label>Telefone / WhatsApp<input value={newCustomer.phone} onChange={e=>setNewCustomer({...newCustomer,phone:e.target.value})} placeholder="(91) 99999-9999"/></label><label>E-mail<input type="email" value={newCustomer.email} onChange={e=>setNewCustomer({...newCustomer,email:e.target.value})} placeholder="cliente@email.com"/></label></div><div className="modal-foot"><button type="button" className="secondary-btn" onClick={()=>setShowNewCustomer(false)}>Cancelar</button><button className="primary-btn" disabled={saving}>{saving?'Salvando...':'Salvar cliente'}<ArrowUpRight size={16}/></button></div></form></div>}
+
+          {toast && <div className="toast"><Check size={17}/>{toast}</div>}
         </div>
       )}
-
-      {toast && <div className="toast"><Check size={17}/>{toast}</div>}
-    </div>
+    </>
   );
 }
 
-function Overview({orders, storeName, onNew, onNavigate, modules, inventory}) {
-  const ready = orders.filter(o=>o.status==='Aguardando pagamento').length;
-  const inProgress = orders.filter(o=>o.status==='Em atendimento').length;
+function Overview({orders,storeName,onNew,onNavigate,modules,inventory}) {
+  const ready = orders.filter(o=>o.status==='Pronto para retirada').length;
+  const waiting = orders.filter(o=>o.status==='Aguardando peça').length;
   const lowStockItems = inventory.filter(p => p.qty < 3);
 
   return <div className="page-content">
     {lowStockItems.length > 0 && (
       <div style={{background: '#451a03', border: '1px solid #b45309', color: '#fef3c7', padding: '10px 16px', borderRadius: '8px', marginBottom: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
         <span style={{display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px'}}>
-          <AlertTriangle size={18} color="#f59e0b"/> ⚠️ <strong>Alerta de Estoque:</strong> {lowStockItems.length} produto(s) com menos de 3 unidades (pomadas, cervejas ou insumos).
+          <AlertTriangle size={18} color="#f59e0b"/> ⚠️ <strong>Alerta de Estoque Mínimo:</strong> {lowStockItems.length} produto(s) com menos de 3 unidades no estoque.
         </span>
         <button onClick={()=>onNavigate('inventory')} style={{background: '#b45309', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px'}}>
           Ver Estoque
@@ -1182,95 +1705,60 @@ function Overview({orders, storeName, onNew, onNavigate, modules, inventory}) {
       </div>
     )}
 
-    <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line"/> PAINEL DE CONTROLE <span className="heading-date">/ HOJE</span></div><h1>Bem-vindo, <span>{storeName}.</span></h1><p>Acompanhe os clientes na cadeira, faturamento e vendas de hoje.</p></div>{modules.appointments && <button className="primary-btn" onClick={onNew}><Plus size={17}/> Nova Comanda / Horário</button>}</div>
+    <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line"/> PAINEL DE CONTROLE <span className="heading-date">/ HOJE</span></div><h1>Bem-vindo, <span>{storeName}.</span></h1><p>Veja o resumo de atendimentos, estoque e vendas de hoje.</p></div>{modules.orders && <button className="primary-btn" onClick={onNew}><Plus size={17}/> Nova ordem de serviço</button>}</div>
+    <div className="hero-panel" style={{background: '#0c0c0f', border: '1px solid #1a1a20'}}><div className="hero-copy"><div className="hero-kicker"><span className="pulse-dot"/> WORKSHOP OVERVIEW</div><h2>Seu estabelecimento.<br/><span>Sob controle.</span></h2><p>Acompanhe serviços, vendas e estoque em um só lugar.</p>{modules.orders && <button className="hero-link" onClick={()=>onNavigate('orders')}>Ver ordens de serviço <ArrowUpRight size={16}/></button>}</div><div className="hero-device"><div className="device-glow"/><div className="device-ring ring-a"/><div className="device-ring ring-b"/><div className="phone-render"><div className="phone-camera"/><div className="phone-screen"><div className="screen-top"><span>RT MOBILE</span><span>•••</span></div><div className="screen-label">STATUS</div><div className="screen-score">100<span>%</span></div><div className="screen-chart"><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/></div><div className="screen-lines"><i/><i/><i/></div></div><div className="phone-side"/></div><div className="floating-chip chip-top"><Activity size={15}/><span><b>Sistema</b><small>Ativo</small></span></div><div className="floating-chip chip-bottom"><ShieldCheck size={15}/><span><b>RT Protegido</b><small>Segurança total</small></span></div></div><div className="hero-index">01 <span>/ 04</span></div></div>
 
-    {modules.appointments && (
-      <div className="metrics-grid">
-        <Metric icon={Calendar} label="Comandas Hoje" value={String(orders.length).padStart(2,'0')} trend="Agendamentos e cortes" tone="blue"/>
-        <Metric icon={Scissors} label="Na Cadeira Agora" value={String(inProgress).padStart(2,'0')} trend="Em atendimento" tone="violet"/>
-        <Metric icon={Clock3} label="Aguardando Pagamento" value={String(ready).padStart(2,'0')} trend="Serviço finalizado" tone="amber"/>
-        <Metric icon={Check} label="Finalizados" value={String(orders.filter(o=>o.status==='Finalizado').length).padStart(2,'0')} trend="Cortes concluídos" tone="green"/>
-      </div>
-    )}
+    {modules.orders && <div className="metrics-grid"><Metric icon={ClipboardList} label="Ordens ativas" value={String(orders.length).padStart(2,'0')} trend="Ordens registradas" tone="blue"/><Metric icon={Wrench} label="Em andamento" value={String(orders.filter(o=>o.status==='Em manutenção').length).padStart(2,'0')} trend="Em atendimento agora" tone="violet"/><Metric icon={Clock3} label="Aguardando peça" value={String(waiting).padStart(2,'0')} trend="Dependem de componente" tone="amber"/><Metric icon={Check} label="Prontos para retirada" value={String(ready).padStart(2,'0')} trend="Aguardam o cliente" tone="green"/></div>}
 
-    <div className="content-grid" style={{marginTop: '20px'}}>
+    <div className="content-grid">
       <section className="panel orders-panel" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
-        <div className="panel-heading"><div><h3>Atendimentos Recentes</h3><p>Últimos clientes agendados e atendidos</p></div>{modules.appointments && <button className="icon-btn" onClick={()=>onNavigate('appointments')}><ArrowUpRight size={17}/></button>}</div>
-        <div className="table-wrap"><table><thead><tr><th>COMANDA / CLIENTE</th><th>SERVIÇO / BARBEIRO</th><th>STATUS</th><th>VALOR</th></tr></thead><tbody>{orders.slice(0,4).map(o=><tr key={o.id}><td><div className="order-id">{o.id}</div><div className="cell-sub">{o.customer}</div></td><td><div className="device-cell"><div className="device-mini"><Scissors size={15}/></div><span>{o.service}</span></div><div className="cell-sub">{o.barberName}</div></td><td><StatusPill status={o.status}/></td><td className="time-cell"><strong>{o.amount}</strong></td></tr>)}</tbody></table></div>
-        {modules.appointments && <button className="panel-bottom-link" onClick={()=>onNavigate('appointments')}>Abrir todas as comandas <ArrowUpRight size={15}/></button>}
+        <div className="panel-heading"><div><h3>Ordens recentes</h3><p>Últimos atendimentos recebidos</p></div>{modules.orders && <button className="icon-btn" onClick={()=>onNavigate('orders')}><ArrowUpRight size={17}/></button>}</div>
+        <div className="table-wrap"><table><thead><tr><th>ORDEM / CLIENTE</th><th>APARELHO</th><th>STATUS</th><th>VALOR</th></tr></thead><tbody>{orders.slice(0,4).map(o=><tr key={o.id}><td><div className="order-id">{o.id}</div><div className="cell-sub">{o.customer}</div></td><td><div className="device-cell"><div className="device-mini"><Smartphone size={15}/></div><span>{o.device}</span></div><div className="cell-sub">{o.issue}</div></td><td><StatusPill status={o.status}/></td><td className="time-cell"><strong>{o.amount}</strong></td></tr>)}</tbody></table></div>
+        {modules.orders && <button className="panel-bottom-link" onClick={()=>onNavigate('orders')}>Abrir todas as ordens <ArrowUpRight size={15}/></button>}
       </section>
 
       <section className="panel quick-panel" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
-        <div className="panel-heading"><div><h3>Acesso Rápido</h3><p>Atalhos do dia a dia na barbearia</p></div><div className="quick-symbol"><Sparkles size={16}/></div></div>
-        {modules.appointments && <QuickAction icon={Plus} title="Novo Atendimento" desc="Abrir comanda ou agendar" onClick={onNew}/>}
-        <QuickAction icon={Users} title="Consultar Clientes" desc="Histórico e contatos" onClick={()=>onNavigate('customers')}/>
-        {modules.inventory && <QuickAction icon={Package} title="Estoque de Pomadas & Bar" desc="Gerenciar produtos" onClick={()=>onNavigate('inventory')}/>}
-        {modules.cashRegister && <QuickAction icon={Wallet} title="Caixa do Balcão" desc="Lançar entradas e sangrias" onClick={()=>onNavigate('cash')}/>}
+        <div className="panel-heading"><div><h3>Acesso rápido</h3><p>Atalhos do dia a dia</p></div><div className="quick-symbol"><Sparkles size={16}/></div></div>
+        {modules.orders && <QuickAction icon={Plus} title="Nova ordem de serviço" desc="Registrar atendimento recebido" onClick={onNew}/>}
+        <QuickAction icon={Users} title="Consultar clientes" desc="Ver dados e histórico" onClick={()=>onNavigate('customers')}/>
+        {modules.inventory && <QuickAction icon={Package} title="Estoque de produtos" desc="Gerenciar acessórios e itens" onClick={()=>onNavigate('inventory')}/>}
+        {modules.iphones && <QuickAction icon={Store} title="Comprar e Upgrade" desc="Aparelhos e trocas" onClick={()=>onNavigate('store')}/>}
+        <div className="quick-note"><ShieldCheck size={15}/><span>Os dados do seu estabelecimento ficam isolados e protegidos.</span></div>
       </section>
     </div>
   </div>
 }
 
-function Metric({icon:Icon,label,value,trend,tone}) {return <div className="metric-card" style={{background: '#0a0a0d', border: '1px solid #18181b'}}><div className="metric-top"><div className={`metric-icon ${tone}`}><Icon size={17}/></div><span className="metric-period">HOJE</span></div><div className="metric-value">{value}</div><div className="metric-label">{label}</div><div className="metric-trend"><span className={`tiny-dot ${tone}`}/>{trend}</div></div>}
+function Metric({icon:Icon,label,value,trend,tone}) {return <div className="metric-card" style={{background: '#0a0a0d', border: '1px solid #18181b'}}><div className="metric-top"><div className={`metric-icon ${tone}`}><Icon size={17}/></div><span className="metric-period">AGORA</span></div><div className="metric-value">{value}</div><div className="metric-label">{label}</div><div className="metric-trend"><span className={`tiny-dot ${tone}`}/>{trend}</div></div>}
 function StatusPill({status}) {return <span className={`status-pill ${statusClass(status)}`}><i/>{status}</span>}
 function QuickAction({icon:Icon,title,desc,onClick}) {return <button className="quick-action" onClick={onClick} style={{background: '#111115'}}><div className="quick-action-icon"><Icon size={17}/></div><span><strong>{title}</strong><small>{desc}</small></span><ArrowUpRight size={15} className="quick-arrow"/></button>}
 
-function AppointmentsPage({orders,search,setSearch,onNew,onStatus,onShare,onPrint,onHaircutReminder}) {
-  return <div className="page-content">
-    <div className="page-heading">
-      <div>
-        <div className="eyebrow"><span className="eyebrow-line"/> OPERAÇÃO NA CADEIRA</div>
-        <h1>Agendamentos & <span>Comandas.</span></h1>
-        <p>Controle a fila de espera, serviços na cadeira e recebimentos.</p>
-      </div>
-      <button className="primary-btn" onClick={onNew}><Plus size={17}/> Nova Comanda</button>
+function OrdersPage({orders,search,setSearch,onNew,onStatus,onShare,onSendWarranty,onOpenChecklist,onPrint,onPellicleReminder}) {
+  return <div className="page-content"><div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line"/> OPERAÇÃO</div><h1>Ordens de <span>serviço.</span></h1><p>Registre entradas e acompanhe cada atendimento do início à entrega.</p></div><button className="primary-btn" onClick={onNew}><Plus size={17}/> Nova ordem</button></div><div className="list-toolbar"><div className="search-box"><Search size={17}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar por cliente, aparelho ou ordem..."/></div><div className="toolbar-count">{orders.length} registros</div></div><div className="panel orders-full" style={{background: '#0a0a0d', border: '1px solid #18181b'}}><div className="table-wrap"><table><thead><tr><th>ORDEM / CLIENTE</th><th>APARELHO / DEFEITO</th><th>SENHA / PADRÃO</th><th>STATUS DO ATENDIMENTO</th><th>VISTORIA</th><th>AÇÕES / DISPAROS</th></tr></thead><tbody>{orders.map(o=><tr key={o.id}><td><div className="order-id">{o.id}</div><div className="cell-sub">{o.customer}</div></td><td><div className="device-cell"><div className="device-mini"><Smartphone size={15}/></div><span>{o.device}</span></div><div className="cell-sub">{o.issue}</div></td><td>
+    <div style={{display: 'flex', alignItems: 'center', gap: '6px'}}>
+      {o.patternDrawing ? (
+        <div style={{display: 'flex', alignItems: 'center', gap: '6px', background: '#000', padding: '2px 6px', borderRadius: '6px', border: '1px solid #333'}}>
+          <img src={o.patternDrawing} alt="Padrão" style={{width: '24px', height: '24px', borderRadius: '3px'}}/>
+          <span style={{fontSize: '11px', color: '#25D366'}}>Padrão</span>
+        </div>
+      ) : (
+        <div style={{display: 'flex', alignItems: 'center', gap: '6px', background: '#111', padding: '4px 8px', borderRadius: '6px', border: '1px solid #333', fontSize: '12px', width: 'fit-content'}}>
+          <Key size={13} color="#f59e0b"/> <strong style={{color: '#fff'}}>{o.devicePassword || 'Sem Senha'}</strong>
+        </div>
+      )}
     </div>
-
-    <div className="list-toolbar"><div className="search-box"><Search size={17}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar por cliente, serviço ou barbeiro..."/></div><div className="toolbar-count">{orders.length} registros</div></div>
-
-    <div className="panel orders-full" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>COMANDA / CLIENTE</th>
-              <th>SERVIÇO / PROFISSIONAL</th>
-              <th>STATUS</th>
-              <th>VALOR</th>
-              <th>AÇÕES / WHATSAPP</th>
-            </tr>
-          </thead>
-          <tbody>
-            {orders.map(o=><tr key={o.id}>
-              <td><div className="order-id">{o.id}</div><div className="cell-sub">{o.customer}</div></td>
-              <td><div className="device-cell"><div className="device-mini"><Scissors size={15}/></div><span>{o.service}</span></div><div className="cell-sub">{o.barberName}</div></td>
-              <td><select className={`status-select ${statusClass(o.status)}`} value={o.status} onChange={e=>onStatus(o.rawId,e.target.value)}>{['Agendado', 'Em atendimento', 'Aguardando pagamento', 'Finalizado', 'Cancelado'].map(s=><option key={s}>{s}</option>)}</select></td>
-              <td className="time-cell"><strong>{o.amount}</strong></td>
-              <td>
-                <div style={{display: 'flex', gap: '6px'}}>
-                  <button className="secondary-btn" onClick={()=>onShare(o)} title="Avisar no WhatsApp" style={{padding: '6px 10px'}}><MessageCircle size={14} color="#25D366"/></button>
-                  <button className="secondary-btn" onClick={()=>onPrint(o)} title="Imprimir Comanda Térmica" style={{padding: '6px 10px'}}><Printer size={14}/></button>
-                  <button className="secondary-btn" onClick={()=>onHaircutReminder(o)} title="Lembrete de Retorno (20 dias)" style={{padding: '6px 10px', color: '#eab308'}}><Calendar size={14}/></button>
-                </div>
-              </td>
-            </tr>)}
-          </tbody>
-        </table>
-        {!orders.length && <div className="empty-state"><Scissors size={28}/><strong>Nenhum agendamento encontrado</strong><span>Registre uma nova comanda de corte ou barba.</span></div>}
-      </div>
-    </div>
-  </div>
+  </td><td><select className={`status-select ${statusClass(o.status)}`} value={o.status} onChange={e=>onStatus(o.rawId,e.target.value)}>{['Recebido','Em diagnóstico','Aguardando aprovação','Aguardando peça','Em manutenção','Pronto para retirada','Entregue'].map(s=><option key={s}>{s}</option>)}</select></td><td><button className="secondary-btn" onClick={()=>onOpenChecklist(o)} style={{display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '12px'}}><CheckSquare size={14} color="#3b82f6"/> Vistoria</button></td><td><div style={{display: 'flex', gap: '6px'}}><button className="secondary-btn" onClick={()=>onShare(o)} title="Disparar Status WhatsApp" style={{padding: '6px 10px'}}><MessageCircle size={14} color="#25D366"/></button><button className="secondary-btn" onClick={()=>onSendWarranty(o)} title="Enviar Termo de Garantia Legal WhatsApp" style={{padding: '6px 10px', color: '#3b82f6'}}><FileText size={14}/></button><button className="secondary-btn" onClick={()=>onPrint(o)} title="Imprimir Cupom Térmico" style={{padding: '6px 10px'}}><Printer size={14}/></button><button className="secondary-btn" onClick={()=>onPellicleReminder(o)} title="Lembrete / Revisão" style={{padding: '6px 10px', color: '#eab308'}}><Calendar size={14}/></button></div></td></tr>)}</tbody></table>{!orders.length && <div className="empty-state"><ClipboardList size={28}/><strong>Nenhuma ordem encontrada</strong><span>Tente mudar a busca ou registre uma nova ordem.</span></div>}</div></div></div>
 }
 
 function CustomersPage({customers, onNew}) {
   return <div className="page-content">
     <div className="page-heading">
       <div>
-        <div className="eyebrow"><span className="eyebrow-line"/> FIDELIZAÇÃO</div>
-        <h1>Base de <span>Clientes.</span></h1>
-        <p>Cadastre seus clientes para disparos de lembretes e pós-atendimento.</p>
+        <div className="eyebrow"><span className="eyebrow-line"/> RELACIONAMENTO</div>
+        <h1>Base de <span>clientes.</span></h1>
+        <p>Centralize os dados e o histórico de atendimento de cada cliente.</p>
       </div>
-      <button className="primary-btn" onClick={onNew}><Plus size={17}/> Novo Cliente</button>
+      <button className="primary-btn" onClick={onNew}><Plus size={17}/> Novo cadastro</button>
     </div>
     <div className="panel orders-full" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
       <div className="table-wrap">
@@ -1278,7 +1766,7 @@ function CustomersPage({customers, onNew}) {
           <thead>
             <tr>
               <th>NOME</th>
-              <th>WHATSAPP / TELEFONE</th>
+              <th>TELEFONE / WHATSAPP</th>
               <th>E-MAIL</th>
               <th>CADASTRADO EM</th>
             </tr>
@@ -1294,7 +1782,7 @@ function CustomersPage({customers, onNew}) {
             ))}
           </tbody>
         </table>
-        {!customers.length && <div className="empty-state"><Users size={28}/><strong>Nenhum cliente cadastrado</strong></div>}
+        {!customers.length && <div className="empty-state"><Users size={28}/><strong>Nenhum cliente cadastrado</strong><span>Clique em "Novo cadastro" para adicionar o primeiro cliente.</span></div>}
       </div>
     </div>
   </div>
@@ -1302,27 +1790,52 @@ function CustomersPage({customers, onNew}) {
 
 function CrmPage({customers, storeName, whatsapp}) {
   const sendSupportFollowup = (customer) => {
-    const text = encodeURIComponent(`Fala ${customer.name}! Tudo bem?\n\nPassando aqui da ${storeName} só para saber se você curtiu o corte/barba e se o resultado ficou do seu agrado!\n\nQualquer ajuste, estamos à disposição por aqui. Grande abraço! 💈✂️`);
+    const deviceName = customer.device || 'seu aparelho';
+    const text = encodeURIComponent(`Olá ${customer.name}! Tudo bem?\n\nPassando aqui da ${storeName} só para saber se deu tudo certo e como está o funcionamento do ${deviceName} depois do serviço realizado com a gente!\n\nSe precisar de qualquer dúvida ou suporte, estamos à disposição por aqui. Abraços!`);
     window.open(`https://wa.me/${customer.phone}?text=${text}`, '_blank');
   };
 
   return <div className="page-content">
     <div className="page-heading">
       <div>
-        <div className="eyebrow"><span className="eyebrow-line"/> PÓS-ATENDIMENTO</div>
-        <h1>Cuidado & <span>Retorno de Clientes.</span></h1>
-        <p>Mantenha contato e garanta que o cliente volte a cada 15 a 20 dias.</p>
+        <div className="eyebrow"><span className="eyebrow-line"/> PÓS-VENDA & CUIDADO</div>
+        <h1>Acompanhamento de <span>Clientes.</span></h1>
+        <p>Envie uma mensagem amigável para saber se o cliente ficou satisfeito, sem parecer invasivo.</p>
       </div>
     </div>
 
-    <div className="panel orders-full" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
+    <div className="metrics-grid" style={{gridTemplateColumns: 'repeat(3, 1fr)'}}>
+      <div className="metric-card" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
+        <div className="metric-top"><span className="metric-period">TOTAL</span></div>
+        <div className="metric-value" style={{color: '#fff'}}>{customers.length}</div>
+        <div className="metric-label">Clientes Atendidos</div>
+      </div>
+
+      <div className="metric-card" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
+        <div className="metric-top"><span className="metric-period">ATENDIMENTO</span></div>
+        <div className="metric-value" style={{color: '#25D366'}}>Receptivo</div>
+        <div className="metric-label">Tom Amigável & Profissional</div>
+      </div>
+
+      <div className="metric-card" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
+        <div className="metric-top"><span className="metric-period">OBJETIVO</span></div>
+        <div className="metric-value" style={{color: '#3b82f6', fontSize: '18px'}}>Fidelização</div>
+        <div className="metric-label">Garantir Satisfação</div>
+      </div>
+    </div>
+
+    <div className="panel orders-full" style={{background: '#0a0a0d', border: '1px solid #18181b', marginTop: '20px'}}>
+      <div className="panel-heading">
+        <div><h3>Histórico de Clientes Atendidos</h3><p>Envie uma mensagem de acompanhamento amigável em 1 clique</p></div>
+      </div>
       <div className="table-wrap">
         <table>
           <thead>
             <tr>
               <th>NOME DO CLIENTE</th>
-              <th>TELEFONE</th>
-              <th>MENSAGEM DE PÓS-CORTE</th>
+              <th>TELEFONE / WHATSAPP</th>
+              <th>ITEM / SERVIÇO</th>
+              <th>MENSAGEM DE CUIDADO</th>
             </tr>
           </thead>
           <tbody>
@@ -1330,15 +1843,17 @@ function CrmPage({customers, storeName, whatsapp}) {
               <tr key={c.id}>
                 <td><strong>{c.name}</strong></td>
                 <td>{c.phone}</td>
+                <td><span className="status-pill neutral">{c.device || 'Atendimento'}</span></td>
                 <td>
                   <button className="primary-btn" onClick={() => sendSupportFollowup(c)} style={{background: '#1a1a24', color: '#25D366', border: '1px solid #25D366', fontSize: '12px', padding: '6px 12px'}}>
-                    <MessageCircle size={14}/> Perguntar Satisfação (WhatsApp)
+                    <MessageCircle size={14}/> Acompanhamento Pós-Venda
                   </button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+        {!customers.length && <div className="empty-state"><HeartHandshake size={28}/><strong>Nenhum cliente cadastrado</strong><span>Os clientes cadastrados aparecerão aqui para acompanhamento pós-serviço.</span></div>}
       </div>
     </div>
   </div>
@@ -1352,9 +1867,9 @@ function CashPage({cashRegister, onNewTransaction}) {
   return <div className="page-content">
     <div className="page-heading">
       <div>
-        <div className="eyebrow"><span className="eyebrow-line"/> FLUXO DO BALCÃO</div>
-        <h1>Caixa da <span>Barbearia.</span></h1>
-        <p>Controle entradas de cortes, produtos, bebidas e despesas do dia.</p>
+        <div className="eyebrow"><span className="eyebrow-line"/> FLUXO DE CAIXA DO ESTABELECIMENTO</div>
+        <h1>Caixa da <span>Loja.</span></h1>
+        <p>Controle entradas, suprimentos de troco, sangrias e despesas do dia a dia.</p>
       </div>
       <button className="primary-btn" onClick={onNewTransaction} style={{background: '#25D366', color: '#000', fontWeight: 'bold'}}>
         <Plus size={17}/> Lançar no Caixa
@@ -1365,33 +1880,40 @@ function CashPage({cashRegister, onNewTransaction}) {
       <div className="metric-card" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
         <div className="metric-top"><span className="metric-period">ABERTURA</span></div>
         <div className="metric-value" style={{color: '#aaa'}}>R$ {cashRegister.openingBalance.toFixed(2)}</div>
-        <div className="metric-label">Fundo de Troco</div>
+        <div className="metric-label">Fundo de Troco Inicial</div>
       </div>
+
       <div className="metric-card" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
         <div className="metric-top"><span className="metric-period">ENTRADAS</span></div>
         <div className="metric-value" style={{color: '#25D366'}}>+ R$ {totalEntries.toFixed(2)}</div>
-        <div className="metric-label">Cortes & Produtos</div>
+        <div className="metric-label">Serviços & Vendas</div>
       </div>
+
       <div className="metric-card" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
-        <div className="metric-top"><span className="metric-period">SAÍDAS</span></div>
+        <div className="metric-top"><span className="metric-period">SANGRIA / SAÍDAS</span></div>
         <div className="metric-value" style={{color: '#ff4d4d'}}>- R$ {totalExits.toFixed(2)}</div>
-        <div className="metric-label">Insumos & Despesas</div>
+        <div className="metric-label">Despesas & Insumos</div>
       </div>
+
       <div className="metric-card" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
-        <div className="metric-top"><span className="metric-period">GAVETA</span></div>
+        <div className="metric-top"><span className="metric-period">SALDO EM GAVETA</span></div>
         <div className="metric-value" style={{color: '#3b82f6'}}>R$ {currentBalance.toFixed(2)}</div>
-        <div className="metric-label">Saldo em Dinheiro</div>
+        <div className="metric-label">Saldo Atual Estimado</div>
       </div>
     </div>
 
     <div className="panel orders-full" style={{background: '#0a0a0d', border: '1px solid #18181b', marginTop: '20px'}}>
+      <div className="panel-heading">
+        <div><h3>Histórico de Lançamentos do Dia</h3><p>Registro das movimentações</p></div>
+      </div>
       <div className="table-wrap">
         <table>
           <thead>
             <tr>
               <th>HORÁRIO</th>
-              <th>DESCRIÇÃO</th>
-              <th>RESPONSÁVEL</th>
+              <th>DESCRIÇÃO DO LANÇAMENTO</th>
+              <th>OPERADOR</th>
+              <th>TIPO</th>
               <th>VALOR</th>
             </tr>
           </thead>
@@ -1401,7 +1923,16 @@ function CashPage({cashRegister, onNewTransaction}) {
                 <td>{item.time}</td>
                 <td><strong>{item.description}</strong></td>
                 <td>{item.user}</td>
-                <td><strong style={{color: item.type === 'in' ? '#25D366' : '#ff4d4d'}}>{item.type === 'in' ? '+' : '-'} R$ {item.amount.toFixed(2)}</strong></td>
+                <td>
+                  <span className={`status-pill ${item.type === 'in' ? 'green' : 'amber'}`}>
+                    {item.type === 'in' ? 'Entrada / Suprimento' : 'Sangria / Saída'}
+                  </span>
+                </td>
+                <td>
+                  <strong style={{color: item.type === 'in' ? '#25D366' : '#ff4d4d'}}>
+                    {item.type === 'in' ? '+' : '-'} R$ {item.amount.toFixed(2)}
+                  </strong>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -1415,9 +1946,9 @@ function InventoryPage({inventory, onNew, onUpdateQty, onDelete}) {
   return <div className="page-content">
     <div className="page-heading">
       <div>
-        <div className="eyebrow"><span className="eyebrow-line"/> ESTOQUE & BAR</div>
-        <h1>Produtos da <span>Barbearia.</span></h1>
-        <p>Gerencie pomadas, óleos, lâminas, cervejas e itens de revenda.</p>
+        <div className="eyebrow"><span className="eyebrow-line"/> CONTROLE DE ESTOQUE</div>
+        <h1>Estoque de <span>Produtos.</span></h1>
+        <p>Cadastre itens, acessórios ou produtos com foto, preço e controle de quantidade.</p>
       </div>
       <button className="primary-btn" onClick={onNew}><Plus size={17}/> Novo Produto</button>
     </div>
@@ -1430,134 +1961,98 @@ function InventoryPage({inventory, onNew, onUpdateQty, onDelete}) {
               <th>PRODUTO</th>
               <th>CATEGORIA</th>
               <th>PREÇO DE VENDA</th>
-              <th>ESTOQUE</th>
+              <th>EM ESTOQUE</th>
               <th>AÇÕES</th>
             </tr>
           </thead>
           <tbody>
             {inventory.map(item => (
               <tr key={item.id}>
-                <td><strong>{item.name}</strong></td>
+                <td>
+                  <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
+                    <div style={{width: '40px', height: '40px', borderRadius: '6px', background: '#18181f', border: '1px solid #333', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+                      {item.photo ? <img src={item.photo} alt={item.name} style={{width: '100%', height: '100%', objectFit: 'cover'}}/> : <Package size={20} color="#888"/>}
+                    </div>
+                    <div>
+                      <strong>{item.name}</strong>
+                      {item.qty < 3 && <div style={{fontSize: '10px', color: '#f59e0b', fontWeight: 'bold'}}>⚠️ Estoque Mínimo</div>}
+                    </div>
+                  </div>
+                </td>
                 <td><span className="status-pill neutral">{item.category}</span></td>
                 <td><strong style={{color: '#25D366'}}>R$ {item.price}</strong></td>
                 <td>
                   <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                     <button className="secondary-btn" style={{padding: '2px 8px'}} onClick={() => onUpdateQty(item.id, -1)}>-</button>
-                    <strong>{item.qty} un</strong>
+                    <strong style={{minWidth: '20px', textAlign: 'center', color: item.qty < 3 ? '#f59e0b' : '#fff'}}>{item.qty} un</strong>
                     <button className="secondary-btn" style={{padding: '2px 8px'}} onClick={() => onUpdateQty(item.id, 1)}>+</button>
                   </div>
                 </td>
-                <td><button className="icon-btn" onClick={() => onDelete(item.id)} style={{color: '#ff4d4d'}}><Trash2 size={16}/></button></td>
+                <td>
+                  <button className="icon-btn" onClick={() => onDelete(item.id)} style={{color: '#ff4d4d'}}><Trash2 size={16}/></button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
+        {!inventory.length && <div className="empty-state"><Package size={28}/><strong>Nenhum produto em estoque</strong><span>Clique em "Novo Produto" para cadastrar itens.</span></div>}
       </div>
-    </div>
-  </div>
-}
-
-function ServicesMenuPage({services, onNewAppointment}) {
-  return <div className="page-content">
-    <div className="page-heading">
-      <div>
-        <div className="eyebrow"><span className="eyebrow-line"/> TABELA DE PREÇOS</div>
-        <h1>Cardápio de <span>Serviços.</span></h1>
-        <p>Serviços disponíveis na barbearia com duração e valores cadastrados.</p>
-      </div>
-      <button className="primary-btn" onClick={onNewAppointment}><Plus size={17}/> Agendar Cliente</button>
-    </div>
-
-    <div className="module-cards">
-      {services.map(s => (
-        <div className="module-card" key={s.name} style={{background: '#0d0d10', border: '1px solid #1a1a20'}}>
-          <div className="module-card-top">
-            <span className="status-pill green">• Ativo</span>
-            <span style={{fontSize: '12px', color: '#888'}}>{s.duration}</span>
-          </div>
-          <div className="module-card-icon"><Scissors size={22} color="#25D366"/></div>
-          <h3>{s.name}</h3>
-          <div style={{fontSize: '20px', fontWeight: 'bold', color: '#25D366', margin: '10px 0'}}>R$ {s.defaultPrice}</div>
-          <button className="primary-btn full-btn" onClick={onNewAppointment}>Agendar Horário →</button>
-        </div>
-      ))}
-    </div>
-  </div>
-}
-
-function ClientServicesPage({services, whatsapp, storeName}) {
-  const bookViaWhatsapp = (s) => {
-    const text = encodeURIComponent(`Olá ${storeName}! Gostaria de agendar um horário para o serviço: *${s.name}* (R$ ${s.defaultPrice}). Quais horários estão livres hoje?`);
-    window.open(`https://wa.me/${whatsapp}?text=${text}`, '_blank');
-  };
-
-  return <div className="page-content">
-    <div className="page-heading">
-      <div>
-        <div className="eyebrow"><span className="eyebrow-line"/> SERVIÇOS & PREÇOS</div>
-        <h1>Tabela da <span>Barbearia.</span></h1>
-        <p>Escolha o serviço desejado e reserve seu horário no WhatsApp.</p>
-      </div>
-    </div>
-
-    <div className="module-cards">
-      {services.map(s => (
-        <div className="module-card" key={s.name} style={{background: '#0d0d10', border: '1px solid #1a1a20'}}>
-          <div className="module-card-top">
-            <span className="status-pill blue">{s.duration}</span>
-          </div>
-          <h3 style={{fontSize: '16px', marginTop: '10px'}}>{s.name}</h3>
-          <div style={{fontSize: '22px', fontWeight: 'bold', color: '#25D366', margin: '10px 0'}}>R$ {s.defaultPrice}</div>
-          <button className="primary-btn full-btn" onClick={() => bookViaWhatsapp(s)} style={{background: '#25D366', color: '#000', fontWeight: 'bold'}}>
-            <MessageCircle size={16}/> Agendar no WhatsApp
-          </button>
-        </div>
-      ))}
     </div>
   </div>
 }
 
 function FinancePage({orders, commissionRate, setCommissionRate}) {
-  const totalRevenue = orders.reduce((acc, o) => acc + (parseFloat(o.amount.replace('R$', '').trim()) || 0), 0);
-  const totalCosts = orders.reduce((acc, o) => acc + (parseFloat(o.costProduct) || 0), 0);
-  const netProfit = totalRevenue - totalCosts;
-  const barberCommissionTotal = (netProfit * (commissionRate / 100));
+  const totalRevenue = orders.reduce((acc, o) => {
+    const val = parseFloat(o.amount.replace('R$', '').trim()) || 0;
+    return acc + val;
+  }, 0);
+
+  const totalPartsCost = orders.reduce((acc, o) => {
+    const val = parseFloat(o.partCost) || 0;
+    return acc + val;
+  }, 0);
+
+  const netProfit = totalRevenue - totalPartsCost;
+  const techCommissionTotal = (netProfit * (commissionRate / 100));
 
   return <div className="page-content">
     <div className="page-heading">
       <div>
         <div className="eyebrow"><span className="eyebrow-line"/> BALANÇO FINANCEIRO</div>
-        <h1>Financeiro & <span>Comissão dos Barbeiros.</span></h1>
-        <p>Acompanhe o faturamento bruto, custos de produtos e rateio das comissões.</p>
+        <h1>Financeiro & <span>Comissões.</span></h1>
+        <p>Acompanhe faturamento bruto, custos, lucro líquido e comissões da equipe.</p>
       </div>
     </div>
 
     <div className="metrics-grid" style={{gridTemplateColumns: 'repeat(4, 1fr)'}}>
       <div className="metric-card" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
         <div className="metric-top"><span className="metric-period">BRUTO</span></div>
-        <div className="metric-value">R$ {totalRevenue.toFixed(2)}</div>
+        <div className="metric-value" style={{color: '#fff'}}>R$ {totalRevenue.toFixed(2)}</div>
         <div className="metric-label">Faturamento Total</div>
       </div>
+
       <div className="metric-card" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
         <div className="metric-top"><span className="metric-period">CUSTOS</span></div>
-        <div className="metric-value" style={{color: '#ff4d4d'}}>R$ {totalCosts.toFixed(2)}</div>
-        <div className="metric-label">Insumos / Produtos</div>
+        <div className="metric-value" style={{color: '#ff4d4d'}}>R$ {totalPartsCost.toFixed(2)}</div>
+        <div className="metric-label">Custo com Insumos/Peças</div>
       </div>
+
       <div className="metric-card" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
         <div className="metric-top"><span className="metric-period">LÍQUIDO</span></div>
         <div className="metric-value" style={{color: '#25D366'}}>R$ {netProfit.toFixed(2)}</div>
         <div className="metric-label">Lucro Líquido</div>
       </div>
+
       <div className="metric-card" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
         <div className="metric-top"><span className="metric-period">COMISSÃO</span></div>
-        <div className="metric-value" style={{color: '#3b82f6'}}>R$ {barberCommissionTotal.toFixed(2)}</div>
-        <div className="metric-label">Comissão Barbeiros ({commissionRate}%)</div>
+        <div className="metric-value" style={{color: '#3b82f6'}}>R$ {techCommissionTotal.toFixed(2)}</div>
+        <div className="metric-label">Comissão da Equipe ({commissionRate}%)</div>
       </div>
     </div>
 
     <div className="panel" style={{background: '#0a0a0d', border: '1px solid #18181b', padding: '20px', marginTop: '20px'}}>
-      <h3>Porcentagem de Comissão dos Barbeiros</h3>
-      <p className="muted">Calculada sobre o lucro líquido dos atendimentos da equipe.</p>
+      <h3>Configuração da Comissão</h3>
+      <p className="muted">Porcentagem calculada sobre o lucro líquido de cada serviço executado.</p>
       <div style={{display: 'flex', alignItems: 'center', gap: '10px', marginTop: '10px'}}>
         <input 
           type="number" 
@@ -1565,7 +2060,7 @@ function FinancePage({orders, commissionRate, setCommissionRate}) {
           onChange={e=>setCommissionRate(e.target.value)} 
           style={{background: '#111', color: '#fff', border: '1px solid #333', padding: '8px 12px', borderRadius: '6px', width: '100px'}}
         />
-        <span>% de comissão por corte/serviço</span>
+        <span>% do lucro líquido por OS</span>
       </div>
     </div>
   </div>
@@ -1577,12 +2072,13 @@ function ClientInventoryPage({inventory, storeName, cart, addToCart, onOpenCart}
   return <div className="page-content">
     <div className="page-heading" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
       <div>
-        <div className="eyebrow"><span className="eyebrow-line"/> PRODUTOS & BEBIDAS</div>
-        <h1>Vitrine da <span>Barbearia.</span></h1>
-        <p>Pomadas, óleos, balms e cervejas disponíveis na {storeName}.</p>
+        <div className="eyebrow"><span className="eyebrow-line"/> VITRINE DO ESTABELECIMENTO</div>
+        <h1>Produtos & <span>Acessórios.</span></h1>
+        <p>Confira os itens disponíveis na {storeName} e adicione à sua sacola.</p>
       </div>
+
       {totalCartItems > 0 && (
-        <button className="primary-btn" onClick={onOpenCart} style={{background: '#25D366', color: '#000', fontWeight: 'bold'}}>
+        <button className="primary-btn" onClick={onOpenCart} style={{background: '#25D366', color: '#000', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px'}}>
           <ShoppingCart size={18}/> Ver Carrinho ({totalCartItems})
         </button>
       )}
@@ -1595,13 +2091,35 @@ function ClientInventoryPage({inventory, storeName, cart, addToCart, onOpenCart}
             <span className="status-pill neutral">{prod.category}</span>
             <small style={{color: prod.qty > 0 ? '#25D366' : '#ff4d4d'}}>{prod.qty > 0 ? `${prod.qty} em estoque` : 'Esgotado'}</small>
           </div>
-          <h3 style={{fontSize: '15px', marginTop: '10px'}}>{prod.name}</h3>
+
+          <div style={{
+            width: '100%', height: '140px', borderRadius: '10px', overflow: 'hidden', margin: '12px 0', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #222'
+          }}>
+            {prod.photo ? (
+              <img src={prod.photo} alt={prod.name} style={{width: '100%', height: '100%', objectFit: 'cover'}} />
+            ) : (
+              <Package size={40} color="#444"/>
+            )}
+          </div>
+
+          <h3 style={{fontSize: '15px'}}>{prod.name}</h3>
           <div style={{fontSize: '18px', fontWeight: 'bold', color: '#25D366', margin: '8px 0'}}>R$ {prod.price}</div>
-          <button className="primary-btn full-btn" disabled={prod.qty <= 0} onClick={() => addToCart(prod)}>
+
+          <button 
+            className="primary-btn full-btn" 
+            disabled={prod.qty <= 0}
+            style={{marginTop: '10px', background: prod.qty > 0 ? '#1f2937' : '#333', color: prod.qty > 0 ? '#fff' : '#888', border: '1px solid #374151'}} 
+            onClick={() => addToCart(prod)}
+          >
             <ShoppingCart size={16}/> {prod.qty > 0 ? 'Adicionar ao Carrinho' : 'Indisponível'}
           </button>
         </div>
       ))}
+      {!inventory.length && (
+        <div style={{gridColumn: '1 / -1', textAlign: 'center', color: '#888', padding: '40px'}}>
+          Nenhum acessório disponível no momento nesta loja.
+        </div>
+      )}
     </div>
   </div>
 }
@@ -1610,6 +2128,8 @@ function CartModal({cart, onClose, onUpdateQty, onClear, pixKey, storeName, stor
   const [deliveryType, setDeliveryType] = useState('pickup');
   const [customerName, setCustomerName] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [isThirdPartyPickup, setIsThirdPartyPickup] = useState(false);
+  const [pickupPersonName, setPickupPersonName] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('pix');
 
   const cartTotal = cart.reduce((acc, item) => acc + (Number(item.price) * item.cartQty), 0);
@@ -1620,19 +2140,36 @@ function CartModal({cart, onClose, onUpdateQty, onClear, pixKey, storeName, stor
   };
 
   const handleFinishOrder = () => {
-    if (!customerName.trim()) { notify('Informe seu nome.'); return; }
-    if (deliveryType === 'delivery' && !deliveryAddress.trim()) { notify('Informe o endereço de entrega.'); return; }
+    if (!customerName.trim()) {
+      notify('Por favor, informe seu nome.'); return;
+    }
+    if (deliveryType === 'delivery' && !deliveryAddress.trim()) {
+      notify('Por favor, informe o endereço para entrega.'); return;
+    }
+    if (deliveryType === 'pickup' && isThirdPartyPickup && !pickupPersonName.trim()) {
+      notify('Informe o nome da pessoa autorizada a retirar.'); return;
+    }
 
     const itemsSummary = cart.map(i => `• ${i.cartQty}x ${i.name} (R$ ${(Number(i.price) * i.cartQty).toFixed(2)})`).join('\n');
-    const logistics = deliveryType === 'pickup' ? `📍 Retirada no balcão da barbearia (${storeAddress})` : `🛵 Entrega em: ${deliveryAddress}`;
+
+    let logisticsInfo = '';
+    if (deliveryType === 'pickup') {
+      logisticsInfo = `🏬 *Modalidade:* RETIRADA NO LOCAL\n📍 *Endereço da Loja:* ${storeAddress}`;
+      if (isThirdPartyPickup) {
+        logisticsInfo += `\n👤 *Pessoa autorizada a retirar:* ${pickupPersonName.trim()}`;
+      }
+    } else {
+      logisticsInfo = `🛵 *Modalidade:* ENTREGA / DELIVERY\n📍 *Endereço de Entrega:* ${deliveryAddress.trim()}`;
+    }
 
     const message = encodeURIComponent(
-      `🛍️ *PEDIDO DE PRODUTOS - ${storeName.toUpperCase()}*\n\n` +
+      `🛍️ *NOVO PEDIDO DE ACESSÓRIOS - ${storeName.toUpperCase()}*\n\n` +
       `👤 *Cliente:* ${customerName.trim()}\n` +
-      `💰 *Total:* R$ ${cartTotal.toFixed(2)}\n` +
-      `💳 *Pagamento:* ${paymentMethod === 'pix' ? 'Pix (Comprovante em anexo)' : 'Na retirada'}\n\n` +
-      `📦 *Itens:*\n${itemsSummary}\n\n` +
-      `${logistics}`
+      `💰 *Total do Pedido:* R$ ${cartTotal.toFixed(2)}\n` +
+      `💳 *Forma de Pagamento:* ${paymentMethod === 'pix' ? 'Pix (Comprovante em anexo)' : 'Cartão / Na entrega'}\n\n` +
+      `📦 *Itens Escolhidos:*\n${itemsSummary}\n\n` +
+      `${logisticsInfo}\n\n` +
+      `Poderiam confirmar o recebimento do pedido?`
     );
 
     window.open(`https://wa.me/${whatsappNumber}?text=${message}`, '_blank');
@@ -1642,49 +2179,129 @@ function CartModal({cart, onClose, onUpdateQty, onClear, pixKey, storeName, stor
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={e=>e.stopPropagation()} style={{background: '#0f0f12', border: '1px solid #222', maxWidth: '480px'}}>
-        <div className="modal-head"><div><div className="eyebrow">CARRINHO</div><h2>Finalizar Pedido</h2></div><button type="button" className="icon-btn" onClick={onClose}><X size={19}/></button></div>
+      <div className="modal" onClick={e=>e.stopPropagation()} style={{background: '#0f0f12', border: '1px solid #222', maxWidth: '520px'}}>
+        <div className="modal-head">
+          <div><div className="eyebrow">FINALIZAÇÃO DE PEDIDO</div><h2>Seu Carrinho de Compras</h2></div>
+          <button type="button" className="icon-btn" onClick={onClose}><X size={19}/></button>
+        </div>
 
-        {cart.length === 0 ? <p className="muted">Carrinho vazio.</p> : (
+        {cart.length === 0 ? (
+          <div style={{textAlign: 'center', padding: '30px 0', color: '#888'}}>
+            <ShoppingCart size={40} style={{marginBottom: '10px'}}/>
+            <p>Seu carrinho está vazio.</p>
+          </div>
+        ) : (
           <div>
-            <div style={{maxHeight: '160px', overflowY: 'auto', marginBottom: '15px'}}>
+            <div style={{maxHeight: '160px', overflowY: 'auto', marginBottom: '15px', borderBottom: '1px solid #222', paddingBottom: '10px'}}>
               {cart.map(item => (
-                <div key={item.id} style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '6px 0'}}>
+                <div key={item.id} style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '6px 0', fontSize: '13px'}}>
                   <span>{item.name}</span>
-                  <div style={{display: 'flex', alignItems: 'center', gap: '6px'}}>
+                  <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                     <button className="secondary-btn" style={{padding: '2px 6px'}} onClick={()=>onUpdateQty(item.id, -1)}>-</button>
                     <strong>{item.cartQty}</strong>
                     <button className="secondary-btn" style={{padding: '2px 6px'}} onClick={()=>onUpdateQty(item.id, 1)}>+</button>
-                    <span style={{color: '#25D366'}}>R$ {(Number(item.price) * item.cartQty).toFixed(2)}</span>
+                    <span style={{minWidth: '65px', textAlign: 'right', color: '#25D366'}}>R$ {(Number(item.price) * item.cartQty).toFixed(2)}</span>
                   </div>
                 </div>
               ))}
             </div>
 
-            <div style={{display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: 'bold', margin: '10px 0'}}>
-              <span>Total:</span><span style={{color: '#25D366'}}>R$ {cartTotal.toFixed(2)}</span>
+            <div style={{display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: 'bold', marginBottom: '15px'}}>
+              <span>Valor Total:</span>
+              <span style={{color: '#25D366'}}>R$ {cartTotal.toFixed(2)}</span>
             </div>
 
-            <label>Seu Nome<input value={customerName} onChange={e=>setCustomerName(e.target.value)} placeholder="Ex: Felipe Silva" required/></label>
+            <label style={{marginBottom: '10px'}}>Seu Nome Completo
+              <input value={customerName} onChange={e=>setCustomerName(e.target.value)} placeholder="Ex: Lucas Gabriel" required />
+            </label>
 
-            <div style={{display: 'flex', gap: '8px', margin: '10px 0'}}>
-              <button type="button" className={`secondary-btn ${deliveryType==='pickup'?'primary-btn':''}`} style={{flex: 1}} onClick={()=>setDeliveryType('pickup')}><Store size={14}/> Retirar na Barbearia</button>
-              <button type="button" className={`secondary-btn ${deliveryType==='delivery'?'primary-btn':''}`} style={{flex: 1}} onClick={()=>setDeliveryType('delivery')}><Truck size={14}/> Delivery</button>
+            <div style={{display: 'flex', gap: '8px', marginBottom: '12px'}}>
+              <button
+                type="button"
+                className={`secondary-btn ${deliveryType === 'pickup' ? 'primary-btn' : ''}`}
+                style={{flex: 1, fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'}}
+                onClick={() => setDeliveryType('pickup')}
+              >
+                <Store size={15}/> Retirada na Loja
+              </button>
+              <button
+                type="button"
+                className={`secondary-btn ${deliveryType === 'delivery' ? 'primary-btn' : ''}`}
+                style={{flex: 1, fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'}}
+                onClick={() => setDeliveryType('delivery')}
+              >
+                <Truck size={15}/> Entrega / Delivery
+              </button>
             </div>
 
-            {deliveryType === 'delivery' && <label>Endereço de Entrega<input value={deliveryAddress} onChange={e=>setDeliveryAddress(e.target.value)} placeholder="Rua, Número, Bairro"/></label>}
-
-            {paymentMethod === 'pix' && (
-              <div style={{background: '#000', padding: '12px', borderRadius: '10px', border: '1px solid #333', textAlign: 'center', margin: '10px 0'}}>
-                <QrCode size={80} color="#25D366" style={{margin: '0 auto 6px', display: 'block'}} />
-                <span style={{fontSize: '11px', color: '#aaa'}}>Chave Pix da Barbearia:</span>
-                <div style={{fontSize: '13px', fontWeight: 'bold', color: '#fff'}}>{pixKey}</div>
-                <button type="button" onClick={copyPix} className="secondary-btn" style={{fontSize: '11px', margin: '6px auto 0'}}><Copy size={12}/> Copiar Pix</button>
+            {deliveryType === 'delivery' ? (
+              <label style={{marginBottom: '12px'}}>Endereço de Entrega (Rua, Número, Bairro)
+                <input value={deliveryAddress} onChange={e=>setDeliveryAddress(e.target.value)} placeholder="Ex: Travessa das Flores, 142 - Centro" required />
+              </label>
+            ) : (
+              <div style={{background: '#141419', padding: '10px', borderRadius: '8px', border: '1px solid #282830', marginBottom: '12px'}}>
+                <span style={{fontSize: '11px', color: '#888', display: 'block', marginBottom: '6px'}}>Retirar no local: {storeAddress}</span>
+                <label style={{display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0, fontSize: '12px'}}>
+                  <input
+                    type="checkbox"
+                    checked={isThirdPartyPickup}
+                    onChange={e => setIsThirdPartyPickup(e.target.checked)}
+                    style={{accentColor: '#25D366'}}
+                  />
+                  Outra pessoa vai retirar o pedido por mim?
+                </label>
+                {isThirdPartyPickup && (
+                  <input
+                    value={pickupPersonName}
+                    onChange={e => setPickupPersonName(e.target.value)}
+                    placeholder="Nome de quem vai buscar na loja"
+                    style={{marginTop: '8px', fontSize: '12px'}}
+                  />
+                )}
               </div>
             )}
 
-            <button type="button" className="primary-btn full-btn" onClick={handleFinishOrder} style={{background: '#25D366', color: '#000', fontWeight: 'bold'}}>
-              <MessageCircle size={18}/> Enviar Pedido no WhatsApp da Barbearia
+            <div style={{marginBottom: '15px'}}>
+              <span style={{fontSize: '12px', color: '#aaa', display: 'block', marginBottom: '6px'}}>Forma de Pagamento:</span>
+              <div style={{display: 'flex', gap: '8px'}}>
+                <button
+                  type="button"
+                  className={`secondary-btn ${paymentMethod === 'pix' ? 'primary-btn' : ''}`}
+                  style={{flex: 1, fontSize: '12px'}}
+                  onClick={() => setPaymentMethod('pix')}
+                >
+                  Pix Instantâneo
+                </button>
+                <button
+                  type="button"
+                  className={`secondary-btn ${paymentMethod === 'card' ? 'primary-btn' : ''}`}
+                  style={{flex: 1, fontSize: '12px'}}
+                  onClick={() => setPaymentMethod('card')}
+                >
+                  Cartão / Na Entrega
+                </button>
+              </div>
+            </div>
+
+            {paymentMethod === 'pix' && (
+              <div style={{background: '#000', padding: '12px', borderRadius: '10px', border: '1px solid #333', textAlign: 'center', marginBottom: '16px'}}>
+                <QrCode size={90} color="#25D366" style={{margin: '0 auto 6px', display: 'block'}} />
+                <span style={{fontSize: '11px', color: '#aaa'}}>Chave Pix da Loja:</span>
+                <div style={{fontSize: '13px', fontWeight: 'bold', color: '#fff', margin: '4px 0'}}>{pixKey}</div>
+                <button type="button" onClick={copyPix} className="secondary-btn" style={{fontSize: '11px', padding: '4px 8px', margin: '0 auto', display: 'flex', alignItems: 'center', gap: '4px'}}>
+                  <Copy size={12}/> Copiar Chave Pix
+                </button>
+                <small style={{display: 'block', color: '#888', fontSize: '10px', marginTop: '6px'}}>Pague o Pix e anexe o comprovante na mensagem do WhatsApp.</small>
+              </div>
+            )}
+
+            <button
+              type="button"
+              className="primary-btn full-btn"
+              onClick={handleFinishOrder}
+              style={{background: '#25D366', color: '#000', fontWeight: 'bold', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'}}
+            >
+              <MessageCircle size={18}/> Enviar Pedido no WhatsApp da Loja
             </button>
           </div>
         )}
@@ -1697,9 +2314,9 @@ function StoresDirectoryPage({stores, onSelectStore, onRequestQuote}) {
   return <div className="page-content">
     <div className="page-heading">
       <div>
-        <div className="eyebrow"><span className="eyebrow-line"/> PORTAL DE BARBEARIAS</div>
-        <h1>Barbearias <span>Ativas.</span></h1>
-        <p>Agende seu horário com os melhores barbeiros da sua região.</p>
+        <div className="eyebrow"><span className="eyebrow-line"/> PORTAL DE ESTABELECIMENTOS</div>
+        <h1>Estabelecimentos & <span>Lojas Ativas.</span></h1>
+        <p>Abaixo estão exibidos os estabelecimentos com plano ativo e suporte garantido.</p>
       </div>
     </div>
 
@@ -1707,27 +2324,120 @@ function StoresDirectoryPage({stores, onSelectStore, onRequestQuote}) {
       {stores.map(store => (
         <div className="module-card" key={store.id} style={{background: '#0d0d10', border: '1px solid #1a1a20'}}>
           <div className="module-card-top">
-            <span className="status-pill green">• Barbearia Aberta</span>
+            <span className="status-pill green">• Plano Ativo</span>
             <span style={{color: '#eab308', display: 'flex', alignItems: 'center', gap: '3px', fontSize: '12px'}}>
-              <Star size={13} fill="#eab308"/> {store.rating} ({store.reviewsCount})
+              <Star size={13} fill="#eab308"/> {store.rating || '5.0'} ({store.reviewsCount || 10})
             </span>
           </div>
-          <div className="module-card-icon"><Scissors size={22} color="#25D366"/></div>
+          <div className="module-card-icon"><Store size={22}/></div>
           <h3>{store.name}</h3>
-          <p style={{fontSize: '12px', color: '#aaa'}}>{store.address}</p>
+          <p style={{fontSize: '12px', color: '#aaa'}}>{store.address || 'Endereço não informado'}</p>
           <p>{store.desc}</p>
+
           <div style={{display: 'flex', gap: '8px', marginTop: '15px'}}>
-            <button className="primary-btn full-btn" onClick={() => onSelectStore(store)}>Ver Serviços & Agendar →</button>
+            <button className="primary-btn full-btn" style={{flex: 1}} onClick={() => onSelectStore(store)}>
+              Entrar no Estabelecimento →
+            </button>
+            <button className="secondary-btn" onClick={() => onRequestQuote(store)} style={{border: '1px solid #25D366', color: '#25D366'}}>
+              Orçamento
+            </button>
           </div>
+        </div>
+      ))}
+
+      {!stores.length && (
+        <div style={{textAlign: 'center', color: '#888', gridColumn: '1 / -1', padding: '40px'}}>
+          Nenhum estabelecimento com plano ativo encontrado no momento.
+        </div>
+      )}
+    </div>
+  </div>
+}
+
+function StorePage({whatsapp, storeName, onUpgrade}) {
+  const [tab, setTab] = useState('seminovos');
+
+  const buyDirect = (modelName, type) => {
+    const text = encodeURIComponent(`Olá ${storeName}! Gostaria de comprar o ${modelName} (${type}). Qual a disponibilidade e valores?`);
+    window.open(`https://wa.me/${whatsapp}?text=${text}`, '_blank');
+  };
+
+  const getModelImage = (t) => {
+    if (t === 'seminovos' || t === 'lacrados') return t === 'seminovos' ? imgSeminovo : imgLacrado;
+    if (t === 'xiaomi') return imgXiaomi;
+    return imgRealme;
+  };
+
+  const currentList = useMemo(() => {
+    if (tab === 'seminovos') return seminovosList;
+    if (tab === 'lacrados') return lacradosList;
+    if (tab === 'xiaomi') return xiaomiList;
+    return realmeList;
+  }, [tab]);
+
+  return <div className="page-content">
+    <div className="page-heading">
+      <div>
+        <div className="eyebrow"><span className="eyebrow-line"/> CENTRAL DE VENDAS & VITRINE</div>
+        <h1>Comprar & <span>Upgrade de Aparelho.</span></h1>
+        <p>Negocie diretamente no WhatsApp da {storeName} (pronta entrega ou encomenda).</p>
+      </div>
+      <button className="primary-btn" onClick={onUpgrade} style={{background: 'linear-gradient(135deg, #25D366, #128C7E)', color: '#000', fontWeight: 'bold'}}>
+        <RefreshCw size={17}/> Fazer Upgrade de Aparelho
+      </button>
+    </div>
+
+    <div className="list-toolbar" style={{gap: '10px', flexWrap: 'wrap'}}>
+      <button className={`secondary-btn ${tab === 'seminovos' ? 'primary-btn' : ''}`} onClick={() => setTab('seminovos')} style={{borderRadius: '8px'}}>
+        iPhones Seminovos
+      </button>
+      <button className={`secondary-btn ${tab === 'lacrados' ? 'primary-btn' : ''}`} onClick={() => setTab('lacrados')} style={{borderRadius: '8px'}}>
+        iPhones Lacrados
+      </button>
+      <button className={`secondary-btn ${tab === 'xiaomi' ? 'primary-btn' : ''}`} onClick={() => setTab('xiaomi')} style={{borderRadius: '8px'}}>
+        Xiaomi & Poco
+      </button>
+      <button className={`secondary-btn ${tab === 'realme' ? 'primary-btn' : ''}`} onClick={() => setTab('realme')} style={{borderRadius: '8px'}}>
+        Realme
+      </button>
+    </div>
+
+    <div className="module-cards" style={{marginTop: '20px'}}>
+      {currentList.map((model) => (
+        <div className="module-card" key={model} style={{background: '#0d0d10', border: '1px solid #1a1a20'}}>
+          <div className="module-card-top">
+            <span className={`status-pill ${tab === 'seminovos' ? 'blue' : tab === 'lacrados' ? 'green' : 'amber'}`}>
+              {tab === 'seminovos' ? 'Seminovo' : tab === 'lacrados' ? 'Lacrado' : tab === 'xiaomi' ? 'Xiaomi / Poco' : 'Realme'}
+            </span>
+            <small style={{color: '#888'}}>Pronta entrega</small>
+          </div>
+
+          <div style={{
+            width: '100%', height: '140px', borderRadius: '10px', overflow: 'hidden', margin: '12px 0', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #222'
+          }}>
+            <img 
+              src={getModelImage(tab)} 
+              alt={model} 
+              style={{width: '100%', height: '100%', objectFit: 'cover', opacity: 0.85}}
+            />
+          </div>
+
+          <h3 style={{fontSize: '16px'}}>{model}</h3>
+          <p style={{fontSize: '12px', color: '#888'}}>Disponível para consulta e reserva na {storeName}.</p>
+          <button className="primary-btn full-btn" style={{marginTop: '15px', background: '#25D366', color: '#000', fontWeight: 'bold'}} onClick={() => buyDirect(model, tab)}>
+            <MessageCircle size={16}/> Comprar no WhatsApp da Loja
+          </button>
         </div>
       ))}
     </div>
   </div>
 }
 
-function TrackPage({orders, storeName, pixKey, whatsapp, storeAddress, mapsUrl, notify}) {
+function TrackPage({orders, storeName, pixKey, whatsapp, storeAddress, mapsUrl, setOrders, notify}) {
   const [trackQuery, setTrackQuery] = useState('');
   const [foundOs, setFoundOs] = useState(null);
+  const [userRating, setUserRating] = useState(5);
+  const [userReviewText, setUserReviewText] = useState('');
 
   const handleSearchOs = (e) => {
     e.preventDefault();
@@ -1735,35 +2445,204 @@ function TrackPage({orders, storeName, pixKey, whatsapp, storeAddress, mapsUrl, 
     setFoundOs(result || 'NOT_FOUND');
   };
 
+  const submitReview = () => {
+    if (foundOs && foundOs !== 'NOT_FOUND') {
+      setOrders(prev => prev.map(o => o.id === foundOs.id ? { ...o, rating: userRating, review: userReviewText } : o));
+      setFoundOs({ ...foundOs, rating: userRating, review: userReviewText });
+      notify('Sua avaliação foi enviada com sucesso! Obrigado.');
+    }
+  };
+
+  const copyPixToClipboard = () => {
+    navigator.clipboard.writeText(pixKey);
+    notify('Chave Pix copiada para a área de transferência!');
+  };
+
+  const getRemainingWarrantyDays = (order) => {
+    if (!order.createdAt || !order.warrantyDays) return order.warrantyDays || 90;
+    const start = new Date(order.createdAt);
+    const now = new Date();
+    const diffTime = Math.abs(now - start);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return Math.max(0, order.warrantyDays - diffDays);
+  };
+
+  const approveBudget = (order) => {
+    const text = encodeURIComponent(`Olá ${storeName}! Gostaria de *APROVAR* o orçamento da minha OS *${order.id}* (${order.device}) no valor de *${order.amount}*. Pode dar andamento no serviço!`);
+    window.open(`https://wa.me/${whatsapp}?text=${text}`, '_blank');
+  };
+
+  const rejectBudget = (order) => {
+    const text = encodeURIComponent(`Olá ${storeName}! Gostaria de conversar a respeito do orçamento da minha OS *${order.id}* (${order.device}). No momento não tenho interesse no reparo ou gostaria de rever o valor.`);
+    window.open(`https://wa.me/${whatsapp}?text=${text}`, '_blank');
+  };
+
+  const getStepIndex = (status) => {
+    const map = {
+      'Recebido': 0,
+      'Em diagnóstico': 1,
+      'Aguardando aprovação': 2,
+      'Aguardando peça': 2,
+      'Em manutenção': 3,
+      'Pronto para retirada': 4,
+      'Entregue': 5
+    };
+    return map[status] ?? 0;
+  };
+
   return <div className="page-content">
     <div className="page-heading">
       <div>
-        <div className="eyebrow"><span className="eyebrow-line"/> CONSULTA DE AGENDAMENTO</div>
-        <h1>Consultar <span>Horário.</span></h1>
-        <p>Digite o código da comanda para verificar o status do seu corte.</p>
+        <div className="eyebrow"><span className="eyebrow-line"/> ÁREA DO CLIENTE</div>
+        <h1>Acompanhar <span>Atendimento.</span></h1>
+        <p>Digite o número da sua Ordem de Serviço para ver o status em tempo real.</p>
       </div>
     </div>
 
-    <div className="panel" style={{background: '#0a0a0d', border: '1px solid #18181b', padding: '24px', maxWidth: '540px', margin: '0 auto'}}>
+    <div className="panel" style={{background: '#0a0a0d', border: '1px solid #18181b', padding: '24px', maxWidth: '640px', margin: '0 auto'}}>
       <form onSubmit={handleSearchOs} style={{display: 'flex', gap: '10px'}}>
-        <input value={trackQuery} onChange={e=>setTrackQuery(e.target.value)} placeholder="Ex: CMD-1048" required style={{flex: 1, background: '#111', color: '#fff', border: '1px solid #333', padding: '10px', borderRadius: '8px'}}/>
-        <button className="primary-btn" type="submit"><Search size={18}/> Buscar</button>
+        <input 
+          value={trackQuery} 
+          onChange={e=>setTrackQuery(e.target.value)} 
+          placeholder="Ex: OS-2048" 
+          style={{flex: 1, background: '#111', color: '#fff', border: '1px solid #333', padding: '10px 14px', borderRadius: '8px', fontSize: '15px'}}
+          required
+        />
+        <button className="primary-btn" type="submit"><Search size={18}/> Rastrear OS</button>
       </form>
 
       {foundOs && foundOs !== 'NOT_FOUND' && (
-        <div style={{marginTop: '20px', background: '#121215', padding: '16px', borderRadius: '10px', border: '1px solid #222'}}>
-          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+        <div style={{marginTop: '25px', background: '#121215', border: '1px solid #222', borderRadius: '12px', padding: '20px'}}>
+          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px'}}>
             <strong>{foundOs.id}</strong>
             <span className={`status-pill ${foundOs.color}`}>{foundOs.status}</span>
           </div>
-          <p style={{margin: '6px 0'}}><strong>Cliente:</strong> {foundOs.customer}</p>
-          <p style={{margin: '6px 0'}}><strong>Serviço:</strong> {foundOs.service}</p>
-          <p style={{margin: '6px 0'}}><strong>Barbeiro:</strong> {foundOs.barberName}</p>
-          <p style={{margin: '6px 0'}}><strong>Valor:</strong> <span style={{color: '#25D366'}}>{foundOs.amount}</span></p>
 
-          <a href={`https://wa.me/${whatsapp}?text=${encodeURIComponent(`Olá! Gostaria de confirmar meu horário da comanda ${foundOs.id} (${foundOs.service}) na${storeName}`)}`} target="_blank" rel="noreferrer" className="primary-btn full-btn" style={{marginTop: '15px', background: '#25D366', color: '#000', textDecoration: 'none', textAlign: 'center'}}>
-            <MessageCircle size={16}/> Falar com a Barbearia no WhatsApp
+          <div style={{margin: '20px 0 25px', background: '#0a0a0d', padding: '16px', borderRadius: '10px', border: '1px solid #1f1f23'}}>
+            <span style={{fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '1px', display: 'block', marginBottom: '12px'}}>
+              Progresso do Atendimento
+            </span>
+            <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative'}}>
+              {orderSteps.map((step, idx) => {
+                const currentIdx = getStepIndex(foundOs.status);
+                const isCompleted = idx <= currentIdx;
+                const isCurrent = idx === currentIdx;
+                return (
+                  <div key={step} style={{display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, position: 'relative', zIndex: 1}}>
+                    <div style={{
+                      width: '24px', height: '24px', borderRadius: '50%',
+                      background: isCompleted ? '#25D366' : '#222',
+                      color: isCompleted ? '#000' : '#666',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '11px', fontWeight: 'bold',
+                      border: isCurrent ? '2px solid #fff' : 'none'
+                    }}>
+                      {isCompleted ? '✓' : idx + 1}
+                    </div>
+                    <span style={{fontSize: '10px', color: isCompleted ? '#fff' : '#666', marginTop: '6px', textAlign: 'center'}}>
+                      {step}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <p style={{margin: '5px 0', fontSize: '14px', color: '#aaa'}}><strong>Cliente:</strong> {foundOs.customer}</p>
+          <p style={{margin: '5px 0', fontSize: '14px', color: '#aaa'}}><strong>Item / Aparelho:</strong> {foundOs.device}</p>
+          <p style={{margin: '5px 0', fontSize: '14px', color: '#aaa'}}><strong>Descrição:</strong> {foundOs.issue}</p>
+          <p style={{margin: '5px 0', fontSize: '14px', color: '#aaa'}}><strong>Valor do Serviço:</strong> <span style={{color: '#25D366', fontWeight: 'bold'}}>{foundOs.amount}</span></p>
+
+          {foundOs.status === 'Aguardando aprovação' && (
+            <div style={{marginTop: '20px', background: '#1c1917', border: '1px solid #78350f', padding: '16px', borderRadius: '10px', textAlign: 'center'}}>
+              <span style={{fontSize: '13px', color: '#f59e0b', fontWeight: 'bold', display: 'block', marginBottom: '8px'}}>
+                ⚠️ Orçamento aguardando sua resposta: {foundOs.amount}
+              </span>
+              <p style={{fontSize: '12px', color: '#d6d3d1', margin: '0 0 14px'}}>
+                Deseja aprovar a execução do serviço pelo valor informado?
+              </p>
+              <div style={{display: 'flex', gap: '8px'}}>
+                <button
+                  type="button"
+                  onClick={() => approveBudget(foundOs)}
+                  className="primary-btn"
+                  style={{flex: 1, background: '#25D366', color: '#000', fontWeight: 'bold', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'}}
+                >
+                  <CheckCircle2 size={16}/> Aprovar no WhatsApp
+                </button>
+                <button
+                  type="button"
+                  onClick={() => rejectBudget(foundOs)}
+                  className="secondary-btn"
+                  style={{flex: 1, borderColor: '#ef4444', color: '#ef4444', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'}}
+                >
+                  <XCircle size={16}/> Recusar / Negociar
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div style={{marginTop: '15px', background: '#111827', border: '1px solid #1e3a8a', padding: '12px', borderRadius: '8px'}}>
+            <span style={{fontSize: '12px', color: '#3b82f6', fontWeight: 'bold'}}>🛡️ GARANTIA DIGITAL ATIVA</span>
+            <p style={{fontSize: '14px', margin: '4px 0', color: '#fff'}}>
+              Restam <strong>{getRemainingWarrantyDays(foundOs)} dias</strong> de garantia (Total contratado: {foundOs.warrantyDays} dias).
+            </p>
+          </div>
+
+          {storeAddress && (
+            <div style={{marginTop: '15px', background: '#18181f', padding: '12px', borderRadius: '8px', border: '1px solid #333'}}>
+              <span style={{fontSize: '12px', color: '#aaa', display: 'flex', alignItems: 'center', gap: '4px'}}>
+                <MapPin size={14} color="#f59e0b"/> LOCALIZAÇÃO PARA RETIRADA:
+              </span>
+              <p style={{fontSize: '13px', margin: '4px 0', color: '#fff'}}>{storeAddress}</p>
+              {mapsUrl && (
+                <a href={mapsUrl} target="_blank" rel="noreferrer" style={{color: '#3b82f6', fontSize: '12px', textDecoration: 'none'}}>
+                  🗺️ Abrir no Google Maps →
+                </a>
+              )}
+            </div>
+          )}
+
+          {pixKey && foundOs.status === 'Pronto para retirada' && (
+            <div style={{marginTop: '20px', background: '#18181f', padding: '15px', borderRadius: '8px', border: '1px solid #333'}}>
+              <span style={{fontSize: '12px', color: '#25D366', fontWeight: 'bold'}}>✓ SEU PEDIDO ESTÁ PRONTO!</span>
+              <p style={{fontSize: '13px', margin: '8px 0'}}>Pagamento via Pix para {storeName}:</p>
+              <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
+                <code style={{background: '#000', padding: '8px 12px', borderRadius: '6px', color: '#fff', fontSize: '13px', flex: 1, border: '1px solid #444'}}>{pixKey}</code>
+                <button className="primary-btn" onClick={copyPixToClipboard} style={{background: '#25D366', color: '#000', fontWeight: 'bold', fontSize: '12px', padding: '8px 12px'}}>
+                  <Copy size={14}/> Copiar Chave
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div style={{marginTop: '20px', background: '#0d0d10', padding: '15px', borderRadius: '8px', border: '1px solid #222'}}>
+            <strong style={{fontSize: '13px'}}>Avalie nosso Atendimento:</strong>
+            <div style={{display: 'flex', gap: '8px', margin: '10px 0'}}>
+              {[1, 2, 3, 4, 5].map(star => (
+                <button key={star} onClick={() => setUserRating(star)} style={{background: 'none', border: 'none', cursor: 'pointer'}}>
+                  <Star size={22} fill={star <= userRating ? '#eab308' : 'none'} color="#eab308"/>
+                </button>
+              ))}
+            </div>
+            <input 
+              value={userReviewText} 
+              onChange={e=>setUserReviewText(e.target.value)} 
+              placeholder="Deixe seu comentário sobre o serviço..." 
+              style={{background: '#111', color: '#fff', border: '1px solid #333', padding: '8px', borderRadius: '6px', width: '100%', fontSize: '12px'}}
+            />
+            <button className="secondary-btn" onClick={submitReview} style={{marginTop: '8px', fontSize: '12px'}}>Enviar Avaliação</button>
+          </div>
+
+          <a href={`https://wa.me/${whatsapp}?text=${encodeURIComponent(`Olá ${storeName}! Estou acompanhando meu atendimento ${foundOs.id} (${foundOs.device})`)}`} target="_blank" rel="noreferrer" className="primary-btn full-btn" style={{marginTop: '20px', background: '#25D366', color: '#000', textDecoration: 'none', textAlign: 'center'}}>
+            <MessageCircle size={16}/> Falar com o Estabelecimento no WhatsApp
           </a>
+        </div>
+      )}
+
+      {foundOs === 'NOT_FOUND' && (
+        <div style={{marginTop: '20px', textAlign: 'center', color: '#888', padding: '20px'}}>
+          Nenhum registro encontrado com o código "{trackQuery}".
         </div>
       )}
     </div>
@@ -1775,52 +2654,230 @@ function PaymentsPage({pixKey, setPixKey, onShowPayModal}) {
     <div className="page-heading">
       <div>
         <div className="eyebrow"><span className="eyebrow-line"/> FINANCEIRO</div>
-        <h1>Configuração <span>Pix da Barbearia.</span></h1>
-        <p>Defina a sua chave Pix para receber pagamentos de cortes e cervejas.</p>
+        <h1>Configuração <span>Pix & Recebimentos.</span></h1>
+        <p>Defina a sua chave Pix para receber pagamentos de serviços e vendas.</p>
       </div>
       <button className="primary-btn" onClick={onShowPayModal} style={{background: '#25D366', color: '#000', fontWeight: 'bold'}}>
         <QrCode size={17}/> Renovação da Assinatura (R$ 50,00)
       </button>
     </div>
 
-    <section className="panel settings-panel" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
-      <div className="settings-row">
-        <span>Sua Chave Pix para Receber dos Clientes</span>
-        <input value={pixKey} onChange={e=>setPixKey(e.target.value)} placeholder="CNPJ, Telefone, E-mail ou CPF" style={{background: '#111', color: '#fff', border: '1px solid #333', padding: '8px 12px', borderRadius: '6px', width: '250px'}}/>
-      </div>
-    </section>
+    <div className="settings-grid">
+      <section className="panel settings-panel" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
+        <div className="settings-title">
+          <div className="settings-icon"><CreditCard size={19}/></div>
+          <div><h3>Sua Chave Pix para Recebimento</h3><p>Exibida aos clientes no fechamento</p></div>
+        </div>
+        <div className="settings-row">
+          <span>Chave Pix Cadastrada</span>
+          <input 
+            value={pixKey} 
+            onChange={e=>setPixKey(e.target.value)} 
+            placeholder="Ex: CNPJ, E-mail, Telefone ou CPF" 
+            style={{background: '#111', color: '#fff', border: '1px solid #333', padding: '8px 12px', borderRadius: '6px', fontSize: '13px', width: '250px'}}
+          />
+        </div>
+        <div className="settings-help">
+          <ShieldCheck size={16}/>
+          <span>Seus clientes efetuarão os pagamentos diretamente na sua conta bancária sem intermediários.</span>
+        </div>
+      </section>
+    </div>
   </div>
 }
 
-function SettingsPage({configured,email,storeName,setStoreName,storeLogo,onLogoUpload,whatsapp,setWhatsapp,pixKey,setPixKey,storeAddress,setStoreAddress,mapsUrl,setMapsUrl,modules,setModules,onLogout,teamMembers,onInviteMember,auditLogs,userAccessLevel,isLifetimeAdmin}) {
+function SettingsPage({configured,email,storeName,setStoreName,storeLogo,onLogoUpload,whatsapp,setWhatsapp,pixKey,setPixKey,storeAddress,setStoreAddress,mapsUrl,setMapsUrl,modules,setModules,onLogout,teamMembers,onInviteMember,auditLogs,userAccessLevel,isLifetimeAdmin,upgradeAssistantEnabled,setUpgradeAssistantEnabled,upgradeDiscounts,setUpgradeDiscounts}) {
   return <div className="page-content">
     <div className="page-heading">
       <div>
         <div className="eyebrow"><span className="eyebrow-line"/> SISTEMA</div>
-        <h1>Configurações da <span>Barbearia.</span></h1>
-        <p>Ajuste dados comerciais, localização, equipe de barbeiros e módulos ativos.</p>
+        <h1>Configurações do <span>Estabelecimento.</span></h1>
+        <p>Ajuste o nome comercial, localização física, equipe e módulos ativos.</p>
       </div>
     </div>
 
     <div className="settings-grid">
+      <section className="panel settings-panel" style={{background: '#0a0a0d', border: '1px solid #18181b', gridColumn: '1 / -1'}}>
+        <div className="settings-title">
+          <div className="settings-icon"><RefreshCw size={19}/></div>
+          <div>
+            <h3>Auxiliar de Avaliação de Upgrade</h3>
+            <p>Ative para permitir que clientes marquem avarias e peças trocadas, abatendo valores automaticamente.</p>
+          </div>
+          <button
+            className={`secondary-btn ${upgradeAssistantEnabled ? 'primary-btn' : ''}`}
+            onClick={() => setUpgradeAssistantEnabled(!upgradeAssistantEnabled)}
+            style={{fontSize: '12px', padding: '6px 14px'}}
+          >
+            {upgradeAssistantEnabled ? '✓ Ativado' : 'Desativado'}
+          </button>
+        </div>
+
+        {upgradeAssistantEnabled && (
+          <div style={{marginTop: '16px', borderTop: '1px solid #222', paddingTop: '16px'}}>
+            <span style={{fontSize: '12px', color: '#aaa', display: 'block', marginBottom: '12px'}}>
+              Defina o valor em Reais (R$) a ser reduzido do celular do cliente para cada tipo de condição:
+            </span>
+
+            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px'}}>
+              <div className="settings-row" style={{flexDirection: 'column', alignItems: 'flex-start', background: '#121217', padding: '10px', borderRadius: '8px'}}>
+                <span style={{fontSize: '12px'}}>Tela Trocada / Trincada</span>
+                <div style={{display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', width: '100%'}}>
+                  <span style={{color: '#ef4444', fontWeight: 'bold'}}>- R$</span>
+                  <input
+                    type="number"
+                    value={upgradeDiscounts.screenReplaced}
+                    onChange={e => setUpgradeDiscounts({...upgradeDiscounts, screenReplaced: e.target.value})}
+                    style={{background: '#000', color: '#fff', border: '1px solid #333', padding: '6px', borderRadius: '6px', width: '100%'}}
+                  />
+                </div>
+              </div>
+
+              <div className="settings-row" style={{flexDirection: 'column', alignItems: 'flex-start', background: '#121217', padding: '10px', borderRadius: '8px'}}>
+                <span style={{fontSize: '12px'}}>Bateria Trocada / Não Genuína</span>
+                <div style={{display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', width: '100%'}}>
+                  <span style={{color: '#ef4444', fontWeight: 'bold'}}>- R$</span>
+                  <input
+                    type="number"
+                    value={upgradeDiscounts.batteryReplaced}
+                    onChange={e => setUpgradeDiscounts({...upgradeDiscounts, batteryReplaced: e.target.value})}
+                    style={{background: '#000', color: '#fff', border: '1px solid #333', padding: '6px', borderRadius: '6px', width: '100%'}}
+                  />
+                </div>
+              </div>
+
+              <div className="settings-row" style={{flexDirection: 'column', alignItems: 'flex-start', background: '#121217', padding: '10px', borderRadius: '8px'}}>
+                <span style={{fontSize: '12px'}}>Face ID / Biometria Inoperante</span>
+                <div style={{display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', width: '100%'}}>
+                  <span style={{color: '#ef4444', fontWeight: 'bold'}}>- R$</span>
+                  <input
+                    type="number"
+                    value={upgradeDiscounts.faceIdOff}
+                    onChange={e => setUpgradeDiscounts({...upgradeDiscounts, faceIdOff: e.target.value})}
+                    style={{background: '#000', color: '#fff', border: '1px solid #333', padding: '6px', borderRadius: '6px', width: '100%'}}
+                  />
+                </div>
+              </div>
+
+              <div className="settings-row" style={{flexDirection: 'column', alignItems: 'flex-start', background: '#121217', padding: '10px', borderRadius: '8px'}}>
+                <span style={{fontSize: '12px'}}>Câmera com Falha / Trocada</span>
+                <div style={{display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', width: '100%'}}>
+                  <span style={{color: '#ef4444', fontWeight: 'bold'}}>- R$</span>
+                  <input
+                    type="number"
+                    value={upgradeDiscounts.cameraFailed}
+                    onChange={e => setUpgradeDiscounts({...upgradeDiscounts, cameraFailed: e.target.value})}
+                    style={{background: '#000', color: '#fff', border: '1px solid #333', padding: '6px', borderRadius: '6px', width: '100%'}}
+                  />
+                </div>
+              </div>
+
+              <div className="settings-row" style={{flexDirection: 'column', alignItems: 'flex-start', background: '#121217', padding: '10px', borderRadius: '8px'}}>
+                <span style={{fontSize: '12px'}}>Lente / Vidrinho da Câmera</span>
+                <div style={{display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', width: '100%'}}>
+                  <span style={{color: '#ef4444', fontWeight: 'bold'}}>- R$</span>
+                  <input
+                    type="number"
+                    value={upgradeDiscounts.cameraLensScratched}
+                    onChange={e => setUpgradeDiscounts({...upgradeDiscounts, cameraLensScratched: e.target.value})}
+                    style={{background: '#000', color: '#fff', border: '1px solid #333', padding: '6px', borderRadius: '6px', width: '100%'}}
+                  />
+                </div>
+              </div>
+
+              <div className="settings-row" style={{flexDirection: 'column', alignItems: 'flex-start', background: '#121217', padding: '10px', borderRadius: '8px'}}>
+                <span style={{fontSize: '12px'}}>Conector / Dock de Carga</span>
+                <div style={{display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', width: '100%'}}>
+                  <span style={{color: '#ef4444', fontWeight: 'bold'}}>- R$</span>
+                  <input
+                    type="number"
+                    value={upgradeDiscounts.chargingPortFailed}
+                    onChange={e => setUpgradeDiscounts({...upgradeDiscounts, chargingPortFailed: e.target.value})}
+                    style={{background: '#000', color: '#fff', border: '1px solid #333', padding: '6px', borderRadius: '6px', width: '100%'}}
+                  />
+                </div>
+              </div>
+
+              <div className="settings-row" style={{flexDirection: 'column', alignItems: 'flex-start', background: '#121217', padding: '10px', borderRadius: '8px'}}>
+                <span style={{fontSize: '12px'}}>Alto-falante / Auricular</span>
+                <div style={{display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', width: '100%'}}>
+                  <span style={{color: '#ef4444', fontWeight: 'bold'}}>- R$</span>
+                  <input
+                    type="number"
+                    value={upgradeDiscounts.audioSpeakerFailed}
+                    onChange={e => setUpgradeDiscounts({...upgradeDiscounts, audioSpeakerFailed: e.target.value})}
+                    style={{background: '#000', color: '#fff', border: '1px solid #333', padding: '6px', borderRadius: '6px', width: '100%'}}
+                  />
+                </div>
+              </div>
+
+              <div className="settings-row" style={{flexDirection: 'column', alignItems: 'flex-start', background: '#121217', padding: '10px', borderRadius: '8px'}}>
+                <span style={{fontSize: '12px'}}>NFC / Pagamento por Aproximação</span>
+                <div style={{display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', width: '100%'}}>
+                  <span style={{color: '#ef4444', fontWeight: 'bold'}}>- R$</span>
+                  <input
+                    type="number"
+                    value={upgradeDiscounts.nfcFailed}
+                    onChange={e => setUpgradeDiscounts({...upgradeDiscounts, nfcFailed: e.target.value})}
+                    style={{background: '#000', color: '#fff', border: '1px solid #333', padding: '6px', borderRadius: '6px', width: '100%'}}
+                  />
+                </div>
+              </div>
+
+              <div className="settings-row" style={{flexDirection: 'column', alignItems: 'flex-start', background: '#121217', padding: '10px', borderRadius: '8px'}}>
+                <span style={{fontSize: '12px'}}>Wi-Fi ou Bluetooth Inoperante</span>
+                <div style={{display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', width: '100%'}}>
+                  <span style={{color: '#ef4444', fontWeight: 'bold'}}>- R$</span>
+                  <input
+                    type="number"
+                    value={upgradeDiscounts.wifiFailed}
+                    onChange={e => setUpgradeDiscounts({...upgradeDiscounts, wifiFailed: e.target.value})}
+                    style={{background: '#000', color: '#fff', border: '1px solid #333', padding: '6px', borderRadius: '6px', width: '100%'}}
+                  />
+                </div>
+              </div>
+
+              <div className="settings-row" style={{flexDirection: 'column', alignItems: 'flex-start', background: '#121217', padding: '10px', borderRadius: '8px'}}>
+                <span style={{fontSize: '12px'}}>Carcaça / Vidro Traseiro com Marcas</span>
+                <div style={{display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', width: '100%'}}>
+                  <span style={{color: '#ef4444', fontWeight: 'bold'}}>- R$</span>
+                  <input
+                    type="number"
+                    value={upgradeDiscounts.housingScratched}
+                    onChange={e => setUpgradeDiscounts({...upgradeDiscounts, housingScratched: e.target.value})}
+                    style={{background: '#000', color: '#fff', border: '1px solid #333', padding: '6px', borderRadius: '6px', width: '100%'}}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </section>
+
       {userAccessLevel === 'owner' && (
         <section className="panel settings-panel" style={{background: '#0a0a0d', border: '1px solid #18181b', gridColumn: '1 / -1'}}>
           <div className="settings-title">
             <div className="settings-icon"><Users size={19}/></div>
-            <div><h3>Equipe de Barbeiros</h3><p>Toda a sua equipe usando a mesma barbearia sem pagar nada a mais</p></div>
-            <button className="primary-btn" onClick={onInviteMember} style={{fontSize: '12px', padding: '6px 12px'}}><UserPlus size={15}/> Adicionar Barbeiro</button>
+            <div><h3>Equipe & Operadores Cadastrados</h3><p>1 Assinatura = Toda a sua equipe usando o mesmo estabelecimento</p></div>
+            <button className="primary-btn" onClick={onInviteMember} style={{fontSize: '12px', padding: '6px 12px'}}><UserPlus size={15}/> Convidar Membro</button>
           </div>
+
           <div className="table-wrap" style={{marginTop: '15px'}}>
             <table>
               <thead>
-                <tr><th>NOME</th><th>E-MAIL</th><th>CARGO</th><th>STATUS</th></tr>
+                <tr>
+                  <th>NOME</th>
+                  <th>E-MAIL</th>
+                  <th>CARGO / FUNÇÃO</th>
+                  <th>STATUS</th>
+                </tr>
               </thead>
               <tbody>
                 {teamMembers.map(m => (
                   <tr key={m.id}>
                     <td><strong>{m.name}</strong></td>
                     <td>{m.email}</td>
-                    <td><span className={`status-pill ${m.role==='owner'?'green':'blue'}`}>{m.role==='owner'?'Proprietário':'Barbeiro'}</span></td>
+                    <td><span className={`status-pill ${m.role === 'owner' ? 'green' : 'blue'}`}>{m.role === 'owner' ? 'Administrador (Dono)' : 'Operador / Técnico'}</span></td>
                     <td><span className="status-pill green">• {m.status}</span></td>
                   </tr>
                 ))}
@@ -1830,17 +2887,128 @@ function SettingsPage({configured,email,storeName,setStoreName,storeLogo,onLogoU
         </section>
       )}
 
+      {userAccessLevel === 'owner' && (
+        <section className="panel settings-panel" style={{background: '#0a0a0d', border: '1px solid #18181b', gridColumn: '1 / -1'}}>
+          <div className="settings-title">
+            <div className="settings-icon"><History size={19}/></div>
+            <div><h3>Histórico de Alterações (Audit Log)</h3><p>Registro de segurança ("Quem fez o quê")</p></div>
+          </div>
+
+          <div className="table-wrap" style={{marginTop: '15px'}}>
+            <table>
+              <thead>
+                <tr>
+                  <th>DATA / HORA</th>
+                  <th>AÇÃO REALIZADA</th>
+                  <th>USUÁRIO / OPERADOR</th>
+                </tr>
+              </thead>
+              <tbody>
+                {auditLogs.slice(0, 5).map(log => (
+                  <tr key={log.id}>
+                    <td>{log.time}</td>
+                    <td><strong>{log.action}</strong></td>
+                    <td>{log.user}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
       <section className="panel settings-panel" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
-        <div className="settings-title"><div className="settings-icon"><Store size={19}/></div><div><h3>Dados da Barbearia</h3><p>Informações exibidas aos clientes</p></div></div>
-        <div className="settings-row"><span>Nome da Barbearia</span><input value={storeName} onChange={e=>setStoreName(e.target.value)} style={{background: '#111', color: '#fff', border: '1px solid #333', padding: '6px 10px', borderRadius: '6px'}}/></div>
-        <div className="settings-row"><span>Endereço Físico</span><input value={storeAddress} onChange={e=>setStoreAddress(e.target.value)} style={{background: '#111', color: '#fff', border: '1px solid #333', padding: '6px 10px', borderRadius: '6px'}}/></div>
-        <div className="settings-row"><span>WhatsApp da Barbearia</span><input value={whatsapp} onChange={e=>setWhatsapp(e.target.value)} style={{background: '#111', color: '#fff', border: '1px solid #333', padding: '6px 10px', borderRadius: '6px'}}/></div>
+        <div className="settings-title"><div className="settings-icon"><Sliders size={19}/></div><div><h3>Módulos do Estabelecimento</h3><p>Ative ou desative os recursos exibidos no painel</p></div></div>
+
+        <div className="settings-row">
+          <span>Ordens de Serviço & Atendimento</span>
+          <button className={`secondary-btn ${modules.orders ? 'primary-btn' : ''}`} onClick={() => setModules({...modules, orders: !modules.orders})}>
+            {modules.orders ? 'Ativado' : 'Desativado'}
+          </button>
+        </div>
+
+        <div className="settings-row">
+          <span>Pós-Venda & Acompanhamento</span>
+          <button className={`secondary-btn ${modules.crm ? 'primary-btn' : ''}`} onClick={() => setModules({...modules, crm: !modules.crm})}>
+            {modules.crm ? 'Ativado' : 'Desativado'}
+          </button>
+        </div>
+
+        <div className="settings-row">
+          <span>Caixa da Loja / Balcão</span>
+          <button className={`secondary-btn ${modules.cashRegister ? 'primary-btn' : ''}`} onClick={() => setModules({...modules, cashRegister: !modules.cashRegister})}>
+            {modules.cashRegister ? 'Ativado' : 'Desativado'}
+          </button>
+        </div>
+
+        <div className="settings-row">
+          <span>Venda de Aparelhos & Upgrade</span>
+          <button className={`secondary-btn ${modules.iphones ? 'primary-btn' : ''}`} onClick={() => setModules({...modules, iphones: !modules.iphones})}>
+            {modules.iphones ? 'Ativado' : 'Desativado'}
+          </button>
+        </div>
+
+        <div className="settings-row">
+          <span>Estoque de Produtos & Itens</span>
+          <button className={`secondary-btn ${modules.inventory ? 'primary-btn' : ''}`} onClick={() => setModules({...modules, inventory: !modules.inventory})}>
+            {modules.inventory ? 'Ativado' : 'Desativado'}
+          </button>
+        </div>
+
+        <div className="settings-row">
+          <span>Financeiro & Comissões</span>
+          <button className={`secondary-btn ${modules.finance ? 'primary-btn' : ''}`} onClick={() => setModules({...modules, finance: !modules.finance})}>
+            {modules.finance ? 'Ativado' : 'Desativado'}
+          </button>
+        </div>
       </section>
 
       <section className="panel settings-panel" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
-        <div className="settings-title"><div className="settings-icon"><ShieldCheck size={19}/></div><div><h3>Licença da Barbearia</h3><p>Gestão do plano RT Systems</p></div></div>
-        <div className="settings-row"><span>Status</span><strong style={{color: '#25D366'}}>{isLifetimeAdmin ? '👑 Licença Vitalícia' : 'Plano Barbearia (R$ 50/mês)'}</strong></div>
-        <div className="settings-row"><span>E-mail</span><strong>{email || 'Conectado'}</strong></div>
+        <div className="settings-title"><div className="settings-icon"><Store size={19}/></div><div><h3>Dados & Endereço do Estabelecimento</h3><p>Identidade exibida no painel, faturas e Google Maps</p></div></div>
+
+        <div className="settings-row">
+          <span>Logotipo do Estabelecimento</span>
+          <label className="secondary-btn" style={{cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', fontSize: '12px'}}>
+            <Upload size={14}/> {storeLogo ? 'Alterar Logo' : 'Enviar Logo'}
+            <input type="file" accept="image/*" onChange={onLogoUpload} style={{display: 'none'}} />
+          </label>
+        </div>
+
+        <div className="settings-row">
+          <span>Nome Comercial</span>
+          <input value={storeName} onChange={e=>setStoreName(e.target.value)} placeholder="Ex: RT Assistência ou Loja X" style={{background: '#111', color: '#fff', border: '1px solid #333', padding: '6px 10px', borderRadius: '6px', fontSize: '13px', width: '220px'}}/>
+        </div>
+
+        <div className="settings-row">
+          <span>Endereço Físico</span>
+          <input value={storeAddress} onChange={e=>setStoreAddress(e.target.value)} placeholder="Av. Principal, 1000 - Centro" style={{background: '#111', color: '#fff', border: '1px solid #333', padding: '6px 10px', borderRadius: '6px', fontSize: '13px', width: '220px'}}/>
+        </div>
+
+        <div className="settings-row">
+          <span>Link do Google Maps</span>
+          <input value={mapsUrl} onChange={e=>setMapsUrl(e.target.value)} placeholder="https://maps.google.com/..." style={{background: '#111', color: '#fff', border: '1px solid #333', padding: '6px 10px', borderRadius: '6px', fontSize: '13px', width: '220px'}}/>
+        </div>
+
+        <div className="settings-row">
+          <span>WhatsApp da Loja (Vendas & OS)</span>
+          <input value={whatsapp} onChange={e=>setWhatsapp(e.target.value)} placeholder="Ex: 5591999999999" style={{background: '#111', color: '#fff', border: '1px solid #333', padding: '6px 10px', borderRadius: '6px', fontSize: '13px', width: '220px'}}/>
+        </div>
+
+        <div className="settings-row">
+          <span>Chave Pix da Loja (Recebimentos)</span>
+          <input value={pixKey} onChange={e=>setPixKey(e.target.value)} placeholder="Sua chave Pix" style={{background: '#111', color: '#fff', border: '1px solid #333', padding: '6px 10px', borderRadius: '6px', fontSize: '13px', width: '220px'}}/>
+        </div>
+      </section>
+
+      <section className="panel settings-panel" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
+        <div className="settings-title"><div className="settings-icon"><ShieldCheck size={19}/></div><div><h3>Licença & Suporte RT Mobile</h3><p>Administração da plataforma</p></div><span className={`connection-badge ${configured?'connected':''}`}><i/>{configured?'Ativo':'Pendente'}</span></div>
+        <div className="settings-row"><span>Status da Licença</span><strong style={{color: '#25D366'}}>{isLifetimeAdmin ? '👑 Licença Vitalícia de Administrador (Sem Cobrança)' : 'Plano Profissional Ativo (R$ 50/mês)'}</strong></div>
+        <div className="settings-row"><span>E-mail do Administrador</span><strong>{email || 'Nenhum'}</strong></div>
+
+        <a href={`https://wa.me/${adminWhatsapp}?text=${encodeURIComponent('Olá Robert! Preciso de suporte no sistema RT Mobile.')}`} target="_blank" rel="noreferrer" className="secondary-btn full-btn" style={{marginTop: '15px', textDecoration: 'none', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'}}>
+          <PhoneCall size={15}/> Falar com Suporte Técnico (Robert)
+        </a>
+
         {email && <button className="secondary-btn logout-btn" onClick={onLogout} style={{marginTop: '15px'}}><LogOut size={16}/> Sair da conta</button>}
       </section>
     </div>
