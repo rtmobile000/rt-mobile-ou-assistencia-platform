@@ -183,7 +183,7 @@ function BarcodeCameraScanner({ onDetected, onClose }) {
   );
 }
 
-/* COMPONENTE EXCLUSIVO DO MODO TV / PAINEL DE CLIENTES NA SALA DE ESPERA */
+/* COMPONENTE MODO TV */
 function TvModeScreen({ orders, storeName, onClose }) {
   const [time, setTime] = useState(new Date().toLocaleTimeString('pt-BR'));
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -399,7 +399,7 @@ function TvModeScreen({ orders, storeName, onClose }) {
   );
 }
 
-/* MODAL CALCULADORA DO CAIXA */
+/* MODAL DA CALCULADORA INTELIGENTE DO CAIXA */
 function CalculatorModal({ onUseValue, onClose }) {
   const [display, setDisplay] = useState('0');
   const [equation, setEquation] = useState('');
