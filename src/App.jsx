@@ -219,6 +219,7 @@ function TvModeScreen({ orders, storeName, onClose }) {
       display: 'flex', flexDirection: 'column', padding: '16px', fontFamily: 'system-ui, sans-serif',
       overflowY: 'auto'
     }}>
+      {/* BOTÃO FIXO DE SEGURANÇA: NUNCA SOME NO MODO RETRATO OU PAISAGEM */}
       <button
         type="button"
         onClick={onClose}
@@ -233,6 +234,7 @@ function TvModeScreen({ orders, storeName, onClose }) {
         <X size={16}/> Sair do Modo TV
       </button>
 
+      {/* CABEÇALHO DO MODO TV */}
       <header style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         flexWrap: 'wrap', gap: '12px', paddingBottom: '16px', paddingRight: '150px',
@@ -270,12 +272,14 @@ function TvModeScreen({ orders, storeName, onClose }) {
         </div>
       </header>
 
+      {/* GRADE RESPONSIVA: 2 COLUNAS NO COMPUTADOR / 1 COLUNA NA VERTICAL */}
       <div style={{
         flex: 1, display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))',
         gap: '16px', marginTop: '16px', overflow: 'visible'
       }}>
         
+        {/* COLUNA 1: EM MANUTENÇÃO */}
         <section style={{
           background: '#0a0a0f', border: '1px solid #222', borderRadius: '16px',
           display: 'flex', flexDirection: 'column', minHeight: '320px', overflow: 'hidden'
@@ -332,6 +336,7 @@ function TvModeScreen({ orders, storeName, onClose }) {
           </div>
         </section>
 
+        {/* COLUNA 2: PRONTOS PARA RETIRADA */}
         <section style={{
           background: '#0a0a0f', border: '1px solid #182c1e', borderRadius: '16px',
           display: 'flex', flexDirection: 'column', minHeight: '320px', overflow: 'hidden'
@@ -462,7 +467,7 @@ function CalculatorModal({ onUseValue, onClose }) {
           <button type="button" className="secondary-btn" onClick={handleClear} style={{background: '#1f1f2e', color: '#ef4444'}}>C</button>
           <button type="button" className="secondary-btn" onClick={handlePercent} style={{background: '#1f1f2e', color: '#38bdf8'}}>%</button>
           <button type="button" className="secondary-btn" onClick={() => setDisplay(prev => prev.startsWith('-') ? prev.slice(1) : '-' + prev)} style={{background: '#1f1f2e'}}>±</button>
-          <button type="button" className="secondary-btn" onClick={() => setOperation(handleOp('÷'))} style={{background: '#181824', color: '#25D366'}} onClick={() => handleOp('÷')}>÷</button>
+          <button type="button" className="secondary-btn" onClick={() => handleOp('÷')} style={{background: '#181824', color: '#25D366'}}>÷</button>
 
           <button type="button" className="secondary-btn" onClick={() => handleNum(7)} style={{background: '#14141c'}}>7</button>
           <button type="button" className="secondary-btn" onClick={() => handleNum(8)} style={{background: '#14141c'}}>8</button>
@@ -666,11 +671,10 @@ function App() {
   const [userAccessLevel, setUserAccessLevel] = useState('owner');
   const [active, setActive] = useState(() => userRole === 'tech' ? 'overview' : 'stores_directory');
   
-  // Estado para abrir e fechar a visualização do Modo TV
   const [showTvMode, setShowTvMode] = useState(false);
 
   const [modules, setModules] = useState({
-    orders: true,    
+    orders: true,     
     iphones: true,    
     inventory: true,  
     finance: true,
@@ -685,7 +689,6 @@ function App() {
   const [isAccountExpired, setIsAccountExpired] = useState(false);
   const [expiredReason, setExpiredReason] = useState('trial');
 
-  // Configurações da Loja
   const [storeName, setStoreName] = useState('RT MOBILE');
   const [storeLogo, setStoreLogo] = useState(null);
   const [whatsappNumber, setWhatsappNumber] = useState('5591989117332');
@@ -694,7 +697,6 @@ function App() {
   const [mapsUrl, setMapsUrl] = useState('https://maps.google.com');
   const [techCommissionRate, setTechCommissionRate] = useState(10);
 
-  // Auxiliar de Upgrade (Configurações com os 10 itens completos)
   const [upgradeAssistantEnabled, setUpgradeAssistantEnabled] = useState(true);
   const [upgradeDiscounts, setUpgradeDiscounts] = useState({
     screenReplaced: 200,
@@ -709,21 +711,16 @@ function App() {
     housingScratched: 90,
   });
 
-  // Carrinho de Acessórios do Cliente
   const [cart, setCart] = useState([]);
   const [showCartModal, setShowCartModal] = useState(false);
 
-  // Caixa da Loja
   const [cashRegister, setCashRegister] = useState({
     isOpen: true,
     openingBalance: 0.00,
     entries: []
   });
 
-  // Equipe
   const [teamMembers, setTeamMembers] = useState([]);
-
-  // Auditoria
   const [auditLogs, setAuditLogs] = useState([]);
 
   const addAuditLog = (action) => {
@@ -758,11 +755,10 @@ function App() {
   const [showCashTransactionModal, setShowCashTransactionModal] = useState(false);
   const [showInviteMemberModal, setShowInviteMemberModal] = useState(false);
 
-  // Modais de Leitura de Código de Barras
   const [showBarcodeScannerForProduct, setShowBarcodeScannerForProduct] = useState(false);
   const [showBarcodeSaleModal, setShowBarcodeSaleModal] = useState(false);
   
-  // Estado para exibir o modal da calculadora
+  // Estado da calculadora adicionado com segurança
   const [showCalculatorModal, setShowCalculatorModal] = useState(false);
   
   const [toast, setToast] = useState('');
@@ -775,7 +771,6 @@ function App() {
   const [authError, setAuthError] = useState('');
   const [saving, setSaving] = useState(false);
   
-  // Modal de Upgrade
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [upgradeStep, setUpgradeStep] = useState(1);
   const [currentDevice, setCurrentDevice] = useState('');
@@ -1665,12 +1660,12 @@ function App() {
             {active==='customers' && userRole === 'tech' && <CustomersPage customers={customers} onNew={()=>setShowNewCustomer(true)} />}
             {active==='crm' && userRole === 'tech' && <CrmPage customers={customers} storeName={storeName} whatsapp={whatsappNumber} />}
             
-            {/* CAIXA COM BOTÃO DE CHAMAR A CALCULADORA */}
+            {/* CAIXA COM O BOTÃO DA CALCULADORA ADICIONADO DIRETAMENTE */}
             {active==='cash' && userRole === 'tech' && (
               <CashPage 
                 cashRegister={cashRegister} 
                 onNewTransaction={() => setShowCashTransactionModal(true)} 
-                onOpenBarcodeSale={() => setShowBarcodeSaleModal(true)} 
+                onOpenBarcodeSale={() => setShowBarcodeSaleModal(true)}
                 onOpenCalculator={() => setShowCalculatorModal(true)}
               />
             )}
@@ -1698,13 +1693,13 @@ function App() {
                 >
                   Falar com Desenvolvedor ↗
                 </a>
-            </span>
+              </span>
             </footer>
           </>
         )}
       </main>
 
-      {/* MODAL DA CALCULADORA DO CAIXA */}
+      {/* MODAL DA CALCULADORA INTELIGENTE DO CAIXA */}
       {showCalculatorModal && (
         <CalculatorModal
           onUseValue={(val) => {
@@ -2091,140 +2086,141 @@ function App() {
                           </span>
                         </label>
                       ))}
-                  </div>
-
-                  {calculateTotalUpgradeDiscount() > 0 && (
-                    <div style={{marginTop: '10px', textAlign: 'right', fontSize: '12px', color: '#ef4444', fontWeight: 'bold'}}>
-                      Abatimento Estimado: - R$ {calculateTotalUpgradeDiscount().toFixed(2)}
                     </div>
-                  )}
+
+                    {calculateTotalUpgradeDiscount() > 0 && (
+                      <div style={{marginTop: '10px', textAlign: 'right', fontSize: '12px', color: '#ef4444', fontWeight: 'bold'}}>
+                        Abatimento Estimado: - R$ {calculateTotalUpgradeDiscount().toFixed(2)}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div style={{marginTop: '15px', textAlign: 'center'}}>
+                  <button className="primary-btn full-btn" onClick={()=>setUpgradeStep(2)}>
+                    Avançar e Escolher Novo Aparelho →
+                  </button>
                 </div>
-              )}
-
-              <div style={{marginTop: '15px', textAlign: 'center'}}>
-                <button className="primary-btn full-btn" onClick={()=>setUpgradeStep(2)}>
-                  Avançar e Escolher Novo Aparelho →
-                </button>
               </div>
-            </div>
-          ) : (
-            <div>
-              <p className="muted">Qual modelo você gostaria de pegar na troca?</p>
-              <label style={{marginTop: '10px'}}>Selecione o novo modelo desejado
-                <select value={targetDevice} onChange={e=>setTargetDevice(e.target.value)}>
-                  <optgroup label="Apple (Seminovos)">
-                    {seminovosList.map(item => <option key={item} value={`${item} (Seminovo)`}>{item} (Seminovo)</option>)}
-                  </optgroup>
-                  <optgroup label="Apple (Lacrados)">
-                    {lacradosList.map(item => <option key={item} value={`${item} (Lacrado)`}>{item} (Lacrado)</option>)}
-                  </optgroup>
-                  <optgroup label="Xiaomi & Poco">
-                    {xiaomiList.map(item => <option key={item} value={item}>{item}</option>)}
-                  </optgroup>
-                  <optgroup label="Realme">
-                    {realmeList.map(item => <option key={item} value={item}>{item}</option>)}
-                  </optgroup>
-                </select>
-              </label>
-
-              {upgradeAssistantEnabled && calculateTotalUpgradeDiscount() > 0 && (
-                <div style={{marginTop: '12px', padding: '10px', background: '#1c1414', border: '1px solid #7f1d1d', borderRadius: '8px', fontSize: '12px', color: '#fca5a5'}}>
-                  ⚠️ Foi considerado um abatimento prévio de <strong>- R$ {calculateTotalUpgradeDiscount().toFixed(2)}</strong> pelos detalhes informados no seu aparelho atual.
-                </div>
-              )}
-
-              <div className="modal-foot" style={{marginTop: '20px'}}>
-                <button type="button" className="secondary-btn" onClick={()=>setUpgradeStep(1)}>Voltar</button>
-                <button type="button" className="primary-btn" onClick={finishUpgradeToWhatsapp} style={{background: '#25D366', color: '#000', fontWeight: 'bold'}}>
-                  <MessageCircle size={16}/> Enviar Proposta no WhatsApp da Loja
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    )}
-
-    {showNewOrder && (
-      <div className="modal-backdrop" onClick={()=>setShowNewOrder(false)}>
-        <form className="modal" onClick={e=>e.stopPropagation()} onSubmit={handleCreateOrder} style={{background: '#0f0f12', border: '1px solid #222'}}>
-          <div className="modal-head"><div><div className="eyebrow">NOVA ENTRADA</div><h2>Criar ordem de serviço</h2></div><button type="button" className="icon-btn" onClick={()=>setShowNewOrder(false)}><X size={19}/></button></div><p className="muted">Registre os dados principais e a senha do aparelho para os testes.</p>
-          <label>Cliente
-            <input list="customers-list" value={newOrder.customer} onChange={e=>{
-                const val = e.target.value;
-                const found = customers.find(c => c.name === val);
-                setNewOrder({...newOrder, customer: val, phone: found?.phone || newOrder.phone});
-              }} placeholder="Selecione ou digite o nome do cliente" required/>
-            <datalist id="customers-list">
-              {customers.map(c => <option key={c.id} value={c.name}>{c.phone ? `(${c.phone})` : ''}</option>)}
-            </datalist>
-          </label>
-          <div className="form-grid">
-            <label>Telefone / WhatsApp<input value={newOrder.phone} onChange={e=>setNewOrder({...newOrder,phone:e.target.value})} placeholder="(91) 99999-9999"/></label>
-            <label>Modelo do aparelho<input value={newOrder.device} onChange={e=>setNewOrder({...newOrder,device:e.target.value})} placeholder="Ex.: iPhone 15 Pro ou Redmi Note 15" required/></label>
-          </div>
-
-          <div style={{background: '#121216', padding: '12px', borderRadius: '10px', border: '1px solid #25252d', margin: '10px 0'}}>
-            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px'}}>
-              <span style={{fontSize: '12px', color: '#f59e0b', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px'}}>
-                <Key size={14}/> Senha de Desbloqueio
-              </span>
-              <div style={{display: 'flex', gap: '4px'}}>
-                <button
-                  type="button"
-                  onClick={()=>setPasswordType('text')}
-                  className={`secondary-btn ${passwordType === 'text' ? 'primary-btn' : ''}`}
-                  style={{fontSize: '11px', padding: '3px 8px'}}
-                >
-                  PIN / Texto
-                </button>
-                <button
-                  type="button"
-                  onClick={()=>setPasswordType('pattern')}
-                  className={`secondary-btn ${passwordType === 'pattern' ? 'primary-btn' : ''}`}
-                  style={{fontSize: '11px', padding: '3px 8px'}}
-                >
-                  Padrão Desenho (Android)
-                </button>
-              </div>
-            </div>
-
-            {passwordType === 'text' ? (
-              <input value={newOrder.devicePassword} onChange={e=>setNewOrder({...newOrder, devicePassword: e.target.value})} placeholder="Ex: 123456 ou Sem Senha" />
             ) : (
-              <PatternDrawer value={newOrder.patternDrawing} onChange={(drawing) => setNewOrder({...newOrder, patternDrawing: drawing})} />
+              <div>
+                <p className="muted">Qual modelo você gostaria de pegar na troca?</p>
+                <label style={{marginTop: '10px'}}>Selecione o novo modelo desejado
+                  <select value={targetDevice} onChange={e=>setTargetDevice(e.target.value)}>
+                    <optgroup label="Apple (Seminovos)">
+                      {seminovosList.map(item => <option key={item} value={`${item} (Seminovo)`}>{item} (Seminovo)</option>)}
+                    </optgroup>
+                    <optgroup label="Apple (Lacrados)">
+                      {lacradosList.map(item => <option key={item} value={`${item} (Lacrado)`}>{item} (Lacrado)</option>)}
+                    </optgroup>
+                    <optgroup label="Xiaomi & Poco">
+                      {xiaomiList.map(item => <option key={item} value={item}>{item}</option>)}
+                    </optgroup>
+                    <optgroup label="Realme">
+                      {realmeList.map(item => <option key={item} value={item}>{item}</option>)}
+                    </optgroup>
+                  </select>
+                </label>
+
+                {upgradeAssistantEnabled && calculateTotalUpgradeDiscount() > 0 && (
+                  <div style={{marginTop: '12px', padding: '10px', background: '#1c1414', border: '1px solid #7f1d1d', borderRadius: '8px', fontSize: '12px', color: '#fca5a5'}}>
+                    ⚠️ Foi considerado um abatimento prévio de <strong>- R$ {calculateTotalUpgradeDiscount().toFixed(2)}</strong> pelos detalhes informados no seu aparelho atual.
+                  </div>
+                )}
+
+                <div className="modal-foot" style={{marginTop: '20px'}}>
+                  <button type="button" className="secondary-btn" onClick={()=>setUpgradeStep(1)}>Voltar</button>
+                  <button type="button" className="primary-btn" onClick={finishUpgradeToWhatsapp} style={{background: '#25D366', color: '#000', fontWeight: 'bold'}}>
+                    <MessageCircle size={16}/> Enviar Proposta no WhatsApp da Loja
+                  </button>
+                </div>
+              </div>
             )}
           </div>
+        </div>
+      )}
 
-          <div className="form-grid">
-            <label>Garantia (Dias)
-              <select value={newOrder.warrantyDays} onChange={e=>setNewOrder({...newOrder,warrantyDays:e.target.value})}>
-                <option value="30">30 Dias</option>
-                <option value="90">90 Dias (3 Meses)</option>
-                <option value="180">180 Dias (6 Meses)</option>
-                <option value="365">365 Dias (1 Ano)</option>
-              </select>
+      {showNewOrder && (
+        <div className="modal-backdrop" onClick={()=>setShowNewOrder(false)}>
+          <form className="modal" onClick={e=>e.stopPropagation()} onSubmit={handleCreateOrder} style={{background: '#0f0f12', border: '1px solid #222'}}>
+            <div className="modal-head"><div><div className="eyebrow">NOVA ENTRADA</div><h2>Criar ordem de serviço</h2></div><button type="button" className="icon-btn" onClick={()=>setShowNewOrder(false)}><X size={19}/></button></div><p className="muted">Registre os dados principais e a senha do aparelho para os testes.</p>
+            <label>Cliente
+              <input list="customers-list" value={newOrder.customer} onChange={e=>{
+                  const val = e.target.value;
+                  const found = customers.find(c => c.name === val);
+                  setNewOrder({...newOrder, customer: val, phone: found?.phone || newOrder.phone});
+                }} placeholder="Selecione ou digite o nome do cliente" required/>
+              <datalist id="customers-list">
+                {customers.map(c => <option key={c.id} value={c.name}>{c.phone ? `(${c.phone})` : ''}</option>)}
+              </datalist>
             </label>
-            <label>Status inicial
-              <select value={newOrder.status} onChange={e=>setNewOrder({...newOrder,status:e.target.value})}>
-                {['Recebido','Em diagnóstico','Aguardando aprovação','Aguardando peça','Em manutenção','Pronto para retirada','Entregue'].map(s=><option key={s}>{s}</option>)}
-              </select>
-            </label>
-          </div>
-          <div className="form-grid">
-            <label>Valor cobrado (R$)<input type="number" step="0.01" value={newOrder.amount} onChange={e=>setNewOrder({...newOrder,amount:e.target.value})} placeholder="0,00"/></label>
-            <label>Custo da Peça (R$)<input type="number" step="0.01" value={newOrder.partCost} onChange={e=>setNewOrder({...newOrder,partCost:e.target.value})} placeholder="0,00"/></label>
-          </div>
-          <label>Defeito informado<textarea value={newOrder.issue} onChange={e=>setNewOrder({...newOrder,issue:e.target.value})} placeholder="Descreva o problema relatado..." rows="2" required/></label>
-          <div className="modal-foot"><button type="button" className="secondary-btn" onClick={()=>setShowNewOrder(false)}>Cancelar</button><button className="primary-btn" disabled={saving}>{saving?'Salvando...':'Salvar OS & Vistoria'}<ArrowUpRight size={16}/></button></div>
-        </form>
-      </div>
-    )}
+            <div className="form-grid">
+              <label>Telefone / WhatsApp<input value={newOrder.phone} onChange={e=>setNewOrder({...newOrder,phone:e.target.value})} placeholder="(91) 99999-9999"/></label>
+              <label>Modelo do aparelho<input value={newOrder.device} onChange={e=>setNewOrder({...newOrder,device:e.target.value})} placeholder="Ex.: iPhone 15 Pro ou Redmi Note 15" required/></label>
+            </div>
 
-    {showNewCustomer && <div className="modal-backdrop" onClick={()=>setShowNewCustomer(false)}><form className="modal" onClick={e=>e.stopPropagation()} onSubmit={handleCreateCustomer} style={{background: '#0f0f12', border: '1px solid #222'}}><div className="modal-head"><div><div className="eyebrow">NOVO CADASTRO</div><h2>Cadastrar cliente</h2></div><button type="button" className="icon-btn" onClick={()=>setShowNewCustomer(false)}><X size={19}/></button></div><p className="muted">Adicione os dados de contato do cliente.</p><label>Nome completo<input value={newCustomer.name} onChange={e=>setNewCustomer({...newCustomer,name:e.target.value})} placeholder="Nome do cliente" required/></label><div className="form-grid"><label>Telefone / WhatsApp<input value={newCustomer.phone} onChange={e=>setNewCustomer({...newCustomer,phone:e.target.value})} placeholder="(91) 99999-9999"/></label><label>E-mail<input type="email" value={newCustomer.email} onChange={e=>setNewCustomer({...newCustomer,email:e.target.value})} placeholder="cliente@email.com"/></label></div><div className="modal-foot"><button type="button" className="secondary-btn" onClick={()=>setShowNewCustomer(false)}>Cancelar</button><button className="primary-btn" disabled={saving}>{saving?'Salvando...':'Salvar cliente'}<ArrowUpRight size={16}/></button></div></form></div>}
+            <div style={{background: '#121216', padding: '12px', borderRadius: '10px', border: '1px solid #25252d', margin: '10px 0'}}>
+              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px'}}>
+                <span style={{fontSize: '12px', color: '#f59e0b', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px'}}>
+                  <Key size={14}/> Senha de Desbloqueio
+                </span>
+                <div style={{display: 'flex', gap: '4px'}}>
+                  <button
+                    type="button"
+                    onClick={()=>setPasswordType('text')}
+                    className={`secondary-btn ${passwordType === 'text' ? 'primary-btn' : ''}`}
+                    style={{fontSize: '11px', padding: '3px 8px'}}
+                  >
+                    PIN / Texto
+                  </button>
+                  <button
+                    type="button"
+                    onClick={()=>setPasswordType('pattern')}
+                    className={`secondary-btn ${passwordType === 'pattern' ? 'primary-btn' : ''}`}
+                    style={{fontSize: '11px', padding: '3px 8px'}}
+                  >
+                    Padrão Desenho (Android)
+                  </button>
+                </div>
+              </div>
 
-    {toast && <div className="toast"><Check size={17}/>{toast}</div>}
-  </div>
+              {passwordType === 'text' ? (
+                <input value={newOrder.devicePassword} onChange={e=>setNewOrder({...newOrder, devicePassword: e.target.value})} placeholder="Ex: 123456 ou Sem Senha" />
+              ) : (
+                <PatternDrawer value={newOrder.patternDrawing} onChange={(drawing) => setNewOrder({...newOrder, patternDrawing: drawing})} />
+              )}
+            </div>
+
+            <div className="form-grid">
+              <label>Garantia (Dias)
+                <select value={newOrder.warrantyDays} onChange={e=>setNewOrder({...newOrder,warrantyDays:e.target.value})}>
+                  <option value="30">30 Dias</option>
+                  <option value="90">90 Dias (3 Meses)</option>
+                  <option value="180">180 Dias (6 Meses)</option>
+                  <option value="365">365 Dias (1 Ano)</option>
+                </select>
+              </label>
+              <label>Status inicial
+                <select value={newOrder.status} onChange={e=>setNewOrder({...newOrder,status:e.target.value})}>
+                  {['Recebido','Em diagnóstico','Aguardando aprovação','Aguardando peça','Em manutenção','Pronto para retirada','Entregue'].map(s=><option key={s}>{s}</option>)}
+                </select>
+              </label>
+            </div>
+            <div className="form-grid">
+              <label>Valor cobrado (R$)<input type="number" step="0.01" value={newOrder.amount} onChange={e=>setNewOrder({...newOrder,amount:e.target.value})} placeholder="0,00"/></label>
+              <label>Custo da Peça (R$)<input type="number" step="0.01" value={newOrder.partCost} onChange={e=>setNewOrder({...newOrder,partCost:e.target.value})} placeholder="0,00"/></label>
+            </div>
+            <label>Defeito informado<textarea value={newOrder.issue} onChange={e=>setNewOrder({...newOrder,issue:e.target.value})} placeholder="Descreva o problema relatado..." rows="2" required/></label>
+            <div className="modal-foot"><button type="button" className="secondary-btn" onClick={()=>setShowNewOrder(false)}>Cancelar</button><button className="primary-btn" disabled={saving}>{saving?'Salvando...':'Salvar OS & Vistoria'}<ArrowUpRight size={16}/></button></div>
+          </form>
+        </div>
+      )}
+
+      {showNewCustomer && <div className="modal-backdrop" onClick={()=>setShowNewCustomer(false)}><form className="modal" onClick={e=>e.stopPropagation()} onSubmit={handleCreateCustomer} style={{background: '#0f0f12', border: '1px solid #222'}}><div className="modal-head"><div><div className="eyebrow">NOVO CADASTRO</div><h2>Cadastrar cliente</h2></div><button type="button" className="icon-btn" onClick={()=>setShowNewCustomer(false)}><X size={19}/></button></div><p className="muted">Adicione os dados de contato do cliente.</p><label>Nome completo<input value={newCustomer.name} onChange={e=>setNewCustomer({...newCustomer,name:e.target.value})} placeholder="Nome do cliente" required/></label><div className="form-grid"><label>Telefone / WhatsApp<input value={newCustomer.phone} onChange={e=>setNewCustomer({...newCustomer,phone:e.target.value})} placeholder="(91) 99999-9999"/></label><label>E-mail<input type="email" value={newCustomer.email} onChange={e=>setNewCustomer({...newCustomer,email:e.target.value})} placeholder="cliente@email.com"/></label></div><div className="modal-foot"><button type="button" className="secondary-btn" onClick={()=>setShowNewCustomer(false)}>Cancelar</button><button className="primary-btn" disabled={saving}>{saving?'Salvando...':'Salvar cliente'}<ArrowUpRight size={16}/></button></div></form></div>}
+
+      {toast && <div className="toast"><Check size={17}/>{toast}</div>}
+    </div>
+  );
 }
 
 export default App;
