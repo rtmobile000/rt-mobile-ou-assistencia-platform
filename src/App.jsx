@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity, ArrowUpRight, Bell, Camera, Check, ChevronDown, CircleHelp,
   ClipboardList, Clock3, CreditCard, Gauge, LogOut, Menu, MessageCircle,
-  Plus, RefreshCw, Search, Settings, ShieldCheck, Smartphone, Sparkles, Store, Users, Wrench, X, Upload, PhoneCall, QrCode, Package, Sliders, Trash2, CheckSquare, Printer, Star, DollarSign, Send, Calendar, Clock, Lock, UserPlus, AlertTriangle, History, Wallet, MapPin, Copy, FileText, HeartHandshake, Key, CheckCircle2, XCircle, Eraser, ShoppingCart, Truck, UserCheck, CheckCircle, Image, Tv, Maximize2, Minimize2, Calculator, Delete
+  Plus, RefreshCw, Search, Settings, ShieldCheck, Smartphone, Sparkles, Store, Users, Wrench, X, Upload, PhoneCall, QrCode, Package, Sliders, Trash2, CheckSquare, Printer, Star, DollarSign, Send, Calendar, Clock, Lock, UserPlus, AlertTriangle, History, Wallet, MapPin, Copy, FileText, HeartHandshake, Key, CheckCircle2, XCircle, Eraser, ShoppingCart, Truck, UserCheck, CheckCircle, Tv, Maximize2, Minimize2, Calculator
 } from 'lucide-react';
 import { supabase, supabaseConfigured } from './lib/supabase';
 
@@ -183,7 +183,7 @@ function BarcodeCameraScanner({ onDetected, onClose }) {
   );
 }
 
-/* COMPONENTE EXCLUSIVO DO MODO TV / PAINEL DE CLIENTES NA SALA DE ESPERA */
+/* COMPONENTE MODO TV */
 function TvModeScreen({ orders, storeName, onClose }) {
   const [time, setTime] = useState(new Date().toLocaleTimeString('pt-BR'));
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -430,7 +430,6 @@ function CalculatorModal({ onUseValue, onClose }) {
   const handleCalculate = () => {
     try {
       const fullExpr = equation + display;
-      // Substitui símbolos visuais por operadores de JS
       const sanitized = fullExpr.replace(/x/g, '*').replace(/÷/g, '/');
       const result = eval(sanitized);
       setDisplay(String(Number(result.toFixed(2))));
@@ -451,7 +450,6 @@ function CalculatorModal({ onUseValue, onClose }) {
           <button type="button" className="icon-btn" onClick={onClose}><X size={18}/></button>
         </div>
 
-        {/* DISPLAY DA CALCULADORA */}
         <div style={{
           background: '#050508', border: '1px solid #222', borderRadius: '8px',
           padding: '12px 16px', textAlign: 'right', marginBottom: '14px'
@@ -460,7 +458,6 @@ function CalculatorModal({ onUseValue, onClose }) {
           <div style={{fontSize: '26px', fontWeight: 'bold', color: '#25D366', fontFamily: 'monospace', overflowX: 'auto'}}>{display}</div>
         </div>
 
-        {/* TECLADO */}
         <div style={{display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px'}}>
           <button type="button" className="secondary-btn" onClick={handleClear} style={{background: '#1f1f2e', color: '#ef4444'}}>C</button>
           <button type="button" className="secondary-btn" onClick={handlePercent} style={{background: '#1f1f2e', color: '#38bdf8'}}>%</button>
@@ -487,7 +484,6 @@ function CalculatorModal({ onUseValue, onClose }) {
           <button type="button" className="primary-btn" onClick={handleCalculate} style={{background: '#25D366', color: '#000', fontWeight: 'bold'}}>=</button>
         </div>
 
-        {/* BOTÃO PARA USAR O VALOR NO CAIXA */}
         <button
           type="button"
           onClick={() => {
@@ -688,7 +684,6 @@ function App() {
   const [isAccountExpired, setIsAccountExpired] = useState(false);
   const [expiredReason, setExpiredReason] = useState('trial');
 
-  // Configurações da Loja
   const [storeName, setStoreName] = useState('RT MOBILE');
   const [storeLogo, setStoreLogo] = useState(null);
   const [whatsappNumber, setWhatsappNumber] = useState('5591989117332');
@@ -755,7 +750,6 @@ function App() {
   const [showCashTransactionModal, setShowCashTransactionModal] = useState(false);
   const [showInviteMemberModal, setShowInviteMemberModal] = useState(false);
 
-  // Modais de Leitura de Código de Barras & Calculadora
   const [showBarcodeScannerForProduct, setShowBarcodeScannerForProduct] = useState(false);
   const [showBarcodeSaleModal, setShowBarcodeSaleModal] = useState(false);
   const [showCalculatorModal, setShowCalculatorModal] = useState(false);
@@ -1688,7 +1682,6 @@ function App() {
         )}
       </main>
 
-      {/* MODAL CALCULADORA DO CAIXA */}
       {showCalculatorModal && (
         <CalculatorModal
           onUseValue={(val) => {
