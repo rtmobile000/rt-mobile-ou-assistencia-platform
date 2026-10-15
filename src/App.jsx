@@ -1,4 +1,4 @@
-/* COMPONENTE EXCLUSIVO DO MODO TV / PAINEL DE CLIENTES NA SALA DE ESPERA (CORRIGIDO PARA MODO RETRATO E PAISAGEM) */
+/* COMPONENTE EXCLUSIVO DO MODO TV / PAINEL DE CLIENTES NA SALA DE ESPERA (CORREÇÃO DE BOTÃO VOLTAR) */
 function TvModeScreen({ orders, storeName, onClose }) {
   const [time, setTime] = useState(new Date().toLocaleTimeString('pt-BR'));
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -34,10 +34,26 @@ function TvModeScreen({ orders, storeName, onClose }) {
       display: 'flex', flexDirection: 'column', padding: '16px', fontFamily: 'system-ui, sans-serif',
       overflowY: 'auto'
     }}>
-      {/* CABEÇALHO DO MODO TV COM SUPORTE TOTAL A RETRATO E PAISAGEM */}
+      {/* BOTÃO FLUTUANTE DE SEGURANÇA (GARANTE SAÍDA EM TELAS PEQUENAS E RETRATO) */}
+      <button
+        type="button"
+        onClick={onClose}
+        style={{
+          position: 'fixed', top: '12px', right: '12px', zIndex: 1000000,
+          background: '#ef4444', color: '#fff', border: '2px solid rgba(255,255,255,0.2)',
+          padding: '8px 14px', borderRadius: '8px', fontWeight: 'bold', fontSize: '12px',
+          boxShadow: '0 4px 15px rgba(239, 68, 68, 0.5)', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: '6px'
+        }}
+      >
+        <X size={16}/> Sair do Modo TV
+      </button>
+
+      {/* CABEÇALHO DO MODO TV COM QUEBRA RESPONSIVA */}
       <header style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        flexWrap: 'wrap', gap: '12px', paddingBottom: '16px', borderBottom: '1px solid #1f1f28'
+        flexWrap: 'wrap', gap: '12px', paddingBottom: '16px', paddingRight: '140px',
+        borderBottom: '1px solid #1f1f28'
       }}>
         <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
           <div style={{
@@ -53,54 +69,35 @@ function TvModeScreen({ orders, storeName, onClose }) {
           </div>
         </div>
 
-        {/* BOTÕES DE AÇÃO: SEMPRE VISÍVEIS TANTO NO PC QUANTO NO CELULAR/TABLET VERTICAL */}
-        <div style={{display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginLeft: 'auto'}}>
+        <div style={{display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap'}}>
           <div style={{
             fontSize: '18px', fontWeight: 800, fontFamily: 'monospace', color: '#fff',
             background: '#101015', padding: '6px 12px', borderRadius: '8px', border: '1px solid #222'
           }}>
             {time}
           </div>
-          
           <button
             type="button"
             onClick={toggleFullscreen}
-            style={{
-              background: '#1a1a24', color: '#fff', border: '1px solid #333',
-              padding: '8px 12px', borderRadius: '8px', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px'
-            }}
+            style={{background: '#1a1a24', color: '#fff', border: '1px solid #333', padding: '8px 12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px'}}
             title="Alternar Tela Cheia"
           >
             {isFullscreen ? <Minimize2 size={16}/> : <Maximize2 size={16}/>}
           </button>
-
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              background: '#ef4444', color: '#fff', border: 'none',
-              padding: '8px 14px', borderRadius: '8px', fontWeight: 'bold',
-              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px',
-              fontSize: '13px', zIndex: 10
-            }}
-          >
-            <X size={16}/> Voltar / Fechar
-          </button>
         </div>
       </header>
 
-      {/* GRADE QUE SE ADAPTA: 2 COLUNAS NA HORIZONTAL/PC E 1 COLUNA EMPILHADA NA VERTICAL */}
+      {/* GRADE DIVIDIDA: 2 COLUNAS NO PC/HORIZONTAL E 1 COLUNA NO CELULAR/VERTICAL */}
       <div style={{
         flex: 1, display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))',
         gap: '16px', marginTop: '16px', overflow: 'visible'
       }}>
         
-        {/* COLUNA 1: EM MANUTENÇÃO / BANCADA */}
+        {/* COLUNA 1: EM MANUTENÇÃO */}
         <section style={{
           background: '#0a0a0f', border: '1px solid #222', borderRadius: '16px',
-          display: 'flex', flexDirection: 'column', minHeight: '300px', overflow: 'hidden'
+          display: 'flex', flexDirection: 'column', minHeight: '320px', overflow: 'hidden'
         }}>
           <div style={{
             padding: '14px 16px', background: '#12121c', borderBottom: '1px solid #222',
@@ -146,7 +143,7 @@ function TvModeScreen({ orders, storeName, onClose }) {
             ))}
 
             {inMaintenanceOrders.length === 0 && (
-              <div style={{flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666', flexDirection: 'column', gap: '6px', padding: '30px 0'}}>
+              <div style={{flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666', flexDirection: 'column', gap: '6px', padding: '40px 0'}}>
                 <Wrench size={28} color="#333" />
                 <span style={{fontSize: '13px'}}>Nenhum serviço em manutenção no momento</span>
               </div>
@@ -157,7 +154,7 @@ function TvModeScreen({ orders, storeName, onClose }) {
         {/* COLUNA 2: PRONTOS PARA RETIRADA */}
         <section style={{
           background: '#0a0a0f', border: '1px solid #182c1e', borderRadius: '16px',
-          display: 'flex', flexDirection: 'column', minHeight: '300px', overflow: 'hidden'
+          display: 'flex', flexDirection: 'column', minHeight: '320px', overflow: 'hidden'
         }}>
           <div style={{
             padding: '14px 16px', background: '#0e1c12', borderBottom: '1px solid #1f3b25',
@@ -201,7 +198,7 @@ function TvModeScreen({ orders, storeName, onClose }) {
             ))}
 
             {readyOrders.length === 0 && (
-              <div style={{flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666', flexDirection: 'column', gap: '6px', padding: '30px 0'}}>
+              <div style={{flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666', flexDirection: 'column', gap: '6px', padding: '40px 0'}}>
                 <CheckCircle2 size={28} color="#222" />
                 <span style={{fontSize: '13px'}}>Nenhum aparelho aguardando retirada</span>
               </div>
