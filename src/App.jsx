@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity, ArrowUpRight, Bell, Camera, Check, ChevronDown, CircleHelp,
   ClipboardList, Clock3, CreditCard, Gauge, LogOut, Menu, MessageCircle,
-  Plus, RefreshCw, Search, Settings, ShieldCheck, Smartphone, Sparkles, Store, Users, Wrench, X, Upload, PhoneCall, QrCode, Package, Sliders, Trash2, CheckSquare, Printer, Star, DollarSign, Send, Calendar, Clock, Lock, UserPlus, AlertTriangle, History, Wallet, MapPin, Copy, FileText, HeartHandshake, Key, CheckCircle2, XCircle, Eraser, ShoppingCart, Truck, UserCheck, CheckCircle, Image
+  Plus, RefreshCw, Search, Settings, ShieldCheck, Smartphone, Sparkles, Store, Users, Wrench, X, Upload, PhoneCall, QrCode, Package, Sliders, Trash2, CheckSquare, Printer, Star, DollarSign, Send, Calendar, Clock, Lock, UserPlus, AlertTriangle, History, Wallet, MapPin, Copy, FileText, HeartHandshake, Key, CheckCircle2, XCircle, Eraser, ShoppingCart, Truck, UserCheck, CheckCircle, Image, Barcode, Tv, Maximize2, Minimize2
 } from 'lucide-react';
 import { supabase, supabaseConfigured } from './lib/supabase';
 
@@ -75,6 +75,313 @@ const orderSteps = [
   'Pronto para retirada',
   'Entregue'
 ];
+
+/* COMPONENTE DE CÂMERA SCANNER DE CÓDIGO DE BARRAS */
+function BarcodeCameraScanner({ onDetected, onClose }) {
+  const videoRef = useRef(null);
+  const [errorMsg, setErrorMsg] = useState('');
+  const streamRef = useRef(null);
+
+  useEffect(() => {
+    let active = true;
+    let detector = null;
+
+    if ('BarcodeDetector' in window) {
+      try {
+        detector = new window.BarcodeDetector({
+          formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'qr_code', 'upc_a', 'upc_e']
+        });
+      } catch (err) {
+        detector = null;
+      }
+    }
+
+    navigator.mediaDevices?.getUserMedia({ video: { facingMode: 'environment' } })
+      .then(stream => {
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play();
+        }
+
+        const scanLoop = async () => {
+          if (!active) return;
+          if (videoRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
+            if (detector) {
+              try {
+                const barcodes = await detector.detect(videoRef.current);
+                if (barcodes.length > 0) {
+                  onDetected(barcodes[0].rawValue);
+                  return;
+                }
+              } catch (e) {
+                // skip frame
+              }
+            }
+          }
+          requestAnimationFrame(scanLoop);
+        };
+
+        requestAnimationFrame(scanLoop);
+      })
+      .catch(err => {
+        setErrorMsg('Não foi possível abrir a câmera. Conecte o leitor físico USB ou digite o código.');
+      });
+
+    return () => {
+      active = false;
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [onDetected]);
+
+  return (
+    <div className="modal-backdrop" onClick={onClose} style={{zIndex: 99999}}>
+      <div className="modal" onClick={e=>e.stopPropagation()} style={{background: '#0d0d12', border: '1px solid #333', maxWidth: '420px', textAlign: 'center'}}>
+        <div className="modal-head">
+          <div>
+            <div className="eyebrow">LEITOR ÓPTICO</div>
+            <h2>Escanear Código de Barras</h2>
+          </div>
+          <button type="button" className="icon-btn" onClick={onClose}><X size={19}/></button>
+        </div>
+
+        {errorMsg ? (
+          <div style={{padding: '20px', color: '#ef4444', fontSize: '13px'}}>{errorMsg}</div>
+        ) : (
+          <div style={{position: 'relative', width: '100%', height: '260px', overflow: 'hidden', borderRadius: '10px', background: '#000', margin: '15px 0'}}>
+            <video ref={videoRef} playsInline muted style={{width: '100%', height: '100%', objectFit: 'cover'}} />
+            <div style={{
+              position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+              width: '80%', height: '100px', border: '2px solid #25D366', borderRadius: '8px',
+              boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.45)', pointerEvents: 'none'
+            }}>
+              <div style={{position: 'absolute', top: '50%', width: '100%', height: '2px', background: '#ef4444', opacity: 0.8, boxShadow: '0 0 8px #ef4444'}} />
+            </div>
+          </div>
+        )}
+
+        <p className="muted" style={{fontSize: '12px', margin: '8px 0'}}>
+          Aponte a câmera para o código de barras ou bipa diretamente com o leitor USB na bancada.
+        </p>
+
+        <button type="button" className="secondary-btn full-btn" onClick={onClose} style={{marginTop: '10px'}}>
+          Fechar Leitor
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* COMPONENTE EXCLUSIVO DO MODO TV / PAINEL DE CLIENTES NA SALA DE ESPERA */
+function TvModeScreen({ orders, storeName, onClose }) {
+  const [time, setTime] = useState(new Date().toLocaleTimeString('pt-BR'));
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTime(new Date().toLocaleTimeString('pt-BR'));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
+      }
+    }
+  };
+
+  const inMaintenanceOrders = useMemo(() => {
+    return orders.filter(o => ['Em manutenção', 'Em diagnóstico', 'Aguardando peça'].includes(o.status));
+  }, [orders]);
+
+  const readyOrders = useMemo(() => {
+    return orders.filter(o => o.status === 'Pronto para retirada');
+  }, [orders]);
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 999999, background: '#050508', color: '#fff',
+      display: 'flex', flexDirection: 'column', padding: '24px', fontFamily: 'system-ui, sans-serif'
+    }}>
+      {/* CABEÇALHO DO MODO TV */}
+      <header style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        paddingBottom: '20px', borderBottom: '1px solid #1f1f28'
+      }}>
+        <div style={{display: 'flex', alignItems: 'center', gap: '16px'}}>
+          <div style={{
+            background: '#000', border: '1.5px solid #25D366', borderRadius: '12px',
+            padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '10px'
+          }}>
+            <Tv size={26} color="#25D366" />
+            <span style={{fontSize: '22px', fontWeight: 900, letterSpacing: '1px'}}>{storeName.toUpperCase()}</span>
+          </div>
+          <div>
+            <div style={{fontSize: '12px', color: '#25D366', fontWeight: 700, letterSpacing: '2px'}}>PAINEL DE ATENDIMENTO</div>
+            <div style={{fontSize: '13px', color: '#888'}}>Acompanhe em tempo real os serviços da bancada</div>
+          </div>
+        </div>
+
+        <div style={{display: 'flex', alignItems: 'center', gap: '16px'}}>
+          <div style={{
+            fontSize: '32px', fontWeight: 800, fontFamily: 'monospace', color: '#fff',
+            background: '#101015', padding: '6px 18px', borderRadius: '8px', border: '1px solid #222'
+          }}>
+            {time}
+          </div>
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            style={{background: '#1a1a24', color: '#fff', border: '1px solid #333', padding: '10px 14px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'}}
+            title="Alternar Tela Cheia"
+          >
+            {isFullscreen ? <Minimize2 size={18}/> : <Maximize2 size={18}/>}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{background: '#ef4444', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'}}
+          >
+            <X size={18}/> Sair do Modo TV
+          </button>
+        </div>
+      </header>
+
+      {/* GRADE DIVIDIDA EM 2 COLUNAS DE DESTAQUE */}
+      <div style={{flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '24px', overflow: 'hidden'}}>
+        
+        {/* COLUNA 1: EM MANUTENÇÃO / BANCADA TÉCNICA */}
+        <section style={{
+          background: '#0a0a0f', border: '1px solid #222', borderRadius: '16px',
+          display: 'flex', flexDirection: 'column', overflow: 'hidden'
+        }}>
+          <div style={{
+            padding: '16px 20px', background: '#12121c', borderBottom: '1px solid #222',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+          }}>
+            <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
+              <div style={{width: '12px', height: '12px', borderRadius: '50%', background: '#3b82f6', boxShadow: '0 0 10px #3b82f6'}} />
+              <h2 style={{fontSize: '18px', fontWeight: 'bold', margin: 0}}>EM MANUTENÇÃO & DIAGNÓSTICO</h2>
+            </div>
+            <span style={{fontSize: '13px', background: '#1e293b', color: '#38bdf8', padding: '4px 10px', borderRadius: '20px', fontWeight: 'bold'}}>
+              {inMaintenanceOrders.length} Aparelho(s)
+            </span>
+          </div>
+
+          <div style={{flex: 1, overflowY: 'auto', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px'}}>
+            {inMaintenanceOrders.map(item => (
+              <div key={item.id} style={{
+                background: '#111118', border: '1px solid #1f1f2c', borderRadius: '12px',
+                padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+              }}>
+                <div>
+                  <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
+                    <span style={{background: '#1a1a26', border: '1px solid #333', padding: '2px 8px', borderRadius: '6px', fontSize: '13px', fontWeight: 'bold', color: '#38bdf8'}}>
+                      {item.id}
+                    </span>
+                    <strong style={{fontSize: '18px', color: '#fff'}}>{item.customer}</strong>
+                  </div>
+                  <div style={{fontSize: '14px', color: '#aaa', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px'}}>
+                    <Smartphone size={15} color="#25D366" /> {item.device}
+                  </div>
+                </div>
+                <div style={{textAlign: 'right'}}>
+                  <span style={{
+                    fontSize: '12px', padding: '4px 12px', borderRadius: '20px', fontWeight: 'bold',
+                    background: item.status === 'Em manutenção' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(234, 179, 8, 0.15)',
+                    color: item.status === 'Em manutenção' ? '#60a5fa' : '#facc15',
+                    border: `1px solid ${item.status === 'Em manutenção' ? '#2563eb' : '#ca8a04'}`
+                  }}>
+                    {item.status}
+                  </span>
+                  <div style={{fontSize: '11px', color: '#666', marginTop: '6px'}}>Bancada Ativa</div>
+                </div>
+              </div>
+            ))}
+
+            {inMaintenanceOrders.length === 0 && (
+              <div style={{flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666', flexDirection: 'column', gap: '8px'}}>
+                <Wrench size={32} color="#333" />
+                <span>Nenhum serviço em manutenção no momento</span>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* COLUNA 2: PRONTOS PARA RETIRADA NO BALCÃO */}
+        <section style={{
+          background: '#0a0a0f', border: '1px solid #182c1e', borderRadius: '16px',
+          display: 'flex', flexDirection: 'column', overflow: 'hidden'
+        }}>
+          <div style={{
+            padding: '16px 20px', background: '#0e1c12', borderBottom: '1px solid #1f3b25',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+          }}>
+            <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
+              <div style={{width: '12px', height: '12px', borderRadius: '50%', background: '#25D366', boxShadow: '0 0 12px #25D366'}} />
+              <h2 style={{fontSize: '18px', fontWeight: 'bold', margin: 0, color: '#25D366'}}>PRONTO PARA RETIRADA</h2>
+            </div>
+            <span style={{fontSize: '13px', background: '#0f381c', color: '#4ade80', padding: '4px 10px', borderRadius: '20px', fontWeight: 'bold'}}>
+              {readyOrders.length} Disponível(is)
+            </span>
+          </div>
+
+          <div style={{flex: 1, overflowY: 'auto', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px'}}>
+            {readyOrders.map(item => (
+              <div key={item.id} style={{
+                background: '#0d1810', border: '1px solid #1c3d25', borderRadius: '12px',
+                padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+              }}>
+                <div>
+                  <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
+                    <span style={{background: '#16331e', border: '1px solid #25D366', padding: '2px 8px', borderRadius: '6px', fontSize: '13px', fontWeight: 'bold', color: '#25D366'}}>
+                      {item.id}
+                    </span>
+                    <strong style={{fontSize: '19px', color: '#fff'}}>{item.customer}</strong>
+                  </div>
+                  <div style={{fontSize: '14px', color: '#86efac', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px'}}>
+                    <CheckCircle size={15} color="#25D366" /> {item.device}
+                  </div>
+                </div>
+                <div style={{textAlign: 'right'}}>
+                  <span style={{
+                    fontSize: '13px', padding: '6px 14px', borderRadius: '20px', fontWeight: '900',
+                    background: '#25D366', color: '#000', display: 'inline-flex', alignItems: 'center', gap: '4px'
+                  }}>
+                    ✓ DISPONÍVEL
+                  </span>
+                  <div style={{fontSize: '11px', color: '#4ade80', marginTop: '6px'}}>Apresente sua via no balcão</div>
+                </div>
+              </div>
+            ))}
+
+            {readyOrders.length === 0 && (
+              <div style={{flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666', flexDirection: 'column', gap: '8px'}}>
+                <CheckCircle2 size={32} color="#222" />
+                <span>Nenhum aparelho aguardando retirada</span>
+              </div>
+            )}
+          </div>
+        </section>
+
+      </div>
+
+      <footer style={{
+        marginTop: '16px', display: 'flex', justifyContent: 'space-between',
+        alignItems: 'center', fontSize: '12px', color: '#666'
+      }}>
+        <span>• Sistema Atualizado Automaticamente em Tempo Real</span>
+        <span>RT MOBILE SISTEMAS TÉCNICOS</span>
+      </footer>
+    </div>
+  );
+}
 
 function PatternDrawer({ value, onChange }) {
   const canvasRef = useRef(null);
@@ -239,6 +546,9 @@ function App() {
   const [userAccessLevel, setUserAccessLevel] = useState('owner');
   const [active, setActive] = useState(() => userRole === 'tech' ? 'overview' : 'stores_directory');
   
+  // Estado para abrir e fechar a visualização do Modo TV
+  const [showTvMode, setShowTvMode] = useState(false);
+
   const [modules, setModules] = useState({
     orders: true,     
     iphones: true,    
@@ -327,6 +637,10 @@ function App() {
   const [showQuoteModal, setShowQuoteModal] = useState(null);
   const [showCashTransactionModal, setShowCashTransactionModal] = useState(false);
   const [showInviteMemberModal, setShowInviteMemberModal] = useState(false);
+
+  // Modais de Leitura de Código de Barras
+  const [showBarcodeScannerForProduct, setShowBarcodeScannerForProduct] = useState(false);
+  const [showBarcodeSaleModal, setShowBarcodeSaleModal] = useState(false);
   
   const [toast, setToast] = useState('');
   const [mobileNav, setMobileNav] = useState(false);
@@ -368,7 +682,9 @@ function App() {
     checklist: { ...defaultChecklist }
   });
   const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', email: '' });
-  const [newProduct, setNewProduct] = useState({ name: '', category: 'Capas', price: '', qty: '1', photo: null });
+  
+  // Novo Produto com campo barcode
+  const [newProduct, setNewProduct] = useState({ name: '', category: 'Capas', price: '', qty: '1', barcode: '', photo: null });
 
   const isSuperAdmin = useMemo(() => {
     return session?.user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
@@ -646,12 +962,13 @@ function App() {
       category: newProduct.category,
       price: parseFloat(newProduct.price.replace(',', '.')).toFixed(2),
       qty: parseInt(newProduct.qty) || 0,
+      barcode: newProduct.barcode.trim(),
       photo: newProduct.photo
     };
     setInventory(prev => [item, ...prev]);
-    addAuditLog(`Adicionou ${item.name} ao estoque`);
+    addAuditLog(`Adicionou ${item.name} ao estoque ${item.barcode ? `(Código: ${item.barcode})` : ''}`);
     setShowNewProduct(false);
-    setNewProduct({ name: '', category: 'Capas', price: '', qty: '1', photo: null });
+    setNewProduct({ name: '', category: 'Capas', price: '', qty: '1', barcode: '', photo: null });
     notify('Produto adicionado ao estoque!');
   };
 
@@ -690,6 +1007,45 @@ function App() {
   const deleteProduct = (id) => {
     setInventory(prev => prev.filter(p => p.id !== id));
     notify('Produto removido.');
+  };
+
+  // Venda expressa de produto pelo código de barras no Caixa
+  const handleSellProductByBarcode = (scannedCode) => {
+    const code = String(scannedCode).trim();
+    if (!code) {
+      notify('Código inválido.');
+      return;
+    }
+
+    const found = inventory.find(p => p.barcode && p.barcode.trim() === code);
+    if (!found) {
+      notify(`Nenhum produto cadastrado com o código ${code}.`);
+      return;
+    }
+
+    if (found.qty <= 0) {
+      notify(`Atenção: ${found.name} está esgotado no estoque!`);
+      return;
+    }
+
+    // Abate 1 unidade do estoque
+    updateProductQty(found.id, -1);
+
+    // Lança entrada automática no Caixa da Loja
+    const val = parseFloat(found.price);
+    const newEntry = {
+      id: String(Date.now()),
+      type: 'in',
+      description: `Venda Balcão: ${found.name} (Bipado)`,
+      amount: val,
+      time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      user: userAccessLevel === 'owner' ? 'Dono' : 'Técnico'
+    };
+
+    setCashRegister(prev => ({ ...prev, entries: [newEntry, ...prev.entries] }));
+    addAuditLog(`Vendeu 1x ${found.name} no caixa via código de barras: R$ ${val.toFixed(2)}`);
+    setShowBarcodeSaleModal(false);
+    notify(`Venda confirmada: ${found.name} (+ R$ ${val.toFixed(2)}) e estoque atualizado!`);
   };
 
   // Funções do Carrinho
@@ -974,6 +1330,16 @@ function App() {
 
   return (
     <div className="app-shell" style={{background: '#08080a', color: '#f0f0f0'}}>
+      
+      {/* RENDERIZAÇÃO EM MODO TV TELA CHEIA QUANDO ATIVADO */}
+      {showTvMode && (
+        <TvModeScreen
+          orders={orders}
+          storeName={storeName}
+          onClose={() => setShowTvMode(false)}
+        />
+      )}
+
       <aside className={`sidebar ${mobileNav ? 'sidebar-open' : ''}`} style={{background: '#0a0a0c', borderRight: '1px solid #18181b'}}>
         <div className="brand-lockup">
           <div className="brand-mark" style={{background: '#000', width: '38px', height: '38px', borderRadius: '8px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #222'}}>
@@ -1027,6 +1393,24 @@ function App() {
               <span style={{color: '#25D366'}}>Painel ADM Geral ⚡</span>
             </div>
             <ChevronDown size={15}/>
+          </div>
+        )}
+
+        {/* BOTÃO ATALHO DO MODO TV NA SIDEBAR */}
+        {userRole === 'tech' && (
+          <div style={{padding: '0 12px', margin: '4px 0 10px'}}>
+            <button
+              type="button"
+              onClick={() => setShowTvMode(true)}
+              className="secondary-btn full-btn"
+              style={{
+                background: 'linear-gradient(135deg, #111827, #0f172a)',
+                border: '1px solid #38bdf8', color: '#38bdf8', fontWeight: 'bold',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '8px'
+              }}
+            >
+              <Tv size={16}/> Abrir Modo TV / Recepção
+            </button>
           </div>
         )}
         
@@ -1146,6 +1530,16 @@ function App() {
                 <div className="breadcrumb">{storeName} <span>/</span> <strong>{activeNav.find(n=>n.id===active)?.label || 'Visão geral'}</strong></div>
               </div>
               <div className="topbar-actions">
+                {userRole === 'tech' && (
+                  <button
+                    type="button"
+                    onClick={() => setShowTvMode(true)}
+                    className="secondary-btn"
+                    style={{display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', border: '1px solid #38bdf8', color: '#38bdf8'}}
+                  >
+                    <Tv size={15}/> Modo TV
+                  </button>
+                )}
                 <div className="system-status"><span className="status-dot" style={{background: '#25D366'}}/> RT Mobile v1.0</div>
                 <button className="icon-btn notification-btn" onClick={()=>notify('Você está em dia.')}><Bell size={18}/><i/></button>
                 <button className="top-avatar" onClick={()=>userRole === 'tech' ? setActive('settings') : logout()}>
@@ -1154,11 +1548,11 @@ function App() {
               </div>
             </header>
             
-            {active==='overview' && userRole === 'tech' && <Overview orders={orders} storeName={storeName} onNew={()=>setShowNewOrder(true)} onNavigate={setActive} modules={modules} inventory={inventory} />}
+            {active==='overview' && userRole === 'tech' && <Overview orders={orders} storeName={storeName} onNew={()=>setShowNewOrder(true)} onNavigate={setActive} modules={modules} inventory={inventory} onOpenTv={() => setShowTvMode(true)} />}
             {active==='orders' && userRole === 'tech' && <OrdersPage orders={filteredOrders} search={search} setSearch={setSearch} onNew={()=>setShowNewOrder(true)} onStatus={handleUpdateStatus} onShare={shareOsStatusWhatsapp} onSendWarranty={sendWarrantyTermWhatsapp} onOpenChecklist={(o) => setShowChecklistModal(o)} onPrint={(o) => setShowPrintModal(o)} onPellicleReminder={sendPellicleReminder} />}
             {active==='customers' && userRole === 'tech' && <CustomersPage customers={customers} onNew={()=>setShowNewCustomer(true)} />}
             {active==='crm' && userRole === 'tech' && <CrmPage customers={customers} storeName={storeName} whatsapp={whatsappNumber} />}
-            {active==='cash' && userRole === 'tech' && <CashPage cashRegister={cashRegister} onNewTransaction={() => setShowCashTransactionModal(true)} />}
+            {active==='cash' && userRole === 'tech' && <CashPage cashRegister={cashRegister} onNewTransaction={() => setShowCashTransactionModal(true)} onOpenBarcodeSale={() => setShowBarcodeSaleModal(true)} />}
             {active==='inventory' && userRole === 'tech' && <InventoryPage inventory={inventory} onNew={()=>setShowNewProduct(true)} onUpdateQty={updateProductQty} onDelete={deleteProduct} />}
             {active==='client_inventory' && <ClientInventoryPage inventory={inventory} storeName={storeName} cart={cart} addToCart={addToCart} onOpenCart={() => setShowCartModal(true)} />}
             {active==='stores_directory' && <StoresDirectoryPage stores={activeStores} onSelectStore={(s) => { setStoreName(s.name); setWhatsappNumber(s.phone); notify(`Estabelecimento "${s.name}" selecionado!`); setActive('store'); }} onRequestQuote={(s) => setShowQuoteModal(s)} />}
@@ -1187,6 +1581,27 @@ function App() {
           </>
         )}
       </main>
+
+      {/* SCANNER DE CÂMERA PARA O CADASTRO DE PRODUTO */}
+      {showBarcodeScannerForProduct && (
+        <BarcodeCameraScanner
+          onDetected={(code) => {
+            setNewProduct(prev => ({ ...prev, barcode: code }));
+            setShowBarcodeScannerForProduct(false);
+            notify(`Código detectado: ${code}`);
+          }}
+          onClose={() => setShowBarcodeScannerForProduct(false)}
+        />
+      )}
+
+      {/* MODAL DE BIPAR / VENDER NO CAIXA (LEITOR FÍSICO OU CÂMERA) */}
+      {showBarcodeSaleModal && (
+        <BarcodeSaleModal
+          inventory={inventory}
+          onDetectedBarcode={handleSellProductByBarcode}
+          onClose={() => setShowBarcodeSaleModal(false)}
+        />
+      )}
 
       {/* MODAL DO CARRINHO DE COMPRAS & CHECKOUT PIX */}
       {showCartModal && (
@@ -1392,6 +1807,7 @@ function App() {
         </div>
       )}
 
+      {/* MODAL NOVO PRODUTO COM CÓDIGO DE BARRAS & SCANNER */}
       {showNewProduct && (
         <div className="modal-backdrop" onClick={()=>setShowNewProduct(false)}>
           <form className="modal" onClick={e=>e.stopPropagation()} onSubmit={handleCreateProduct} style={{background: '#0f0f12', border: '1px solid #222'}}>
@@ -1401,7 +1817,29 @@ function App() {
               <input value={newProduct.name} onChange={e=>setNewProduct({...newProduct, name: e.target.value})} placeholder="Ex: Capa MagSafe iPhone 15 Pro" required />
             </label>
 
-            <div className="form-grid">
+            {/* CAMPO DE CÓDIGO DE BARRAS & BOTÃO DO LEITOR */}
+            <div style={{marginTop: '10px'}}>
+              <label>Código de Barras / EAN
+                <div style={{display: 'flex', gap: '8px', marginTop: '4px'}}>
+                  <input
+                    value={newProduct.barcode}
+                    onChange={e=>setNewProduct({...newProduct, barcode: e.target.value})}
+                    placeholder="Bipe com o leitor óptico USB ou digite..."
+                    style={{flex: 1}}
+                  />
+                  <button
+                    type="button"
+                    className="secondary-btn"
+                    onClick={() => setShowBarcodeScannerForProduct(true)}
+                    style={{display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', border: '1px solid #25D366', color: '#25D366'}}
+                  >
+                    <Barcode size={16}/> Ler Câmera
+                  </button>
+                </div>
+              </label>
+            </div>
+
+            <div className="form-grid" style={{marginTop: '10px'}}>
               <label>Categoria
                 <select value={newProduct.category} onChange={e=>setNewProduct({...newProduct, category: e.target.value})}>
                   {['Capas', 'Películas', 'Carregadores', 'Fones', 'Caixinhas de Som', 'Outros'].map(c => <option key={c}>{c}</option>)}
@@ -1449,7 +1887,7 @@ function App() {
                   <input value={currentDevice} onChange={e=>setCurrentDevice(e.target.value)} placeholder="Ex: iPhone 13 Pro Max ou Redmi Note 13" required />
                 </label>
 
-                {/* BOTÃO E PREVIEW DA FOTO DO APARELHO (CÂMERA OU GALERIA) */}
+                {/* BOTÃO E PREVIEW DA FOTO DO APARELHO */}
                 <div style={{marginTop: '12px', background: '#121217', padding: '12px', borderRadius: '8px', border: '1px solid #26262e'}}>
                   <span style={{fontSize: '12px', color: '#aaa', display: 'block', marginBottom: '8px'}}>
                     📸 Foto do Aparelho Atual (Câmera ou Galeria):
@@ -1669,7 +2107,7 @@ function App() {
   );
 }
 
-function Overview({orders,storeName,onNew,onNavigate,modules,inventory}) {
+function Overview({orders,storeName,onNew,onNavigate,modules,inventory,onOpenTv}) {
   const ready = orders.filter(o=>o.status==='Pronto para retirada').length;
   const waiting = orders.filter(o=>o.status==='Aguardando peça').length;
   const lowStockItems = inventory.filter(p => p.qty < 3);
@@ -1686,7 +2124,20 @@ function Overview({orders,storeName,onNew,onNavigate,modules,inventory}) {
       </div>
     )}
 
-    <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line"/> PAINEL DE CONTROLE <span className="heading-date">/ HOJE</span></div><h1>Bem-vindo, <span>{storeName}.</span></h1><p>Veja o resumo de atendimentos, estoque e vendas de hoje.</p></div>{modules.orders && <button className="primary-btn" onClick={onNew}><Plus size={17}/> Nova ordem de serviço</button>}</div>
+    <div className="page-heading">
+      <div>
+        <div className="eyebrow"><span className="eyebrow-line"/> PAINEL DE CONTROLE <span className="heading-date">/ HOJE</span></div>
+        <h1>Bem-vindo, <span>{storeName}.</span></h1>
+        <p>Veja o resumo de atendimentos, estoque e vendas de hoje.</p>
+      </div>
+      <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap'}}>
+        <button className="secondary-btn" onClick={onOpenTv} style={{display: 'flex', alignItems: 'center', gap: '6px', border: '1px solid #38bdf8', color: '#38bdf8'}}>
+          <Tv size={17}/> Abrir Painel TV
+        </button>
+        {modules.orders && <button className="primary-btn" onClick={onNew}><Plus size={17}/> Nova ordem de serviço</button>}
+      </div>
+    </div>
+    
     <div className="hero-panel" style={{background: '#0c0c0f', border: '1px solid #1a1a20'}}><div className="hero-copy"><div className="hero-kicker"><span className="pulse-dot"/> WORKSHOP OVERVIEW</div><h2>Seu estabelecimento.<br/><span>Sob controle.</span></h2><p>Acompanhe serviços, vendas e estoque em um só lugar.</p>{modules.orders && <button className="hero-link" onClick={()=>onNavigate('orders')}>Ver ordens de serviço <ArrowUpRight size={16}/></button>}</div><div className="hero-device"><div className="device-glow"/><div className="device-ring ring-a"/><div className="device-ring ring-b"/><div className="phone-render"><div className="phone-camera"/><div className="phone-screen"><div className="screen-top"><span>RT MOBILE</span><span>•••</span></div><div className="screen-label">STATUS</div><div className="screen-score">100<span>%</span></div><div className="screen-chart"><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/></div><div className="screen-lines"><i/><i/><i/></div></div><div className="phone-side"/></div><div className="floating-chip chip-top"><Activity size={15}/><span><b>Sistema</b><small>Ativo</small></span></div><div className="floating-chip chip-bottom"><ShieldCheck size={15}/><span><b>RT Protegido</b><small>Segurança total</small></span></div></div><div className="hero-index">01 <span>/ 04</span></div></div>
     
     {modules.orders && <div className="metrics-grid"><Metric icon={ClipboardList} label="Ordens ativas" value={String(orders.length).padStart(2,'0')} trend="Ordens registradas" tone="blue"/><Metric icon={Wrench} label="Em andamento" value={String(orders.filter(o=>o.status==='Em manutenção').length).padStart(2,'0')} trend="Em atendimento agora" tone="violet"/><Metric icon={Clock3} label="Aguardando peça" value={String(waiting).padStart(2,'0')} trend="Dependem de componente" tone="amber"/><Metric icon={Check} label="Prontos para retirada" value={String(ready).padStart(2,'0')} trend="Aguardam o cliente" tone="green"/></div>}
@@ -1700,6 +2151,7 @@ function Overview({orders,storeName,onNew,onNavigate,modules,inventory}) {
       
       <section className="panel quick-panel" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
         <div className="panel-heading"><div><h3>Acesso rápido</h3><p>Atalhos do dia a dia</p></div><div className="quick-symbol"><Sparkles size={16}/></div></div>
+        <QuickAction icon={Tv} title="Modo TV / Sala de Espera" desc="Painel de status para TV ou tablet" onClick={onOpenTv}/>
         {modules.orders && <QuickAction icon={Plus} title="Nova ordem de serviço" desc="Registrar atendimento recebido" onClick={onNew}/>}
         <QuickAction icon={Users} title="Consultar clientes" desc="Ver dados e histórico" onClick={()=>onNavigate('customers')}/>
         {modules.inventory && <QuickAction icon={Package} title="Estoque de produtos" desc="Gerenciar acessórios e itens" onClick={()=>onNavigate('inventory')}/>}
@@ -1840,7 +2292,7 @@ function CrmPage({customers, storeName, whatsapp}) {
   </div>
 }
 
-function CashPage({cashRegister, onNewTransaction}) {
+function CashPage({cashRegister, onNewTransaction, onOpenBarcodeSale}) {
   const totalEntries = cashRegister.entries.filter(e => e.type === 'in').reduce((a, b) => a + b.amount, 0);
   const totalExits = cashRegister.entries.filter(e => e.type === 'out').reduce((a, b) => a + b.amount, 0);
   const currentBalance = cashRegister.openingBalance + totalEntries - totalExits;
@@ -1852,9 +2304,14 @@ function CashPage({cashRegister, onNewTransaction}) {
         <h1>Caixa da <span>Loja.</span></h1>
         <p>Controle entradas, suprimentos de troco, sangrias e despesas do dia a dia.</p>
       </div>
-      <button className="primary-btn" onClick={onNewTransaction} style={{background: '#25D366', color: '#000', fontWeight: 'bold'}}>
-        <Plus size={17}/> Lançar no Caixa
-      </button>
+      <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap'}}>
+        <button className="secondary-btn" onClick={onOpenBarcodeSale} style={{background: '#1f2937', color: '#25D366', border: '1px solid #25D366', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px'}}>
+          <Barcode size={17}/> Bipar / Vender Produto
+        </button>
+        <button className="primary-btn" onClick={onNewTransaction} style={{background: '#25D366', color: '#000', fontWeight: 'bold'}}>
+          <Plus size={17}/> Lançar Manual
+        </button>
+      </div>
     </div>
 
     <div className="metrics-grid" style={{gridTemplateColumns: 'repeat(4, 1fr)'}}>
@@ -1923,13 +2380,90 @@ function CashPage({cashRegister, onNewTransaction}) {
   </div>
 }
 
+/* MODAL DE VENDA NO CAIXA POR CÓDIGO DE BARRAS */
+function BarcodeSaleModal({ inventory, onDetectedBarcode, onClose }) {
+  const [manualCode, setManualCode] = useState('');
+  const [useCamera, setUseCamera] = useState(false);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  const handleManualSubmit = (e) => {
+    e.preventDefault();
+    if (manualCode.trim()) {
+      onDetectedBarcode(manualCode.trim());
+    }
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={e=>e.stopPropagation()} style={{background: '#0f0f12', border: '1px solid #222', maxWidth: '440px'}}>
+        <div className="modal-head">
+          <div>
+            <div className="eyebrow">CAIXA RÁPIDO</div>
+            <h2>Venda por Código de Barras</h2>
+          </div>
+          <button type="button" className="icon-btn" onClick={onClose}><X size={19}/></button>
+        </div>
+
+        <p className="muted" style={{fontSize: '13px'}}>
+          Bipe com o leitor óptico USB/Bluetooth ou use a câmera do seu celular para registrar no caixa e abater o estoque.
+        </p>
+
+        <form onSubmit={handleManualSubmit} style={{margin: '15px 0'}}>
+          <label>Código de Barras (Leitor ou Digitação)
+            <div style={{display: 'flex', gap: '8px', marginTop: '6px'}}>
+              <input
+                ref={inputRef}
+                value={manualCode}
+                onChange={e=>setManualCode(e.target.value)}
+                placeholder="Bipe com o leitor óptico..."
+                autoFocus
+                style={{flex: 1}}
+              />
+              <button className="primary-btn" type="submit" style={{padding: '0 14px'}}>
+                Confirmar
+              </button>
+            </div>
+          </label>
+        </form>
+
+        <div style={{textAlign: 'center', margin: '15px 0'}}>
+          <span style={{fontSize: '11px', color: '#666', textTransform: 'uppercase'}}>ou prefere usar a câmera?</span>
+        </div>
+
+        <button
+          type="button"
+          className="secondary-btn full-btn"
+          onClick={() => setUseCamera(true)}
+          style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', border: '1px solid #25D366', color: '#25D366', padding: '10px'}}
+        >
+          <Camera size={18}/> Abrir Câmera para Escanear
+        </button>
+
+        {useCamera && (
+          <BarcodeCameraScanner
+            onDetected={(code) => {
+              setUseCamera(false);
+              onDetectedBarcode(code);
+            }}
+            onClose={() => setUseCamera(false)}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
 function InventoryPage({inventory, onNew, onUpdateQty, onDelete}) {
   return <div className="page-content">
     <div className="page-heading">
       <div>
         <div className="eyebrow"><span className="eyebrow-line"/> CONTROLE DE ESTOQUE</div>
         <h1>Estoque de <span>Produtos.</span></h1>
-        <p>Cadastre itens, acessórios ou produtos com foto, preço e controle de quantidade.</p>
+        <p>Cadastre itens, acessórios ou produtos com foto, preço, código de barras e controle de quantidade.</p>
       </div>
       <button className="primary-btn" onClick={onNew}><Plus size={17}/> Novo Produto</button>
     </div>
@@ -1940,6 +2474,7 @@ function InventoryPage({inventory, onNew, onUpdateQty, onDelete}) {
           <thead>
             <tr>
               <th>PRODUTO</th>
+              <th>CÓD. BARRAS / EAN</th>
               <th>CATEGORIA</th>
               <th>PREÇO DE VENDA</th>
               <th>EM ESTOQUE</th>
@@ -1960,6 +2495,16 @@ function InventoryPage({inventory, onNew, onUpdateQty, onDelete}) {
                     </div>
                   </div>
                 </td>
+                <td>
+                  {item.barcode ? (
+                    <div style={{display: 'flex', alignItems: 'center', gap: '6px', background: '#111', padding: '4px 8px', borderRadius: '4px', border: '1px solid #333', width: 'fit-content'}}>
+                      <Barcode size={14} color="#25D366" />
+                      <span style={{fontSize: '12px', fontFamily: 'monospace', color: '#fff'}}>{item.barcode}</span>
+                    </div>
+                  ) : (
+                    <span style={{fontSize: '11px', color: '#666'}}>Sem código</span>
+                  )}
+                </td>
                 <td><span className="status-pill neutral">{item.category}</span></td>
                 <td><strong style={{color: '#25D366'}}>R$ {item.price}</strong></td>
                 <td>
@@ -1976,7 +2521,7 @@ function InventoryPage({inventory, onNew, onUpdateQty, onDelete}) {
             ))}
           </tbody>
         </table>
-        {!inventory.length && <div className="empty-state"><Package size={28}/><strong>Nenhum produto em estoque</strong><span>Clique em "Novo Produto" para cadastrar itens.</span></div>}
+        {!inventory.length && <div className="empty-state"><Package size={28}/><strong>Nenhum produto em estoque</strong><span>Clique em "Novo Produto" para cadastrar itens com código de barras.</span></div>}
       </div>
     </div>
   </div>
