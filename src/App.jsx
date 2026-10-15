@@ -2,11 +2,11 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity, ArrowUpRight, Bell, Camera, Check, ChevronDown, CircleHelp,
   ClipboardList, Clock3, CreditCard, Gauge, LogOut, Menu, MessageCircle,
-  Plus, RefreshCw, Search, Settings, ShieldCheck, Smartphone, Sparkles, Store, Users, Wrench, X, Upload, PhoneCall, QrCode, Package, Sliders, Trash2, CheckSquare, Printer, Star, DollarSign, Send, Calendar, Clock, Lock, UserPlus, AlertTriangle, History, Wallet, MapPin, Copy, FileText, HeartHandshake, Key, CheckCircle2, XCircle, Eraser, ShoppingCart, Truck, UserCheck, CheckCircle, Image, Tv, Maximize2, Minimize2, Calculator
+  Plus, RefreshCw, Search, Settings, ShieldCheck, Smartphone, Sparkles, Store, Users, Wrench, X, Upload, PhoneCall, QrCode, Package, Sliders, Trash2, CheckSquare, Printer, Star, DollarSign, Send, Calendar, Clock, Lock, UserPlus, AlertTriangle, History, Wallet, MapPin, Copy, FileText, HeartHandshake, Key, CheckCircle2, XCircle, Eraser, ShoppingCart, Truck, UserCheck, CheckCircle, Tv, Maximize2, Minimize2
 } from 'lucide-react';
 import { supabase, supabaseConfigured } from './lib/supabase';
 
-// Ícone SVG nativo de Código de Barras
+// Ícone SVG nativo de Código de Barras (evita erro de versão do lucide-react no Render)
 function BarcodeIcon({ size = 16, color = "currentColor", style = {} }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>
@@ -183,7 +183,7 @@ function BarcodeCameraScanner({ onDetected, onClose }) {
   );
 }
 
-/* COMPONENTE MODO TV */
+/* COMPONENTE EXCLUSIVO DO MODO TV / PAINEL DE CLIENTES NA SALA DE ESPERA */
 function TvModeScreen({ orders, storeName, onClose }) {
   const [time, setTime] = useState(new Date().toLocaleTimeString('pt-BR'));
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -219,6 +219,7 @@ function TvModeScreen({ orders, storeName, onClose }) {
       display: 'flex', flexDirection: 'column', padding: '16px', fontFamily: 'system-ui, sans-serif',
       overflowY: 'auto'
     }}>
+      {/* BOTÃO FIXO DE SEGURANÇA: NUNCA SOME NO MODO RETRATO OU PAISAGEM */}
       <button
         type="button"
         onClick={onClose}
@@ -233,6 +234,7 @@ function TvModeScreen({ orders, storeName, onClose }) {
         <X size={16}/> Sair do Modo TV
       </button>
 
+      {/* CABEÇALHO DO MODO TV */}
       <header style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         flexWrap: 'wrap', gap: '12px', paddingBottom: '16px', paddingRight: '150px',
@@ -270,12 +272,14 @@ function TvModeScreen({ orders, storeName, onClose }) {
         </div>
       </header>
 
+      {/* GRADE RESPONSIVA: 2 COLUNAS NO COMPUTADOR / 1 COLUNA NA VERTICAL */}
       <div style={{
         flex: 1, display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))',
         gap: '16px', marginTop: '16px', overflow: 'visible'
       }}>
         
+        {/* COLUNA 1: EM MANUTENÇÃO */}
         <section style={{
           background: '#0a0a0f', border: '1px solid #222', borderRadius: '16px',
           display: 'flex', flexDirection: 'column', minHeight: '320px', overflow: 'hidden'
@@ -332,6 +336,7 @@ function TvModeScreen({ orders, storeName, onClose }) {
           </div>
         </section>
 
+        {/* COLUNA 2: PRONTOS PARA RETIRADA */}
         <section style={{
           background: '#0a0a0f', border: '1px solid #182c1e', borderRadius: '16px',
           display: 'flex', flexDirection: 'column', minHeight: '320px', overflow: 'hidden'
@@ -390,115 +395,11 @@ function TvModeScreen({ orders, storeName, onClose }) {
 
       <footer style={{
         marginTop: '16px', display: 'flex', justifyContent: 'space-between',
-        alignItems: 'center', fontSize: '11px', color: '#666'
+        alignItems: 'center', fontSize: '11px', color: '#666', flexWrap: 'wrap', gap: '6px'
       }}>
         <span>• Atualização em tempo real</span>
-        <span>RT MOBILE SISTEMAS TÉCNICOS</span>
+        <span>RT MOBILE SISTEMAS</span>
       </footer>
-    </div>
-  );
-}
-
-/* MODAL DA CALCULADORA INTELIGENTE DO CAIXA */
-function CalculatorModal({ onUseValue, onClose }) {
-  const [display, setDisplay] = useState('0');
-  const [equation, setEquation] = useState('');
-
-  const handleNum = (num) => {
-    setDisplay(prev => prev === '0' ? String(num) : prev + num);
-  };
-
-  const handleOp = (op) => {
-    setEquation(display + ' ' + op + ' ');
-    setDisplay('0');
-  };
-
-  const handleClear = () => {
-    setDisplay('0');
-    setEquation('');
-  };
-
-  const handlePercent = () => {
-    try {
-      const val = parseFloat(display) / 100;
-      setDisplay(String(val));
-    } catch {
-      setDisplay('Erro');
-    }
-  };
-
-  const handleCalculate = () => {
-    try {
-      const fullExpr = equation + display;
-      const sanitized = fullExpr.replace(/x/g, '*').replace(/÷/g, '/');
-      const result = eval(sanitized);
-      setDisplay(String(Number(result.toFixed(2))));
-      setEquation('');
-    } catch {
-      setDisplay('Erro');
-    }
-  };
-
-  return (
-    <div className="modal-backdrop" onClick={onClose} style={{zIndex: 99999}}>
-      <div className="modal" onClick={e=>e.stopPropagation()} style={{background: '#0e0e12', border: '1px solid #333', maxWidth: '320px', padding: '20px'}}>
-        <div className="modal-head" style={{marginBottom: '12px'}}>
-          <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
-            <Calculator size={20} color="#25D366"/>
-            <h2 style={{fontSize: '16px', margin: 0}}>Calculadora do Caixa</h2>
-          </div>
-          <button type="button" className="icon-btn" onClick={onClose}><X size={18}/></button>
-        </div>
-
-        <div style={{
-          background: '#050508', border: '1px solid #222', borderRadius: '8px',
-          padding: '12px 16px', textAlign: 'right', marginBottom: '14px'
-        }}>
-          <div style={{fontSize: '11px', color: '#666', minHeight: '16px', fontFamily: 'monospace'}}>{equation}</div>
-          <div style={{fontSize: '26px', fontWeight: 'bold', color: '#25D366', fontFamily: 'monospace', overflowX: 'auto'}}>{display}</div>
-        </div>
-
-        <div style={{display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px'}}>
-          <button type="button" className="secondary-btn" onClick={handleClear} style={{background: '#1f1f2e', color: '#ef4444'}}>C</button>
-          <button type="button" className="secondary-btn" onClick={handlePercent} style={{background: '#1f1f2e', color: '#38bdf8'}}>%</button>
-          <button type="button" className="secondary-btn" onClick={() => setDisplay(prev => prev.startsWith('-') ? prev.slice(1) : '-' + prev)} style={{background: '#1f1f2e'}}>±</button>
-          <button type="button" className="secondary-btn" onClick={() => handleOp('÷')} style={{background: '#181824', color: '#25D366'}}>÷</button>
-
-          <button type="button" className="secondary-btn" onClick={() => handleNum(7)} style={{background: '#14141c'}}>7</button>
-          <button type="button" className="secondary-btn" onClick={() => handleNum(8)} style={{background: '#14141c'}}>8</button>
-          <button type="button" className="secondary-btn" onClick={() => handleNum(9)} style={{background: '#14141c'}}>9</button>
-          <button type="button" className="secondary-btn" onClick={() => handleOp('x')} style={{background: '#181824', color: '#25D366'}}>×</button>
-
-          <button type="button" className="secondary-btn" onClick={() => handleNum(4)} style={{background: '#14141c'}}>4</button>
-          <button type="button" className="secondary-btn" onClick={() => handleNum(5)} style={{background: '#14141c'}}>5</button>
-          <button type="button" className="secondary-btn" onClick={() => handleNum(6)} style={{background: '#14141c'}}>6</button>
-          <button type="button" className="secondary-btn" onClick={() => handleOp('-')} style={{background: '#181824', color: '#25D366'}}>-</button>
-
-          <button type="button" className="secondary-btn" onClick={() => handleNum(1)} style={{background: '#14141c'}}>1</button>
-          <button type="button" className="secondary-btn" onClick={() => handleNum(2)} style={{background: '#14141c'}}>2</button>
-          <button type="button" className="secondary-btn" onClick={() => handleNum(3)} style={{background: '#14141c'}}>3</button>
-          <button type="button" className="secondary-btn" onClick={() => handleOp('+')} style={{background: '#181824', color: '#25D366'}}>+</button>
-
-          <button type="button" className="secondary-btn" onClick={() => handleNum(0)} style={{gridColumn: 'span 2', background: '#14141c'}}>0</button>
-          <button type="button" className="secondary-btn" onClick={() => !display.includes('.') && setDisplay(prev => prev + '.')} style={{background: '#14141c'}}>.</button>
-          <button type="button" className="primary-btn" onClick={handleCalculate} style={{background: '#25D366', color: '#000', fontWeight: 'bold'}}>=</button>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => {
-            const val = parseFloat(display);
-            if (!isNaN(val)) {
-              onUseValue(val.toFixed(2));
-              onClose();
-            }
-          }}
-          className="primary-btn full-btn"
-          style={{marginTop: '12px', background: '#3b82f6', color: '#fff', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'}}
-        >
-          <Check size={16}/> Usar Valor Calculado (R$ {display})
-        </button>
-      </div>
     </div>
   );
 }
@@ -666,6 +567,7 @@ function App() {
   const [userAccessLevel, setUserAccessLevel] = useState('owner');
   const [active, setActive] = useState(() => userRole === 'tech' ? 'overview' : 'stores_directory');
   
+  // Estado para abrir e fechar a visualização do Modo TV
   const [showTvMode, setShowTvMode] = useState(false);
 
   const [modules, setModules] = useState({
@@ -684,6 +586,7 @@ function App() {
   const [isAccountExpired, setIsAccountExpired] = useState(false);
   const [expiredReason, setExpiredReason] = useState('trial');
 
+  // Configurações da Loja
   const [storeName, setStoreName] = useState('RT MOBILE');
   const [storeLogo, setStoreLogo] = useState(null);
   const [whatsappNumber, setWhatsappNumber] = useState('5591989117332');
@@ -692,6 +595,7 @@ function App() {
   const [mapsUrl, setMapsUrl] = useState('https://maps.google.com');
   const [techCommissionRate, setTechCommissionRate] = useState(10);
 
+  // Auxiliar de Upgrade (Configurações com os 10 itens completos)
   const [upgradeAssistantEnabled, setUpgradeAssistantEnabled] = useState(true);
   const [upgradeDiscounts, setUpgradeDiscounts] = useState({
     screenReplaced: 200,
@@ -706,16 +610,21 @@ function App() {
     housingScratched: 90,
   });
 
+  // Carrinho de Acessórios do Cliente
   const [cart, setCart] = useState([]);
   const [showCartModal, setShowCartModal] = useState(false);
 
+  // Caixa da Loja
   const [cashRegister, setCashRegister] = useState({
     isOpen: true,
     openingBalance: 0.00,
     entries: []
   });
 
+  // Equipe
   const [teamMembers, setTeamMembers] = useState([]);
+
+  // Auditoria
   const [auditLogs, setAuditLogs] = useState([]);
 
   const addAuditLog = (action) => {
@@ -750,9 +659,9 @@ function App() {
   const [showCashTransactionModal, setShowCashTransactionModal] = useState(false);
   const [showInviteMemberModal, setShowInviteMemberModal] = useState(false);
 
+  // Modais de Leitura de Código de Barras
   const [showBarcodeScannerForProduct, setShowBarcodeScannerForProduct] = useState(false);
   const [showBarcodeSaleModal, setShowBarcodeSaleModal] = useState(false);
-  const [showCalculatorModal, setShowCalculatorModal] = useState(false);
   
   const [toast, setToast] = useState('');
   const [mobileNav, setMobileNav] = useState(false);
@@ -764,6 +673,7 @@ function App() {
   const [authError, setAuthError] = useState('');
   const [saving, setSaving] = useState(false);
   
+  // Modal de Upgrade
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [upgradeStep, setUpgradeStep] = useState(1);
   const [currentDevice, setCurrentDevice] = useState('');
@@ -1652,7 +1562,7 @@ function App() {
             {active==='orders' && userRole === 'tech' && <OrdersPage orders={filteredOrders} search={search} setSearch={setSearch} onNew={()=>setShowNewOrder(true)} onStatus={handleUpdateStatus} onShare={shareOsStatusWhatsapp} onSendWarranty={sendWarrantyTermWhatsapp} onOpenChecklist={(o) => setShowChecklistModal(o)} onPrint={(o) => setShowPrintModal(o)} onPellicleReminder={sendPellicleReminder} />}
             {active==='customers' && userRole === 'tech' && <CustomersPage customers={customers} onNew={()=>setShowNewCustomer(true)} />}
             {active==='crm' && userRole === 'tech' && <CrmPage customers={customers} storeName={storeName} whatsapp={whatsappNumber} />}
-            {active==='cash' && userRole === 'tech' && <CashPage cashRegister={cashRegister} onNewTransaction={() => setShowCashTransactionModal(true)} onOpenBarcodeSale={() => setShowBarcodeSaleModal(true)} onOpenCalculator={() => setShowCalculatorModal(true)} />}
+            {active==='cash' && userRole === 'tech' && <CashPage cashRegister={cashRegister} onNewTransaction={() => setShowCashTransactionModal(true)} onOpenBarcodeSale={() => setShowBarcodeSaleModal(true)} />}
             {active==='inventory' && userRole === 'tech' && <InventoryPage inventory={inventory} onNew={()=>setShowNewProduct(true)} onUpdateQty={updateProductQty} onDelete={deleteProduct} />}
             {active==='client_inventory' && <ClientInventoryPage inventory={inventory} storeName={storeName} cart={cart} addToCart={addToCart} onOpenCart={() => setShowCartModal(true)} />}
             {active==='stores_directory' && <StoresDirectoryPage stores={activeStores} onSelectStore={(s) => { setStoreName(s.name); setWhatsappNumber(s.phone); notify(`Estabelecimento "${s.name}" selecionado!`); setActive('store'); }} onRequestQuote={(s) => setShowQuoteModal(s)} />}
@@ -1681,18 +1591,6 @@ function App() {
           </>
         )}
       </main>
-
-      {/* MODAL CALCULADORA DO CAIXA */}
-      {showCalculatorModal && (
-        <CalculatorModal
-          onUseValue={(val) => {
-            setCashTx(prev => ({ ...prev, amount: val }));
-            setShowCashTransactionModal(true);
-            notify(`Valor R$ ${val} aplicado no lançamento do caixa!`);
-          }}
-          onClose={() => setShowCalculatorModal(false)}
-        />
-      )}
 
       {showBarcodeScannerForProduct && (
         <BarcodeCameraScanner
@@ -2204,6 +2102,1440 @@ function App() {
       {toast && <div className="toast"><Check size={17}/>{toast}</div>}
     </div>
   );
+}
+
+function Overview({orders,storeName,onNew,onNavigate,modules,inventory,onOpenTv}) {
+  const ready = orders.filter(o=>o.status==='Pronto para retirada').length;
+  const waiting = orders.filter(o=>o.status==='Aguardando peça').length;
+  const lowStockItems = inventory.filter(p => p.qty < 3);
+
+  return <div className="page-content">
+    {lowStockItems.length > 0 && (
+      <div style={{background: '#451a03', border: '1px solid #b45309', color: '#fef3c7', padding: '10px 16px', borderRadius: '8px', marginBottom: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+        <span style={{display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px'}}>
+          <AlertTriangle size={18} color="#f59e0b"/> ⚠️ <strong>Alerta de Estoque Mínimo:</strong> {lowStockItems.length} produto(s) com menos de 3 unidades no estoque.
+        </span>
+        <button onClick={()=>onNavigate('inventory')} style={{background: '#b45309', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px'}}>
+          Ver Estoque
+        </button>
+      </div>
+    )}
+
+    <div className="page-heading">
+      <div>
+        <div className="eyebrow"><span className="eyebrow-line"/> PAINEL DE CONTROLE <span className="heading-date">/ HOJE</span></div>
+        <h1>Bem-vindo, <span>{storeName}.</span></h1>
+        <p>Veja o resumo de atendimentos, estoque e vendas de hoje.</p>
+      </div>
+      <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap'}}>
+        <button className="secondary-btn" onClick={onOpenTv} style={{display: 'flex', alignItems: 'center', gap: '6px', border: '1px solid #38bdf8', color: '#38bdf8'}}>
+          <Tv size={17}/> Abrir Painel TV
+        </button>
+        {modules.orders && <button className="primary-btn" onClick={onNew}><Plus size={17}/> Nova ordem de serviço</button>}
+      </div>
+    </div>
+    
+    <div className="hero-panel" style={{background: '#0c0c0f', border: '1px solid #1a1a20'}}><div className="hero-copy"><div className="hero-kicker"><span className="pulse-dot"/> WORKSHOP OVERVIEW</div><h2>Seu estabelecimento.<br/><span>Sob controle.</span></h2><p>Acompanhe serviços, vendas e estoque em um só lugar.</p>{modules.orders && <button className="hero-link" onClick={()=>onNavigate('orders')}>Ver ordens de serviço <ArrowUpRight size={16}/></button>}</div><div className="hero-device"><div className="device-glow"/><div className="device-ring ring-a"/><div className="device-ring ring-b"/><div className="phone-render"><div className="phone-camera"/><div className="phone-screen"><div className="screen-top"><span>RT MOBILE</span><span>•••</span></div><div className="screen-label">STATUS</div><div className="screen-score">100<span>%</span></div><div className="screen-chart"><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/><i/></div><div className="screen-lines"><i/><i/><i/></div></div><div className="phone-side"/></div><div className="floating-chip chip-top"><Activity size={15}/><span><b>Sistema</b><small>Ativo</small></span></div><div className="floating-chip chip-bottom"><ShieldCheck size={15}/><span><b>RT Protegido</b><small>Segurança total</small></span></div></div><div className="hero-index">01 <span>/ 04</span></div></div>
+    
+    {modules.orders && <div className="metrics-grid"><Metric icon={ClipboardList} label="Ordens ativas" value={String(orders.length).padStart(2,'0')} trend="Ordens registradas" tone="blue"/><Metric icon={Wrench} label="Em andamento" value={String(orders.filter(o=>o.status==='Em manutenção').length).padStart(2,'0')} trend="Em atendimento agora" tone="violet"/><Metric icon={Clock3} label="Aguardando peça" value={String(waiting).padStart(2,'0')} trend="Dependem de componente" tone="amber"/><Metric icon={Check} label="Prontos para retirada" value={String(ready).padStart(2,'0')} trend="Aguardam o cliente" tone="green"/></div>}
+    
+    <div className="content-grid">
+      <section className="panel orders-panel" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
+        <div className="panel-heading"><div><h3>Ordens recentes</h3><p>Últimos atendimentos recebidos</p></div>{modules.orders && <button className="icon-btn" onClick={()=>onNavigate('orders')}><ArrowUpRight size={17}/></button>}</div>
+        <div className="table-wrap"><table><thead><tr><th>ORDEM / CLIENTE</th><th>APARELHO</th><th>STATUS</th><th>VALOR</th></tr></thead><tbody>{orders.slice(0,4).map(o=><tr key={o.id}><td><div className="order-id">{o.id}</div><div className="cell-sub">{o.customer}</div></td><td><div className="device-cell"><div className="device-mini"><Smartphone size={15}/></div><span>{o.device}</span></div><div className="cell-sub">{o.issue}</div></td><td><StatusPill status={o.status}/></td><td className="time-cell"><strong>{o.amount}</strong></td></tr>)}</tbody></table></div>
+        {modules.orders && <button className="panel-bottom-link" onClick={()=>onNavigate('orders')}>Abrir todas as ordens <ArrowUpRight size={15}/></button>}
+      </section>
+      
+      <section className="panel quick-panel" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
+        <div className="panel-heading"><div><h3>Acesso rápido</h3><p>Atalhos do dia a dia</p></div><div className="quick-symbol"><Sparkles size={16}/></div></div>
+        <QuickAction icon={Tv} title="Modo TV / Sala de Espera" desc="Painel de status para TV ou tablet" onClick={onOpenTv}/>
+        {modules.orders && <QuickAction icon={Plus} title="Nova ordem de serviço" desc="Registrar atendimento recebido" onClick={onNew}/>}
+        <QuickAction icon={Users} title="Consultar clientes" desc="Ver dados e histórico" onClick={()=>onNavigate('customers')}/>
+        {modules.inventory && <QuickAction icon={Package} title="Estoque de produtos" desc="Gerenciar acessórios e itens" onClick={()=>onNavigate('inventory')}/>}
+        {modules.iphones && <QuickAction icon={Store} title="Comprar e Upgrade" desc="Aparelhos e trocas" onClick={()=>onNavigate('store')}/>}
+        <div className="quick-note"><ShieldCheck size={15}/><span>Os dados do seu estabelecimento ficam isolados e protegidos.</span></div>
+      </section>
+    </div>
+  </div>
+}
+
+function Metric({icon:Icon,label,value,trend,tone}) {return <div className="metric-card" style={{background: '#0a0a0d', border: '1px solid #18181b'}}><div className="metric-top"><div className={`metric-icon ${tone}`}><Icon size={17}/></div><span className="metric-period">AGORA</span></div><div className="metric-value">{value}</div><div className="metric-label">{label}</div><div className="metric-trend"><span className={`tiny-dot ${tone}`}/>{trend}</div></div>}
+function StatusPill({status}) {return <span className={`status-pill ${statusClass(status)}`}><i/>{status}</span>}
+function QuickAction({icon:Icon,title,desc,onClick}) {return <button className="quick-action" onClick={onClick} style={{background: '#111115'}}><div className="quick-action-icon"><Icon size={17}/></div><span><strong>{title}</strong><small>{desc}</small></span><ArrowUpRight size={15} className="quick-arrow"/></button>}
+
+function OrdersPage({orders,search,setSearch,onNew,onStatus,onShare,onSendWarranty,onOpenChecklist,onPrint,onPellicleReminder}) {
+  return <div className="page-content"><div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line"/> OPERAÇÃO</div><h1>Ordens de <span>serviço.</span></h1><p>Registre entradas e acompanhe cada atendimento do início à entrega.</p></div><button className="primary-btn" onClick={onNew}><Plus size={17}/> Nova ordem</button></div><div className="list-toolbar"><div className="search-box"><Search size={17}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar por cliente, aparelho ou ordem..."/></div><div className="toolbar-count">{orders.length} registros</div></div><div className="panel orders-full" style={{background: '#0a0a0d', border: '1px solid #18181b'}}><div className="table-wrap"><table><thead><tr><th>ORDEM / CLIENTE</th><th>APARELHO / DEFEITO</th><th>SENHA / PADRÃO</th><th>STATUS DO ATENDIMENTO</th><th>VISTORIA</th><th>AÇÕES / DISPAROS</th></tr></thead><tbody>{orders.map(o=><tr key={o.id}><td><div className="order-id">{o.id}</div><div className="cell-sub">{o.customer}</div></td><td><div className="device-cell"><div className="device-mini"><Smartphone size={15}/></div><span>{o.device}</span></div><div className="cell-sub">{o.issue}</div></td><td>
+    <div style={{display: 'flex', alignItems: 'center', gap: '6px'}}>
+      {o.patternDrawing ? (
+        <div style={{display: 'flex', alignItems: 'center', gap: '6px', background: '#000', padding: '2px 6px', borderRadius: '6px', border: '1px solid #333'}}>
+          <img src={o.patternDrawing} alt="Padrão" style={{width: '24px', height: '24px', borderRadius: '3px'}}/>
+          <span style={{fontSize: '11px', color: '#25D366'}}>Padrão</span>
+        </div>
+      ) : (
+        <div style={{display: 'flex', alignItems: 'center', gap: '6px', background: '#111', padding: '4px 8px', borderRadius: '6px', border: '1px solid #333', fontSize: '12px', width: 'fit-content'}}>
+          <Key size={13} color="#f59e0b"/> <strong style={{color: '#fff'}}>{o.devicePassword || 'Sem Senha'}</strong>
+        </div>
+      )}
+    </div>
+  </td><td><select className={`status-select ${statusClass(o.status)}`} value={o.status} onChange={e=>onStatus(o.rawId,e.target.value)}>{['Recebido','Em diagnóstico','Aguardando aprovação','Aguardando peça','Em manutenção','Pronto para retirada','Entregue'].map(s=><option key={s}>{s}</option>)}</select></td><td><button className="secondary-btn" onClick={()=>onOpenChecklist(o)} style={{display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '12px'}}><CheckSquare size={14} color="#3b82f6"/> Vistoria</button></td><td><div style={{display: 'flex', gap: '6px'}}><button className="secondary-btn" onClick={()=>onShare(o)} title="Disparar Status WhatsApp" style={{padding: '6px 10px'}}><MessageCircle size={14} color="#25D366"/></button><button className="secondary-btn" onClick={()=>onSendWarranty(o)} title="Enviar Termo de Garantia Legal WhatsApp" style={{padding: '6px 10px', color: '#3b82f6'}}><FileText size={14}/></button><button className="secondary-btn" onClick={()=>onPrint(o)} title="Imprimir Cupom Térmico" style={{padding: '6px 10px'}}><Printer size={14}/></button><button className="secondary-btn" onClick={()=>onPellicleReminder(o)} title="Lembrete / Revisão" style={{padding: '6px 10px', color: '#eab308'}}><Calendar size={14}/></button></div></td></tr>)}</tbody></table>{!orders.length && <div className="empty-state"><ClipboardList size={28}/><strong>Nenhuma ordem encontrada</strong><span>Tente mudar a busca ou registre uma nova ordem.</span></div>}</div></div></div>
+}
+
+function CustomersPage({customers, onNew}) {
+  return <div className="page-content">
+    <div className="page-heading">
+      <div>
+        <div className="eyebrow"><span className="eyebrow-line"/> RELACIONAMENTO</div>
+        <h1>Base de <span>clientes.</span></h1>
+        <p>Centralize os dados e o histórico de atendimento de cada cliente.</p>
+      </div>
+      <button className="primary-btn" onClick={onNew}><Plus size={17}/> Novo cadastro</button>
+    </div>
+    <div className="panel orders-full" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>NOME</th>
+              <th>TELEFONE / WHATSAPP</th>
+              <th>E-MAIL</th>
+              <th>CADASTRADO EM</th>
+            </tr>
+          </thead>
+          <tbody>
+            {customers.map(c => (
+              <tr key={c.id}>
+                <td><strong>{c.name}</strong></td>
+                <td>{c.phone || 'Não informado'}</td>
+                <td>{c.email || 'Não informado'}</td>
+                <td className="time-cell">{new Date(c.created_at).toLocaleDateString('pt-BR')}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {!customers.length && <div className="empty-state"><Users size={28}/><strong>Nenhum cliente cadastrado</strong><span>Clique em "Novo cadastro" para adicionar o primeiro cliente.</span></div>}
+      </div>
+    </div>
+  </div>
+}
+
+function CrmPage({customers, storeName, whatsapp}) {
+  const sendSupportFollowup = (customer) => {
+    const deviceName = customer.device || 'seu aparelho';
+    const text = encodeURIComponent(`Olá ${customer.name}! Tudo bem?\n\nPassando aqui da ${storeName} só para saber se deu tudo certo e como está o funcionamento do ${deviceName} depois do serviço realizado com a gente!\n\nSe precisar de qualquer dúvida ou suporte, estamos à disposição por aqui. Abraços!`);
+    window.open(`https://wa.me/${customer.phone}?text=${text}`, '_blank');
+  };
+
+  return <div className="page-content">
+    <div className="page-heading">
+      <div>
+        <div className="eyebrow"><span className="eyebrow-line"/> PÓS-VENDA & CUIDADO</div>
+        <h1>Acompanhamento de <span>Clientes.</span></h1>
+        <p>Envie uma mensagem amigável para saber se o cliente ficou satisfeito, sem parecer invasivo.</p>
+      </div>
+    </div>
+
+    <div className="metrics-grid" style={{gridTemplateColumns: 'repeat(3, 1fr)'}}>
+      <div className="metric-card" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
+        <div className="metric-top"><span className="metric-period">TOTAL</span></div>
+        <div className="metric-value" style={{color: '#fff'}}>{customers.length}</div>
+        <div className="metric-label">Clientes Atendidos</div>
+      </div>
+
+      <div className="metric-card" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
+        <div className="metric-top"><span className="metric-period">ATENDIMENTO</span></div>
+        <div className="metric-value" style={{color: '#25D366'}}>Receptivo</div>
+        <div className="metric-label">Tom Amigável & Profissional</div>
+      </div>
+
+      <div className="metric-card" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
+        <div className="metric-top"><span className="metric-period">OBJETIVO</span></div>
+        <div className="metric-value" style={{color: '#3b82f6', fontSize: '18px'}}>Fidelização</div>
+        <div className="metric-label">Garantir Satisfação</div>
+      </div>
+    </div>
+
+    <div className="panel orders-full" style={{background: '#0a0a0d', border: '1px solid #18181b', marginTop: '20px'}}>
+      <div className="panel-heading">
+        <div><h3>Histórico de Clientes Atendidos</h3><p>Envie uma mensagem de acompanhamento amigável em 1 clique</p></div>
+      </div>
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>NOME DO CLIENTE</th>
+              <th>TELEFONE / WHATSAPP</th>
+              <th>ITEM / SERVIÇO</th>
+              <th>MENSAGEM DE CUIDADO</th>
+            </tr>
+          </thead>
+          <tbody>
+            {customers.map(c => (
+              <tr key={c.id}>
+                <td><strong>{c.name}</strong></td>
+                <td>{c.phone}</td>
+                <td><span className="status-pill neutral">{c.device || 'Atendimento'}</span></td>
+                <td>
+                  <button className="primary-btn" onClick={() => sendSupportFollowup(c)} style={{background: '#1a1a24', color: '#25D366', border: '1px solid #25D366', fontSize: '12px', padding: '6px 12px'}}>
+                    <MessageCircle size={14}/> Acompanhamento Pós-Venda
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {!customers.length && <div className="empty-state"><HeartHandshake size={28}/><strong>Nenhum cliente cadastrado</strong><span>Os clientes cadastrados aparecerão aqui para acompanhamento pós-serviço.</span></div>}
+      </div>
+    </div>
+  </div>
+}
+
+function CashPage({cashRegister, onNewTransaction, onOpenBarcodeSale}) {
+  const totalEntries = cashRegister.entries.filter(e => e.type === 'in').reduce((a, b) => a + b.amount, 0);
+  const totalExits = cashRegister.entries.filter(e => e.type === 'out').reduce((a, b) => a + b.amount, 0);
+  const currentBalance = cashRegister.openingBalance + totalEntries - totalExits;
+
+  return <div className="page-content">
+    <div className="page-heading">
+      <div>
+        <div className="eyebrow"><span className="eyebrow-line"/> FLUXO DE CAIXA DO ESTABELECIMENTO</div>
+        <h1>Caixa da <span>Loja.</span></h1>
+        <p>Controle entradas, suprimentos de troco, sangrias e despesas do dia a dia.</p>
+      </div>
+      <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap'}}>
+        <button className="secondary-btn" onClick={onOpenBarcodeSale} style={{background: '#1f2937', color: '#25D366', border: '1px solid #25D366', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px'}}>
+          <BarcodeIcon size={17}/> Bipar / Vender Produto
+        </button>
+        <button className="primary-btn" onClick={onNewTransaction} style={{background: '#25D366', color: '#000', fontWeight: 'bold'}}>
+          <Plus size={17}/> Lançar Manual
+        </button>
+      </div>
+    </div>
+
+    <div className="metrics-grid" style={{gridTemplateColumns: 'repeat(4, 1fr)'}}>
+      <div className="metric-card" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
+        <div className="metric-top"><span className="metric-period">ABERTURA</span></div>
+        <div className="metric-value" style={{color: '#aaa'}}>R$ {cashRegister.openingBalance.toFixed(2)}</div>
+        <div className="metric-label">Fundo de Troco Inicial</div>
+      </div>
+
+      <div className="metric-card" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
+        <div className="metric-top"><span className="metric-period">ENTRADAS</span></div>
+        <div className="metric-value" style={{color: '#25D366'}}>+ R$ {totalEntries.toFixed(2)}</div>
+        <div className="metric-label">Serviços & Vendas</div>
+      </div>
+
+      <div className="metric-card" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
+        <div className="metric-top"><span className="metric-period">SANGRIA / SAÍDAS</span></div>
+        <div className="metric-value" style={{color: '#ff4d4d'}}>- R$ {totalExits.toFixed(2)}</div>
+        <div className="metric-label">Despesas & Insumos</div>
+      </div>
+
+      <div className="metric-card" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
+        <div className="metric-top"><span className="metric-period">SALDO EM GAVETA</span></div>
+        <div className="metric-value" style={{color: '#3b82f6'}}>R$ {currentBalance.toFixed(2)}</div>
+        <div className="metric-label">Saldo Atual Estimado</div>
+      </div>
+    </div>
+
+    <div className="panel orders-full" style={{background: '#0a0a0d', border: '1px solid #18181b', marginTop: '20px'}}>
+      <div className="panel-heading">
+        <div><h3>Histórico de Lançamentos do Dia</h3><p>Registro das movimentações</p></div>
+      </div>
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>HORÁRIO</th>
+              <th>DESCRIÇÃO DO LANÇAMENTO</th>
+              <th>OPERADOR</th>
+              <th>TIPO</th>
+              <th>VALOR</th>
+            </tr>
+          </thead>
+          <tbody>
+            {cashRegister.entries.map(item => (
+              <tr key={item.id}>
+                <td>{item.time}</td>
+                <td><strong>{item.description}</strong></td>
+                <td>{item.user}</td>
+                <td>
+                  <span className={`status-pill ${item.type === 'in' ? 'green' : 'amber'}`}>
+                    {item.type === 'in' ? 'Entrada / Suprimento' : 'Sangria / Saída'}
+                  </span>
+                </td>
+                <td>
+                  <strong style={{color: item.type === 'in' ? '#25D366' : '#ff4d4d'}}>
+                    {item.type === 'in' ? '+' : '-'} R$ {item.amount.toFixed(2)}
+                  </strong>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+}
+
+/* MODAL DE VENDA NO CAIXA POR CÓDIGO DE BARRAS */
+function BarcodeSaleModal({ inventory, onDetectedBarcode, onClose }) {
+  const [manualCode, setManualCode] = useState('');
+  const [useCamera, setUseCamera] = useState(false);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  const handleManualSubmit = (e) => {
+    e.preventDefault();
+    if (manualCode.trim()) {
+      onDetectedBarcode(manualCode.trim());
+    }
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={e=>e.stopPropagation()} style={{background: '#0f0f12', border: '1px solid #222', maxWidth: '440px'}}>
+        <div className="modal-head">
+          <div>
+            <div className="eyebrow">CAIXA RÁPIDO</div>
+            <h2>Venda por Código de Barras</h2>
+          </div>
+          <button type="button" className="icon-btn" onClick={onClose}><X size={19}/></button>
+        </div>
+
+        <p className="muted" style={{fontSize: '13px'}}>
+          Bipe com o leitor óptico USB/Bluetooth ou use a câmera do seu celular para registrar no caixa e abater o estoque.
+        </p>
+
+        <form onSubmit={handleManualSubmit} style={{margin: '15px 0'}}>
+          <label>Código de Barras (Leitor ou Digitação)
+            <div style={{display: 'flex', gap: '8px', marginTop: '6px'}}>
+              <input
+                ref={inputRef}
+                value={manualCode}
+                onChange={e=>setManualCode(e.target.value)}
+                placeholder="Bipe com o leitor óptico..."
+                autoFocus
+                style={{flex: 1}}
+              />
+              <button className="primary-btn" type="submit" style={{padding: '0 14px'}}>
+                Confirmar
+              </button>
+            </div>
+          </label>
+        </form>
+
+        <div style={{textAlign: 'center', margin: '15px 0'}}>
+          <span style={{fontSize: '11px', color: '#666', textTransform: 'uppercase'}}>ou prefere usar a câmera?</span>
+        </div>
+
+        <button
+          type="button"
+          className="secondary-btn full-btn"
+          onClick={() => setUseCamera(true)}
+          style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', border: '1px solid #25D366', color: '#25D366', padding: '10px'}}
+        >
+          <Camera size={18}/> Abrir Câmera para Escanear
+        </button>
+
+        {useCamera && (
+          <BarcodeCameraScanner
+            onDetected={(code) => {
+              setUseCamera(false);
+              onDetectedBarcode(code);
+            }}
+            onClose={() => setUseCamera(false)}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function InventoryPage({inventory, onNew, onUpdateQty, onDelete}) {
+  return <div className="page-content">
+    <div className="page-heading">
+      <div>
+        <div className="eyebrow"><span className="eyebrow-line"/> CONTROLE DE ESTOQUE</div>
+        <h1>Estoque de <span>Produtos.</span></h1>
+        <p>Cadastre itens, acessórios ou produtos com foto, preço, código de barras e controle de quantidade.</p>
+      </div>
+      <button className="primary-btn" onClick={onNew}><Plus size={17}/> Novo Produto</button>
+    </div>
+
+    <div className="panel orders-full" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>PRODUTO</th>
+              <th>CÓD. BARRAS / EAN</th>
+              <th>CATEGORIA</th>
+              <th>PREÇO DE VENDA</th>
+              <th>EM ESTOQUE</th>
+              <th>AÇÕES</th>
+            </tr>
+          </thead>
+          <tbody>
+            {inventory.map(item => (
+              <tr key={item.id}>
+                <td>
+                  <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
+                    <div style={{width: '40px', height: '40px', borderRadius: '6px', background: '#18181f', border: '1px solid #333', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+                      {item.photo ? <img src={item.photo} alt={item.name} style={{width: '100%', height: '100%', objectFit: 'cover'}}/> : <Package size={20} color="#888"/>}
+                    </div>
+                    <div>
+                      <strong>{item.name}</strong>
+                      {item.qty < 3 && <div style={{fontSize: '10px', color: '#f59e0b', fontWeight: 'bold'}}>⚠️ Estoque Mínimo</div>}
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  {item.barcode ? (
+                    <div style={{display: 'flex', alignItems: 'center', gap: '6px', background: '#111', padding: '4px 8px', borderRadius: '4px', border: '1px solid #333', width: 'fit-content'}}>
+                      <BarcodeIcon size={14} color="#25D366" />
+                      <span style={{fontSize: '12px', fontFamily: 'monospace', color: '#fff'}}>{item.barcode}</span>
+                    </div>
+                  ) : (
+                    <span style={{fontSize: '11px', color: '#666'}}>Sem código</span>
+                  )}
+                </td>
+                <td><span className="status-pill neutral">{item.category}</span></td>
+                <td><strong style={{color: '#25D366'}}>R$ {item.price}</strong></td>
+                <td>
+                  <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                    <button className="secondary-btn" style={{padding: '2px 8px'}} onClick={() => onUpdateQty(item.id, -1)}>-</button>
+                    <strong style={{minWidth: '20px', textAlign: 'center', color: item.qty < 3 ? '#f59e0b' : '#fff'}}>{item.qty} un</strong>
+                    <button className="secondary-btn" style={{padding: '2px 8px'}} onClick={() => onUpdateQty(item.id, 1)}>+</button>
+                  </div>
+                </td>
+                <td>
+                  <button className="icon-btn" onClick={() => onDelete(item.id)} style={{color: '#ff4d4d'}}><Trash2 size={16}/></button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {!inventory.length && <div className="empty-state"><Package size={28}/><strong>Nenhum produto em estoque</strong><span>Clique em "Novo Produto" para cadastrar itens com código de barras.</span></div>}
+      </div>
+    </div>
+  </div>
+}
+
+function FinancePage({orders, commissionRate, setCommissionRate}) {
+  const totalRevenue = orders.reduce((acc, o) => {
+    const val = parseFloat(o.amount.replace('R$', '').trim()) || 0;
+    return acc + val;
+  }, 0);
+
+  const totalPartsCost = orders.reduce((acc, o) => {
+    const val = parseFloat(o.partCost) || 0;
+    return acc + val;
+  }, 0);
+
+  const netProfit = totalRevenue - totalPartsCost;
+  const techCommissionTotal = (netProfit * (commissionRate / 100));
+
+  return <div className="page-content">
+    <div className="page-heading">
+      <div>
+        <div className="eyebrow"><span className="eyebrow-line"/> BALANÇO FINANCEIRO</div>
+        <h1>Financeiro & <span>Comissões.</span></h1>
+        <p>Acompanhe faturamento bruto, custos, lucro líquido e comissões da equipe.</p>
+      </div>
+    </div>
+
+    <div className="metrics-grid" style={{gridTemplateColumns: 'repeat(4, 1fr)'}}>
+      <div className="metric-card" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
+        <div className="metric-top"><span className="metric-period">BRUTO</span></div>
+        <div className="metric-value" style={{color: '#fff'}}>R$ {totalRevenue.toFixed(2)}</div>
+        <div className="metric-label">Faturamento Total</div>
+      </div>
+
+      <div className="metric-card" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
+        <div className="metric-top"><span className="metric-period">CUSTOS</span></div>
+        <div className="metric-value" style={{color: '#ff4d4d'}}>R$ {totalPartsCost.toFixed(2)}</div>
+        <div className="metric-label">Custo com Insumos/Peças</div>
+      </div>
+
+      <div className="metric-card" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
+        <div className="metric-top"><span className="metric-period">LÍQUIDO</span></div>
+        <div className="metric-value" style={{color: '#25D366'}}>R$ {netProfit.toFixed(2)}</div>
+        <div className="metric-label">Lucro Líquido</div>
+      </div>
+
+      <div className="metric-card" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
+        <div className="metric-top"><span className="metric-period">COMISSÃO</span></div>
+        <div className="metric-value" style={{color: '#3b82f6'}}>R$ {techCommissionTotal.toFixed(2)}</div>
+        <div className="metric-label">Comissão da Equipe ({commissionRate}%)</div>
+      </div>
+    </div>
+
+    <div className="panel" style={{background: '#0a0a0d', border: '1px solid #18181b', padding: '20px', marginTop: '20px'}}>
+      <h3>Configuração da Comissão</h3>
+      <p className="muted">Porcentagem calculada sobre o lucro líquido de cada serviço executado.</p>
+      <div style={{display: 'flex', alignItems: 'center', gap: '10px', marginTop: '10px'}}>
+        <input 
+          type="number" 
+          value={commissionRate} 
+          onChange={e=>setCommissionRate(e.target.value)} 
+          style={{background: '#111', color: '#fff', border: '1px solid #333', padding: '8px 12px', borderRadius: '6px', width: '100px'}}
+        />
+        <span>% do lucro líquido por OS</span>
+      </div>
+    </div>
+  </div>
+}
+
+function ClientInventoryPage({inventory, storeName, cart, addToCart, onOpenCart}) {
+  const totalCartItems = cart.reduce((acc, item) => acc + item.cartQty, 0);
+
+  return <div className="page-content">
+    <div className="page-heading" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+      <div>
+        <div className="eyebrow"><span className="eyebrow-line"/> VITRINE DO ESTABELECIMENTO</div>
+        <h1>Produtos & <span>Acessórios.</span></h1>
+        <p>Confira os itens disponíveis na {storeName} e adicione à sua sacola.</p>
+      </div>
+      
+      {totalCartItems > 0 && (
+        <button className="primary-btn" onClick={onOpenCart} style={{background: '#25D366', color: '#000', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px'}}>
+          <ShoppingCart size={18}/> Ver Carrinho ({totalCartItems})
+        </button>
+      )}
+    </div>
+
+    <div className="module-cards">
+      {inventory.map(prod => (
+        <div className="module-card" key={prod.id} style={{background: '#0d0d10', border: '1px solid #1a1a20'}}>
+          <div className="module-card-top">
+            <span className="status-pill neutral">{prod.category}</span>
+            <small style={{color: prod.qty > 0 ? '#25D366' : '#ff4d4d'}}>{prod.qty > 0 ? `${prod.qty} em estoque` : 'Esgotado'}</small>
+          </div>
+          
+          <div style={{
+            width: '100%', height: '140px', borderRadius: '10px', overflow: 'hidden', margin: '12px 0', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #222'
+          }}>
+            {prod.photo ? (
+              <img src={prod.photo} alt={prod.name} style={{width: '100%', height: '100%', objectFit: 'cover'}} />
+            ) : (
+              <Package size={40} color="#444"/>
+            )}
+          </div>
+
+          <h3 style={{fontSize: '15px'}}>{prod.name}</h3>
+          <div style={{fontSize: '18px', fontWeight: 'bold', color: '#25D366', margin: '8px 0'}}>R$ {prod.price}</div>
+          
+          <button 
+            className="primary-btn full-btn" 
+            disabled={prod.qty <= 0}
+            style={{marginTop: '10px', background: prod.qty > 0 ? '#1f2937' : '#333', color: prod.qty > 0 ? '#fff' : '#888', border: '1px solid #374151'}} 
+            onClick={() => addToCart(prod)}
+          >
+            <ShoppingCart size={16}/> {prod.qty > 0 ? 'Adicionar ao Carrinho' : 'Indisponível'}
+          </button>
+        </div>
+      ))}
+      {!inventory.length && (
+        <div style={{gridColumn: '1 / -1', textAlign: 'center', color: '#888', padding: '40px'}}>
+          Nenhum acessório disponível no momento nesta loja.
+        </div>
+      )}
+    </div>
+  </div>
+}
+
+function CartModal({cart, onClose, onUpdateQty, onClear, pixKey, storeName, storeAddress, whatsappNumber, notify}) {
+  const [deliveryType, setDeliveryType] = useState('pickup');
+  const [customerName, setCustomerName] = useState('');
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [isThirdPartyPickup, setIsThirdPartyPickup] = useState(false);
+  const [pickupPersonName, setPickupPersonName] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('pix');
+
+  const cartTotal = cart.reduce((acc, item) => acc + (Number(item.price) * item.cartQty), 0);
+
+  const copyPix = () => {
+    navigator.clipboard.writeText(pixKey);
+    notify('Chave Pix copiada com sucesso!');
+  };
+
+  const handleFinishOrder = () => {
+    if (!customerName.trim()) {
+      notify('Por favor, informe seu nome.'); return;
+    }
+    if (deliveryType === 'delivery' && !deliveryAddress.trim()) {
+      notify('Por favor, informe o endereço para entrega.'); return;
+    }
+    if (deliveryType === 'pickup' && isThirdPartyPickup && !pickupPersonName.trim()) {
+      notify('Informe o nome da pessoa autorizada a retirar.'); return;
+    }
+
+    const itemsSummary = cart.map(i => `• ${i.cartQty}x ${i.name} (R$ ${(Number(i.price) * i.cartQty).toFixed(2)})`).join('\n');
+    
+    let logisticsInfo = '';
+    if (deliveryType === 'pickup') {
+      logisticsInfo = `🏬 *Modalidade:* RETIRADA NO LOCAL\n📍 *Endereço da Loja:* ${storeAddress}`;
+      if (isThirdPartyPickup) {
+        logisticsInfo += `\n👤 *Pessoa autorizada a retirar:* ${pickupPersonName.trim()}`;
+      }
+    } else {
+      logisticsInfo = `🛵 *Modalidade:* ENTREGA / DELIVERY\n📍 *Endereço de Entrega:* ${deliveryAddress.trim()}`;
+    }
+
+    const message = encodeURIComponent(
+      `🛍️ *NOVO PEDIDO DE ACESSÓRIOS - ${storeName.toUpperCase()}*\n\n` +
+      `👤 *Cliente:* ${customerName.trim()}\n` +
+      `💰 *Total do Pedido:* R$ ${cartTotal.toFixed(2)}\n` +
+      `💳 *Forma de Pagamento:* ${paymentMethod === 'pix' ? 'Pix (Comprovante em anexo)' : 'Cartão / Na entrega'}\n\n` +
+      `📦 *Itens Escolhidos:*\n${itemsSummary}\n\n` +
+      `${logisticsInfo}\n\n` +
+      `Poderiam confirmar o recebimento do pedido?`
+    );
+
+    window.open(`https://wa.me/${whatsappNumber}?text=${message}`, '_blank');
+    onClear();
+    onClose();
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={e=>e.stopPropagation()} style={{background: '#0f0f12', border: '1px solid #222', maxWidth: '520px'}}>
+        <div className="modal-head">
+          <div><div className="eyebrow">FINALIZAÇÃO DE PEDIDO</div><h2>Seu Carrinho de Compras</h2></div>
+          <button type="button" className="icon-btn" onClick={onClose}><X size={19}/></button>
+        </div>
+
+        {cart.length === 0 ? (
+          <div style={{textAlign: 'center', padding: '30px 0', color: '#888'}}>
+            <ShoppingCart size={40} style={{marginBottom: '10px'}}/>
+            <p>Seu carrinho está vazio.</p>
+          </div>
+        ) : (
+          <div>
+            <div style={{maxHeight: '160px', overflowY: 'auto', marginBottom: '15px', borderBottom: '1px solid #222', paddingBottom: '10px'}}>
+              {cart.map(item => (
+                <div key={item.id} style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '6px 0', fontSize: '13px'}}>
+                  <span>{item.name}</span>
+                  <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                    <button className="secondary-btn" style={{padding: '2px 6px'}} onClick={()=>onUpdateQty(item.id, -1)}>-</button>
+                    <strong>{item.cartQty}</strong>
+                    <button className="secondary-btn" style={{padding: '2px 6px'}} onClick={()=>onUpdateQty(item.id, 1)}>+</button>
+                    <span style={{minWidth: '65px', textAlign: 'right', color: '#25D366'}}>R$ {(Number(item.price) * item.cartQty).toFixed(2)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: 'bold', marginBottom: '15px'}}>
+              <span>Valor Total:</span>
+              <span style={{color: '#25D366'}}>R$ {cartTotal.toFixed(2)}</span>
+            </div>
+
+            <label style={{marginBottom: '10px'}}>Seu Nome Completo
+              <input value={customerName} onChange={e=>setCustomerName(e.target.value)} placeholder="Ex: Lucas Gabriel" required />
+            </label>
+
+            <div style={{display: 'flex', gap: '8px', marginBottom: '12px'}}>
+              <button
+                type="button"
+                className={`secondary-btn ${deliveryType === 'pickup' ? 'primary-btn' : ''}`}
+                style={{flex: 1, fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'}}
+                onClick={() => setDeliveryType('pickup')}
+              >
+                <Store size={15}/> Retirada na Loja
+              </button>
+              <button
+                type="button"
+                className={`secondary-btn ${deliveryType === 'delivery' ? 'primary-btn' : ''}`}
+                style={{flex: 1, fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'}}
+                onClick={() => setDeliveryType('delivery')}
+              >
+                <Truck size={15}/> Entrega / Delivery
+              </button>
+            </div>
+
+            {deliveryType === 'delivery' ? (
+              <label style={{marginBottom: '12px'}}>Endereço de Entrega (Rua, Número, Bairro)
+                <input value={deliveryAddress} onChange={e=>setDeliveryAddress(e.target.value)} placeholder="Ex: Travessa das Flores, 142 - Centro" required />
+              </label>
+            ) : (
+              <div style={{background: '#141419', padding: '10px', borderRadius: '8px', border: '1px solid #282830', marginBottom: '12px'}}>
+                <span style={{fontSize: '11px', color: '#888', display: 'block', marginBottom: '6px'}}>Retirar no local: {storeAddress}</span>
+                <label style={{display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0, fontSize: '12px'}}>
+                  <input
+                    type="checkbox"
+                    checked={isThirdPartyPickup}
+                    onChange={e => setIsThirdPartyPickup(e.target.checked)}
+                    style={{accentColor: '#25D366'}}
+                  />
+                  Outra pessoa vai retirar o pedido por mim?
+                </label>
+                {isThirdPartyPickup && (
+                  <input
+                    value={pickupPersonName}
+                    onChange={e => setPickupPersonName(e.target.value)}
+                    placeholder="Nome de quem vai buscar na loja"
+                    style={{marginTop: '8px', fontSize: '12px'}}
+                  />
+                )}
+              </div>
+            )}
+
+            <div style={{marginBottom: '15px'}}>
+              <span style={{fontSize: '12px', color: '#aaa', display: 'block', marginBottom: '6px'}}>Forma de Pagamento:</span>
+              <div style={{display: 'flex', gap: '8px'}}>
+                <button
+                  type="button"
+                  className={`secondary-btn ${paymentMethod === 'pix' ? 'primary-btn' : ''}`}
+                  style={{flex: 1, fontSize: '12px'}}
+                  onClick={() => setPaymentMethod('pix')}
+                >
+                  Pix Instantâneo
+                </button>
+                <button
+                  type="button"
+                  className={`secondary-btn ${paymentMethod === 'card' ? 'primary-btn' : ''}`}
+                  style={{flex: 1, fontSize: '12px'}}
+                  onClick={() => setPaymentMethod('card')}
+                >
+                  Cartão / Na Entrega
+                </button>
+              </div>
+            </div>
+
+            {paymentMethod === 'pix' && (
+              <div style={{background: '#000', padding: '12px', borderRadius: '10px', border: '1px solid #333', textAlign: 'center', marginBottom: '16px'}}>
+                <QrCode size={90} color="#25D366" style={{margin: '0 auto 6px', display: 'block'}} />
+                <span style={{fontSize: '11px', color: '#aaa'}}>Chave Pix da Loja:</span>
+                <div style={{fontSize: '13px', fontWeight: 'bold', color: '#fff', margin: '4px 0'}}>{pixKey}</div>
+                <button type="button" onClick={copyPix} className="secondary-btn" style={{fontSize: '11px', padding: '4px 8px', margin: '0 auto', display: 'flex', alignItems: 'center', gap: '4px'}}>
+                  <Copy size={12}/> Copiar Chave Pix
+                </button>
+                <small style={{display: 'block', color: '#888', fontSize: '10px', marginTop: '6px'}}>Pague o Pix e anexe o comprovante na mensagem do WhatsApp.</small>
+              </div>
+            )}
+
+            <button
+              type="button"
+              className="primary-btn full-btn"
+              onClick={handleFinishOrder}
+              style={{background: '#25D366', color: '#000', fontWeight: 'bold', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'}}
+            >
+              <MessageCircle size={18}/> Enviar Pedido no WhatsApp da Loja
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function StoresDirectoryPage({stores, onSelectStore, onRequestQuote}) {
+  return <div className="page-content">
+    <div className="page-heading">
+      <div>
+        <div className="eyebrow"><span className="eyebrow-line"/> PORTAL DE ESTABELECIMENTOS</div>
+        <h1>Estabelecimentos & <span>Lojas Ativas.</span></h1>
+        <p>Abaixo estão exibidos os estabelecimentos com plano ativo e suporte garantido.</p>
+      </div>
+    </div>
+
+    <div className="module-cards">
+      {stores.map(store => (
+        <div className="module-card" key={store.id} style={{background: '#0d0d10', border: '1px solid #1a1a20'}}>
+          <div className="module-card-top">
+            <span className="status-pill green">• Plano Ativo</span>
+            <span style={{color: '#eab308', display: 'flex', alignItems: 'center', gap: '3px', fontSize: '12px'}}>
+              <Star size={13} fill="#eab308"/> {store.rating || '5.0'} ({store.reviewsCount || 10})
+            </span>
+          </div>
+          <div className="module-card-icon"><Store size={22}/></div>
+          <h3>{store.name}</h3>
+          <p style={{fontSize: '12px', color: '#aaa'}}>{store.address || 'Endereço não informado'}</p>
+          <p>{store.desc}</p>
+          
+          <div style={{display: 'flex', gap: '8px', marginTop: '15px'}}>
+            <button className="primary-btn full-btn" style={{flex: 1}} onClick={() => onSelectStore(store)}>
+              Entrar no Estabelecimento →
+            </button>
+            <button className="secondary-btn" onClick={() => onRequestQuote(store)} style={{border: '1px solid #25D366', color: '#25D366'}}>
+              Orçamento
+            </button>
+          </div>
+        </div>
+      ))}
+
+      {!stores.length && (
+        <div style={{textAlign: 'center', color: '#888', gridColumn: '1 / -1', padding: '40px'}}>
+          Nenhum estabelecimento com plano ativo encontrado no momento.
+        </div>
+      )}
+    </div>
+  </div>
+}
+
+function StorePage({whatsapp, storeName, onUpgrade}) {
+  const [tab, setTab] = useState('seminovos');
+
+  const buyDirect = (modelName, type) => {
+    const text = encodeURIComponent(`Olá ${storeName}! Gostaria de comprar o ${modelName} (${type}). Qual a disponibilidade e valores?`);
+    window.open(`https://wa.me/${whatsapp}?text=${text}`, '_blank');
+  };
+
+  const getModelImage = (t) => {
+    if (t === 'seminovos' || t === 'lacrados') return t === 'seminovos' ? imgSeminovo : imgLacrado;
+    if (t === 'xiaomi') return imgXiaomi;
+    return imgRealme;
+  };
+
+  const currentList = useMemo(() => {
+    if (tab === 'seminovos') return seminovosList;
+    if (tab === 'lacrados') return lacradosList;
+    if (tab === 'xiaomi') return xiaomiList;
+    return realmeList;
+  }, [tab]);
+
+  return <div className="page-content">
+    <div className="page-heading">
+      <div>
+        <div className="eyebrow"><span className="eyebrow-line"/> CENTRAL DE VENDAS & VITRINE</div>
+        <h1>Comprar & <span>Upgrade de Aparelho.</span></h1>
+        <p>Negocie diretamente no WhatsApp da {storeName} (pronta entrega ou encomenda).</p>
+      </div>
+      <button className="primary-btn" onClick={onUpgrade} style={{background: 'linear-gradient(135deg, #25D366, #128C7E)', color: '#000', fontWeight: 'bold'}}>
+        <RefreshCw size={17}/> Fazer Upgrade de Aparelho
+      </button>
+    </div>
+
+    <div className="list-toolbar" style={{gap: '10px', flexWrap: 'wrap'}}>
+      <button className={`secondary-btn ${tab === 'seminovos' ? 'primary-btn' : ''}`} onClick={() => setTab('seminovos')} style={{borderRadius: '8px'}}>
+        iPhones Seminovos
+      </button>
+      <button className={`secondary-btn ${tab === 'lacrados' ? 'primary-btn' : ''}`} onClick={() => setTab('lacrados')} style={{borderRadius: '8px'}}>
+        iPhones Lacrados
+      </button>
+      <button className={`secondary-btn ${tab === 'xiaomi' ? 'primary-btn' : ''}`} onClick={() => setTab('xiaomi')} style={{borderRadius: '8px'}}>
+        Xiaomi & Poco
+      </button>
+      <button className={`secondary-btn ${tab === 'realme' ? 'primary-btn' : ''}`} onClick={() => setTab('realme')} style={{borderRadius: '8px'}}>
+        Realme
+      </button>
+    </div>
+
+    <div className="module-cards" style={{marginTop: '20px'}}>
+      {currentList.map((model) => (
+        <div className="module-card" key={model} style={{background: '#0d0d10', border: '1px solid #1a1a20'}}>
+          <div className="module-card-top">
+            <span className={`status-pill ${tab === 'seminovos' ? 'blue' : tab === 'lacrados' ? 'green' : 'amber'}`}>
+              {tab === 'seminovos' ? 'Seminovo' : tab === 'lacrados' ? 'Lacrado' : tab === 'xiaomi' ? 'Xiaomi / Poco' : 'Realme'}
+            </span>
+            <small style={{color: '#888'}}>Pronta entrega</small>
+          </div>
+          
+          <div style={{
+            width: '100%', height: '140px', borderRadius: '10px', overflow: 'hidden', margin: '12px 0', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #222'
+          }}>
+            <img 
+              src={getModelImage(tab)} 
+              alt={model} 
+              style={{width: '100%', height: '100%', objectFit: 'cover', opacity: 0.85}}
+            />
+          </div>
+
+          <h3 style={{fontSize: '16px'}}>{model}</h3>
+          <p style={{fontSize: '12px', color: '#888'}}>Disponível para consulta e reserva na {storeName}.</p>
+          <button className="primary-btn full-btn" style={{marginTop: '15px', background: '#25D366', color: '#000', fontWeight: 'bold'}} onClick={() => buyDirect(model, tab)}>
+            <MessageCircle size={16}/> Comprar no WhatsApp da Loja
+          </button>
+        </div>
+      ))}
+    </div>
+  </div>
+}
+
+function TrackPage({orders, storeName, pixKey, whatsapp, storeAddress, mapsUrl, setOrders, notify}) {
+  const [trackQuery, setTrackQuery] = useState('');
+  const [foundOs, setFoundOs] = useState(null);
+  const [userRating, setUserRating] = useState(5);
+  const [userReviewText, setUserReviewText] = useState('');
+
+  const handleSearchOs = (e) => {
+    e.preventDefault();
+    const result = orders.find(o => o.id.toLowerCase() === trackQuery.trim().toLowerCase());
+    setFoundOs(result || 'NOT_FOUND');
+  };
+
+  const submitReview = () => {
+    if (foundOs && foundOs !== 'NOT_FOUND') {
+      setOrders(prev => prev.map(o => o.id === foundOs.id ? { ...o, rating: userRating, review: userReviewText } : o));
+      setFoundOs({ ...foundOs, rating: userRating, review: userReviewText });
+      notify('Sua avaliação foi enviada com sucesso! Obrigado.');
+    }
+  };
+
+  const copyPixToClipboard = () => {
+    navigator.clipboard.writeText(pixKey);
+    notify('Chave Pix copiada para a área de transferência!');
+  };
+
+  const getRemainingWarrantyDays = (order) => {
+    if (!order.createdAt || !order.warrantyDays) return order.warrantyDays || 90;
+    const start = new Date(order.createdAt);
+    const now = new Date();
+    const diffTime = Math.abs(now - start);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return Math.max(0, order.warrantyDays - diffDays);
+  };
+
+  const approveBudget = (order) => {
+    const text = encodeURIComponent(`Olá ${storeName}! Gostaria de *APROVAR* o orçamento da minha OS *${order.id}* (${order.device}) no valor de *${order.amount}*. Pode dar andamento no serviço!`);
+    window.open(`https://wa.me/${whatsapp}?text=${text}`, '_blank');
+  };
+
+  const rejectBudget = (order) => {
+    const text = encodeURIComponent(`Olá ${storeName}! Gostaria de conversar a respeito do orçamento da minha OS *${order.id}* (${order.device}). No momento não tenho interesse no reparo ou gostaria de rever o valor.`);
+    window.open(`https://wa.me/${whatsapp}?text=${text}`, '_blank');
+  };
+
+  const getStepIndex = (status) => {
+    const map = {
+      'Recebido': 0,
+      'Em diagnóstico': 1,
+      'Aguardando aprovação': 2,
+      'Aguardando peça': 2,
+      'Em manutenção': 3,
+      'Pronto para retirada': 4,
+      'Entregue': 5
+    };
+    return map[status] ?? 0;
+  };
+
+  return <div className="page-content">
+    <div className="page-heading">
+      <div>
+        <div className="eyebrow"><span className="eyebrow-line"/> ÁREA DO CLIENTE</div>
+        <h1>Acompanhar <span>Atendimento.</span></h1>
+        <p>Digite o número da sua Ordem de Serviço para ver o status em tempo real.</p>
+      </div>
+    </div>
+
+    <div className="panel" style={{background: '#0a0a0d', border: '1px solid #18181b', padding: '24px', maxWidth: '640px', margin: '0 auto'}}>
+      <form onSubmit={handleSearchOs} style={{display: 'flex', gap: '10px'}}>
+        <input 
+          value={trackQuery} 
+          onChange={e=>setTrackQuery(e.target.value)} 
+          placeholder="Ex: OS-2048" 
+          style={{flex: 1, background: '#111', color: '#fff', border: '1px solid #333', padding: '10px 14px', borderRadius: '8px', fontSize: '15px'}}
+          required
+        />
+        <button className="primary-btn" type="submit"><Search size={18}/> Rastrear OS</button>
+      </form>
+
+      {foundOs && foundOs !== 'NOT_FOUND' && (
+        <div style={{marginTop: '25px', background: '#121215', border: '1px solid #222', borderRadius: '12px', padding: '20px'}}>
+          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px'}}>
+            <strong>{foundOs.id}</strong>
+            <span className={`status-pill ${foundOs.color}`}>{foundOs.status}</span>
+          </div>
+
+          <div style={{margin: '20px 0 25px', background: '#0a0a0d', padding: '16px', borderRadius: '10px', border: '1px solid #1f1f23'}}>
+            <span style={{fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '1px', display: 'block', marginBottom: '12px'}}>
+              Progresso do Atendimento
+            </span>
+            <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative'}}>
+              {orderSteps.map((step, idx) => {
+                const currentIdx = getStepIndex(foundOs.status);
+                const isCompleted = idx <= currentIdx;
+                const isCurrent = idx === currentIdx;
+                return (
+                  <div key={step} style={{display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, position: 'relative', zIndex: 1}}>
+                    <div style={{
+                      width: '24px', height: '24px', borderRadius: '50%',
+                      background: isCompleted ? '#25D366' : '#222',
+                      color: isCompleted ? '#000' : '#666',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '11px', fontWeight: 'bold',
+                      border: isCurrent ? '2px solid #fff' : 'none'
+                    }}>
+                      {isCompleted ? '✓' : idx + 1}
+                    </div>
+                    <span style={{fontSize: '10px', color: isCompleted ? '#fff' : '#666', marginTop: '6px', textAlign: 'center'}}>
+                      {step}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <p style={{margin: '5px 0', fontSize: '14px', color: '#aaa'}}><strong>Cliente:</strong> {foundOs.customer}</p>
+          <p style={{margin: '5px 0', fontSize: '14px', color: '#aaa'}}><strong>Item / Aparelho:</strong> {foundOs.device}</p>
+          <p style={{margin: '5px 0', fontSize: '14px', color: '#aaa'}}><strong>Descrição:</strong> {foundOs.issue}</p>
+          <p style={{margin: '5px 0', fontSize: '14px', color: '#aaa'}}><strong>Valor do Serviço:</strong> <span style={{color: '#25D366', fontWeight: 'bold'}}>{foundOs.amount}</span></p>
+
+          {foundOs.status === 'Aguardando aprovação' && (
+            <div style={{marginTop: '20px', background: '#1c1917', border: '1px solid #78350f', padding: '16px', borderRadius: '10px', textAlign: 'center'}}>
+              <span style={{fontSize: '13px', color: '#f59e0b', fontWeight: 'bold', display: 'block', marginBottom: '8px'}}>
+                ⚠️ Orçamento aguardando sua resposta: {foundOs.amount}
+              </span>
+              <p style={{fontSize: '12px', color: '#d6d3d1', margin: '0 0 14px'}}>
+                Deseja aprovar a execução do serviço pelo valor informado?
+              </p>
+              <div style={{display: 'flex', gap: '8px'}}>
+                <button
+                  type="button"
+                  onClick={() => approveBudget(foundOs)}
+                  className="primary-btn"
+                  style={{flex: 1, background: '#25D366', color: '#000', fontWeight: 'bold', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'}}
+                >
+                  <CheckCircle2 size={16}/> Aprovar no WhatsApp
+                </button>
+                <button
+                  type="button"
+                  onClick={() => rejectBudget(foundOs)}
+                  className="secondary-btn"
+                  style={{flex: 1, borderColor: '#ef4444', color: '#ef4444', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'}}
+                >
+                  <XCircle size={16}/> Recusar / Negociar
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div style={{marginTop: '15px', background: '#111827', border: '1px solid #1e3a8a', padding: '12px', borderRadius: '8px'}}>
+            <span style={{fontSize: '12px', color: '#3b82f6', fontWeight: 'bold'}}>🛡️ GARANTIA DIGITAL ATIVA</span>
+            <p style={{fontSize: '14px', margin: '4px 0', color: '#fff'}}>
+              Restam <strong>{getRemainingWarrantyDays(foundOs)} dias</strong> de garantia (Total contratado: {foundOs.warrantyDays} dias).
+            </p>
+          </div>
+
+          {storeAddress && (
+            <div style={{marginTop: '15px', background: '#18181f', padding: '12px', borderRadius: '8px', border: '1px solid #333'}}>
+              <span style={{fontSize: '12px', color: '#aaa', display: 'flex', alignItems: 'center', gap: '4px'}}>
+                <MapPin size={14} color="#f59e0b"/> LOCALIZAÇÃO PARA RETIRADA:
+              </span>
+              <p style={{fontSize: '13px', margin: '4px 0', color: '#fff'}}>{storeAddress}</p>
+              {mapsUrl && (
+                <a href={mapsUrl} target="_blank" rel="noreferrer" style={{color: '#3b82f6', fontSize: '12px', textDecoration: 'none'}}>
+                  🗺️ Abrir no Google Maps →
+                </a>
+              )}
+            </div>
+          )}
+
+          {pixKey && foundOs.status === 'Pronto para retirada' && (
+            <div style={{marginTop: '20px', background: '#18181f', padding: '15px', borderRadius: '8px', border: '1px solid #333'}}>
+              <span style={{fontSize: '12px', color: '#25D366', fontWeight: 'bold'}}>✓ SEU PEDIDO ESTÁ PRONTO!</span>
+              <p style={{fontSize: '13px', margin: '8px 0'}}>Pagamento via Pix para {storeName}:</p>
+              <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
+                <code style={{background: '#000', padding: '8px 12px', borderRadius: '6px', color: '#fff', fontSize: '13px', flex: 1, border: '1px solid #444'}}>{pixKey}</code>
+                <button className="primary-btn" onClick={copyPixToClipboard} style={{background: '#25D366', color: '#000', fontWeight: 'bold', fontSize: '12px', padding: '8px 12px'}}>
+                  <Copy size={14}/> Copiar Chave
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div style={{marginTop: '20px', background: '#0d0d10', padding: '15px', borderRadius: '8px', border: '1px solid #222'}}>
+            <strong style={{fontSize: '13px'}}>Avalie nosso Atendimento:</strong>
+            <div style={{display: 'flex', gap: '8px', margin: '10px 0'}}>
+              {[1, 2, 3, 4, 5].map(star => (
+                <button key={star} onClick={() => setUserRating(star)} style={{background: 'none', border: 'none', cursor: 'pointer'}}>
+                  <Star size={22} fill={star <= userRating ? '#eab308' : 'none'} color="#eab308"/>
+                </button>
+              ))}
+            </div>
+            <input 
+              value={userReviewText} 
+              onChange={e=>setUserReviewText(e.target.value)} 
+              placeholder="Deixe seu comentário sobre o serviço..." 
+              style={{background: '#111', color: '#fff', border: '1px solid #333', padding: '8px', borderRadius: '6px', width: '100%', fontSize: '12px'}}
+            />
+            <button className="secondary-btn" onClick={submitReview} style={{marginTop: '8px', fontSize: '12px'}}>Enviar Avaliação</button>
+          </div>
+
+          <a href={`https://wa.me/${whatsapp}?text=${encodeURIComponent(`Olá ${storeName}! Estou acompanhando meu atendimento ${foundOs.id} (${foundOs.device})`)}`} target="_blank" rel="noreferrer" className="primary-btn full-btn" style={{marginTop: '20px', background: '#25D366', color: '#000', textDecoration: 'none', textAlign: 'center'}}>
+            <MessageCircle size={16}/> Falar com o Estabelecimento no WhatsApp
+          </a>
+        </div>
+      )}
+
+      {foundOs === 'NOT_FOUND' && (
+        <div style={{marginTop: '20px', textAlign: 'center', color: '#888', padding: '20px'}}>
+          Nenhum registro encontrado com o código "{trackQuery}".
+        </div>
+      )}
+    </div>
+  </div>
+}
+
+function PaymentsPage({pixKey, setPixKey, onShowPayModal}) {
+  return <div className="page-content">
+    <div className="page-heading">
+      <div>
+        <div className="eyebrow"><span className="eyebrow-line"/> FINANCEIRO</div>
+        <h1>Configuração <span>Pix & Recebimentos.</span></h1>
+        <p>Defina a sua chave Pix para receber pagamentos de serviços e vendas.</p>
+      </div>
+      <button className="primary-btn" onClick={onShowPayModal} style={{background: '#25D366', color: '#000', fontWeight: 'bold'}}>
+        <QrCode size={17}/> Renovação da Assinatura (R$ 50,00)
+      </button>
+    </div>
+    
+    <div className="settings-grid">
+      <section className="panel settings-panel" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
+        <div className="settings-title">
+          <div className="settings-icon"><CreditCard size={19}/></div>
+          <div><h3>Sua Chave Pix para Recebimento</h3><p>Exibida aos clientes no fechamento</p></div>
+        </div>
+        <div className="settings-row">
+          <span>Chave Pix Cadastrada</span>
+          <input 
+            value={pixKey} 
+            onChange={e=>setPixKey(e.target.value)} 
+            placeholder="Ex: CNPJ, E-mail, Telefone ou CPF" 
+            style={{background: '#111', color: '#fff', border: '1px solid #333', padding: '8px 12px', borderRadius: '6px', fontSize: '13px', width: '250px'}}
+          />
+        </div>
+        <div className="settings-help">
+          <ShieldCheck size={16}/>
+          <span>Seus clientes efetuarão os pagamentos diretamente na sua conta bancária sem intermediários.</span>
+        </div>
+      </section>
+    </div>
+  </div>
+}
+
+function SettingsPage({configured,email,storeName,setStoreName,storeLogo,onLogoUpload,whatsapp,setWhatsapp,pixKey,setPixKey,storeAddress,setStoreAddress,mapsUrl,setMapsUrl,modules,setModules,onLogout,teamMembers,onInviteMember,auditLogs,userAccessLevel,isLifetimeAdmin,upgradeAssistantEnabled,setUpgradeAssistantEnabled,upgradeDiscounts,setUpgradeDiscounts}) {
+  return <div className="page-content">
+    <div className="page-heading">
+      <div>
+        <div className="eyebrow"><span className="eyebrow-line"/> SISTEMA</div>
+        <h1>Configurações do <span>Estabelecimento.</span></h1>
+        <p>Ajuste o nome comercial, localização física, equipe e módulos ativos.</p>
+      </div>
+    </div>
+
+    <div className="settings-grid">
+      <section className="panel settings-panel" style={{background: '#0a0a0d', border: '1px solid #18181b', gridColumn: '1 / -1'}}>
+        <div className="settings-title">
+          <div className="settings-icon"><RefreshCw size={19}/></div>
+          <div>
+            <h3>Auxiliar de Avaliação de Upgrade</h3>
+            <p>Ative para permitir que clientes marquem avarias e peças trocadas, abatendo valores automaticamente.</p>
+          </div>
+          <button
+            className={`secondary-btn ${upgradeAssistantEnabled ? 'primary-btn' : ''}`}
+            onClick={() => setUpgradeAssistantEnabled(!upgradeAssistantEnabled)}
+            style={{fontSize: '12px', padding: '6px 14px'}}
+          >
+            {upgradeAssistantEnabled ? '✓ Ativado' : 'Desativado'}
+          </button>
+        </div>
+
+        {upgradeAssistantEnabled && (
+          <div style={{marginTop: '16px', borderTop: '1px solid #222', paddingTop: '16px'}}>
+            <span style={{fontSize: '12px', color: '#aaa', display: 'block', marginBottom: '12px'}}>
+              Defina o valor em Reais (R$) a ser reduzido do celular do cliente para cada tipo de condição:
+            </span>
+
+            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px'}}>
+              <div className="settings-row" style={{flexDirection: 'column', alignItems: 'flex-start', background: '#121217', padding: '10px', borderRadius: '8px'}}>
+                <span style={{fontSize: '12px'}}>Tela Trocada / Trincada</span>
+                <div style={{display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', width: '100%'}}>
+                  <span style={{color: '#ef4444', fontWeight: 'bold'}}>- R$</span>
+                  <input
+                    type="number"
+                    value={upgradeDiscounts.screenReplaced}
+                    onChange={e => setUpgradeDiscounts({...upgradeDiscounts, screenReplaced: e.target.value})}
+                    style={{background: '#000', color: '#fff', border: '1px solid #333', padding: '6px', borderRadius: '6px', width: '100%'}}
+                  />
+                </div>
+              </div>
+
+              <div className="settings-row" style={{flexDirection: 'column', alignItems: 'flex-start', background: '#121217', padding: '10px', borderRadius: '8px'}}>
+                <span style={{fontSize: '12px'}}>Bateria Trocada / Não Genuína</span>
+                <div style={{display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', width: '100%'}}>
+                  <span style={{color: '#ef4444', fontWeight: 'bold'}}>- R$</span>
+                  <input
+                    type="number"
+                    value={upgradeDiscounts.batteryReplaced}
+                    onChange={e => setUpgradeDiscounts({...upgradeDiscounts, batteryReplaced: e.target.value})}
+                    style={{background: '#000', color: '#fff', border: '1px solid #333', padding: '6px', borderRadius: '6px', width: '100%'}}
+                  />
+                </div>
+              </div>
+
+              <div className="settings-row" style={{flexDirection: 'column', alignItems: 'flex-start', background: '#121217', padding: '10px', borderRadius: '8px'}}>
+                <span style={{fontSize: '12px'}}>Face ID / Biometria Inoperante</span>
+                <div style={{display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', width: '100%'}}>
+                  <span style={{color: '#ef4444', fontWeight: 'bold'}}>- R$</span>
+                  <input
+                    type="number"
+                    value={upgradeDiscounts.faceIdOff}
+                    onChange={e => setUpgradeDiscounts({...upgradeDiscounts, faceIdOff: e.target.value})}
+                    style={{background: '#000', color: '#fff', border: '1px solid #333', padding: '6px', borderRadius: '6px', width: '100%'}}
+                  />
+                </div>
+              </div>
+
+              <div className="settings-row" style={{flexDirection: 'column', alignItems: 'flex-start', background: '#121217', padding: '10px', borderRadius: '8px'}}>
+                <span style={{fontSize: '12px'}}>Câmera com Falha / Trocada</span>
+                <div style={{display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', width: '100%'}}>
+                  <span style={{color: '#ef4444', fontWeight: 'bold'}}>- R$</span>
+                  <input
+                    type="number"
+                    value={upgradeDiscounts.cameraFailed}
+                    onChange={e => setUpgradeDiscounts({...upgradeDiscounts, cameraFailed: e.target.value})}
+                    style={{background: '#000', color: '#fff', border: '1px solid #333', padding: '6px', borderRadius: '6px', width: '100%'}}
+                  />
+                </div>
+              </div>
+
+              <div className="settings-row" style={{flexDirection: 'column', alignItems: 'flex-start', background: '#121217', padding: '10px', borderRadius: '8px'}}>
+                <span style={{fontSize: '12px'}}>Lente / Vidrinho da Câmera</span>
+                <div style={{display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', width: '100%'}}>
+                  <span style={{color: '#ef4444', fontWeight: 'bold'}}>- R$</span>
+                  <input
+                    type="number"
+                    value={upgradeDiscounts.cameraLensScratched}
+                    onChange={e => setUpgradeDiscounts({...upgradeDiscounts, cameraLensScratched: e.target.value})}
+                    style={{background: '#000', color: '#fff', border: '1px solid #333', padding: '6px', borderRadius: '6px', width: '100%'}}
+                  />
+                </div>
+              </div>
+
+              <div className="settings-row" style={{flexDirection: 'column', alignItems: 'flex-start', background: '#121217', padding: '10px', borderRadius: '8px'}}>
+                <span style={{fontSize: '12px'}}>Conector / Dock de Carga</span>
+                <div style={{display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', width: '100%'}}>
+                  <span style={{color: '#ef4444', fontWeight: 'bold'}}>- R$</span>
+                  <input
+                    type="number"
+                    value={upgradeDiscounts.chargingPortFailed}
+                    onChange={e => setUpgradeDiscounts({...upgradeDiscounts, chargingPortFailed: e.target.value})}
+                    style={{background: '#000', color: '#fff', border: '1px solid #333', padding: '6px', borderRadius: '6px', width: '100%'}}
+                  />
+                </div>
+              </div>
+
+              <div className="settings-row" style={{flexDirection: 'column', alignItems: 'flex-start', background: '#121217', padding: '10px', borderRadius: '8px'}}>
+                <span style={{fontSize: '12px'}}>Alto-falante / Auricular</span>
+                <div style={{display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', width: '100%'}}>
+                  <span style={{color: '#ef4444', fontWeight: 'bold'}}>- R$</span>
+                  <input
+                    type="number"
+                    value={upgradeDiscounts.audioSpeakerFailed}
+                    onChange={e => setUpgradeDiscounts({...upgradeDiscounts, audioSpeakerFailed: e.target.value})}
+                    style={{background: '#000', color: '#fff', border: '1px solid #333', padding: '6px', borderRadius: '6px', width: '100%'}}
+                  />
+                </div>
+              </div>
+
+              <div className="settings-row" style={{flexDirection: 'column', alignItems: 'flex-start', background: '#121217', padding: '10px', borderRadius: '8px'}}>
+                <span style={{fontSize: '12px'}}>NFC / Pagamento por Aproximação</span>
+                <div style={{display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', width: '100%'}}>
+                  <span style={{color: '#ef4444', fontWeight: 'bold'}}>- R$</span>
+                  <input
+                    type="number"
+                    value={upgradeDiscounts.nfcFailed}
+                    onChange={e => setUpgradeDiscounts({...upgradeDiscounts, nfcFailed: e.target.value})}
+                    style={{background: '#000', color: '#fff', border: '1px solid #333', padding: '6px', borderRadius: '6px', width: '100%'}}
+                  />
+                </div>
+              </div>
+
+              <div className="settings-row" style={{flexDirection: 'column', alignItems: 'flex-start', background: '#121217', padding: '10px', borderRadius: '8px'}}>
+                <span style={{fontSize: '12px'}}>Wi-Fi ou Bluetooth Inoperante</span>
+                <div style={{display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', width: '100%'}}>
+                  <span style={{color: '#ef4444', fontWeight: 'bold'}}>- R$</span>
+                  <input
+                    type="number"
+                    value={upgradeDiscounts.wifiFailed}
+                    onChange={e => setUpgradeDiscounts({...upgradeDiscounts, wifiFailed: e.target.value})}
+                    style={{background: '#000', color: '#fff', border: '1px solid #333', padding: '6px', borderRadius: '6px', width: '100%'}}
+                  />
+                </div>
+              </div>
+
+              <div className="settings-row" style={{flexDirection: 'column', alignItems: 'flex-start', background: '#121217', padding: '10px', borderRadius: '8px'}}>
+                <span style={{fontSize: '12px'}}>Carcaça / Vidro Traseiro com Marcas</span>
+                <div style={{display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', width: '100%'}}>
+                  <span style={{color: '#ef4444', fontWeight: 'bold'}}>- R$</span>
+                  <input
+                    type="number"
+                    value={upgradeDiscounts.housingScratched}
+                    onChange={e => setUpgradeDiscounts({...upgradeDiscounts, housingScratched: e.target.value})}
+                    style={{background: '#000', color: '#fff', border: '1px solid #333', padding: '6px', borderRadius: '6px', width: '100%'}}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {userAccessLevel === 'owner' && (
+        <section className="panel settings-panel" style={{background: '#0a0a0d', border: '1px solid #18181b', gridColumn: '1 / -1'}}>
+          <div className="settings-title">
+            <div className="settings-icon"><Users size={19}/></div>
+            <div><h3>Equipe & Operadores Cadastrados</h3><p>1 Assinatura = Toda a sua equipe usando o mesmo estabelecimento</p></div>
+            <button className="primary-btn" onClick={onInviteMember} style={{fontSize: '12px', padding: '6px 12px'}}><UserPlus size={15}/> Convidar Membro</button>
+          </div>
+          
+          <div className="table-wrap" style={{marginTop: '15px'}}>
+            <table>
+              <thead>
+                <tr>
+                  <th>NOME</th>
+                  <th>E-MAIL</th>
+                  <th>CARGO / FUNÇÃO</th>
+                  <th>STATUS</th>
+                </tr>
+              </thead>
+              <tbody>
+                {teamMembers.map(m => (
+                  <tr key={m.id}>
+                    <td><strong>{m.name}</strong></td>
+                    <td>{m.email}</td>
+                    <td><span className={`status-pill ${m.role === 'owner' ? 'green' : 'blue'}`}>{m.role === 'owner' ? 'Administrador (Dono)' : 'Operador / Técnico'}</span></td>
+                    <td><span className="status-pill green">• {m.status}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {userAccessLevel === 'owner' && (
+        <section className="panel settings-panel" style={{background: '#0a0a0d', border: '1px solid #18181b', gridColumn: '1 / -1'}}>
+          <div className="settings-title">
+            <div className="settings-icon"><History size={19}/></div>
+            <div><h3>Histórico de Alterações (Audit Log)</h3><p>Registro de segurança ("Quem fez o quê")</p></div>
+          </div>
+          
+          <div className="table-wrap" style={{marginTop: '15px'}}>
+            <table>
+              <thead>
+                <tr>
+                  <th>DATA / HORA</th>
+                  <th>AÇÃO REALIZADA</th>
+                  <th>USUÁRIO / OPERADOR</th>
+                </tr>
+              </thead>
+              <tbody>
+                {auditLogs.slice(0, 5).map(log => (
+                  <tr key={log.id}>
+                    <td>{log.time}</td>
+                    <td><strong>{log.action}</strong></td>
+                    <td>{log.user}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      <section className="panel settings-panel" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
+        <div className="settings-title"><div className="settings-icon"><Sliders size={19}/></div><div><h3>Módulos do Estabelecimento</h3><p>Ative ou desative os recursos exibidos no painel</p></div></div>
+        
+        <div className="settings-row">
+          <span>Ordens de Serviço & Atendimento</span>
+          <button className={`secondary-btn ${modules.orders ? 'primary-btn' : ''}`} onClick={() => setModules({...modules, orders: !modules.orders})}>
+            {modules.orders ? 'Ativado' : 'Desativado'}
+          </button>
+        </div>
+
+        <div className="settings-row">
+          <span>Pós-Venda & Acompanhamento</span>
+          <button className={`secondary-btn ${modules.crm ? 'primary-btn' : ''}`} onClick={() => setModules({...modules, crm: !modules.crm})}>
+            {modules.crm ? 'Ativado' : 'Desativado'}
+          </button>
+        </div>
+
+        <div className="settings-row">
+          <span>Caixa da Loja / Balcão</span>
+          <button className={`secondary-btn ${modules.cashRegister ? 'primary-btn' : ''}`} onClick={() => setModules({...modules, cashRegister: !modules.cashRegister})}>
+            {modules.cashRegister ? 'Ativado' : 'Desativado'}
+          </button>
+        </div>
+
+        <div className="settings-row">
+          <span>Venda de Aparelhos & Upgrade</span>
+          <button className={`secondary-btn ${modules.iphones ? 'primary-btn' : ''}`} onClick={() => setModules({...modules, iphones: !modules.iphones})}>
+            {modules.iphones ? 'Ativado' : 'Desativado'}
+          </button>
+        </div>
+
+        <div className="settings-row">
+          <span>Estoque de Produtos & Itens</span>
+          <button className={`secondary-btn ${modules.inventory ? 'primary-btn' : ''}`} onClick={() => setModules({...modules, inventory: !modules.inventory})}>
+            {modules.inventory ? 'Ativado' : 'Desativado'}
+          </button>
+        </div>
+
+        <div className="settings-row">
+          <span>Financeiro & Comissões</span>
+          <button className={`secondary-btn ${modules.finance ? 'primary-btn' : ''}`} onClick={() => setModules({...modules, finance: !modules.finance})}>
+            {modules.finance ? 'Ativado' : 'Desativado'}
+          </button>
+        </div>
+      </section>
+
+      <section className="panel settings-panel" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
+        <div className="settings-title"><div className="settings-icon"><Store size={19}/></div><div><h3>Dados & Endereço do Estabelecimento</h3><p>Identidade exibida no painel, faturas e Google Maps</p></div></div>
+        
+        <div className="settings-row">
+          <span>Logotipo do Estabelecimento</span>
+          <label className="secondary-btn" style={{cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', fontSize: '12px'}}>
+            <Upload size={14}/> {storeLogo ? 'Alterar Logo' : 'Enviar Logo'}
+            <input type="file" accept="image/*" onChange={onLogoUpload} style={{display: 'none'}} />
+          </label>
+        </div>
+
+        <div className="settings-row">
+          <span>Nome Comercial</span>
+          <input value={storeName} onChange={e=>setStoreName(e.target.value)} placeholder="Ex: RT Assistência ou Loja X" style={{background: '#111', color: '#fff', border: '1px solid #333', padding: '6px 10px', borderRadius: '6px', fontSize: '13px', width: '220px'}}/>
+        </div>
+
+        <div className="settings-row">
+          <span>Endereço Físico</span>
+          <input value={storeAddress} onChange={e=>setStoreAddress(e.target.value)} placeholder="Av. Principal, 1000 - Centro" style={{background: '#111', color: '#fff', border: '1px solid #333', padding: '6px 10px', borderRadius: '6px', fontSize: '13px', width: '220px'}}/>
+        </div>
+
+        <div className="settings-row">
+          <span>Link do Google Maps</span>
+          <input value={mapsUrl} onChange={e=>setMapsUrl(e.target.value)} placeholder="https://maps.google.com/..." style={{background: '#111', color: '#fff', border: '1px solid #333', padding: '6px 10px', borderRadius: '6px', fontSize: '13px', width: '220px'}}/>
+        </div>
+
+        <div className="settings-row">
+          <span>WhatsApp da Loja (Vendas & OS)</span>
+          <input value={whatsapp} onChange={e=>setWhatsapp(e.target.value)} placeholder="Ex: 5591999999999" style={{background: '#111', color: '#fff', border: '1px solid #333', padding: '6px 10px', borderRadius: '6px', fontSize: '13px', width: '220px'}}/>
+        </div>
+
+        <div className="settings-row">
+          <span>Chave Pix da Loja (Recebimentos)</span>
+          <input value={pixKey} onChange={e=>setPixKey(e.target.value)} placeholder="Sua chave Pix" style={{background: '#111', color: '#fff', border: '1px solid #333', padding: '6px 10px', borderRadius: '6px', fontSize: '13px', width: '220px'}}/>
+        </div>
+      </section>
+
+      <section className="panel settings-panel" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
+        <div className="settings-title"><div className="settings-icon"><ShieldCheck size={19}/></div><div><h3>Licença & Suporte RT Mobile</h3><p>Administração da plataforma</p></div><span className={`connection-badge ${configured?'connected':''}`}><i/>{configured?'Ativo':'Pendente'}</span></div>
+        <div className="settings-row"><span>Status da Licença</span><strong style={{color: '#25D366'}}>{isLifetimeAdmin ? '👑 Licença Vitalícia de Administrador (Sem Cobrança)' : 'Plano Profissional Ativo (R$ 50/mês)'}</strong></div>
+        <div className="settings-row"><span>E-mail do Administrador</span><strong>{email || 'Nenhum'}</strong></div>
+        
+        <a href={`https://wa.me/${adminWhatsapp}?text=${encodeURIComponent('Olá Robert! Preciso de suporte no sistema RT Mobile.')}`} target="_blank" rel="noreferrer" className="secondary-btn full-btn" style={{marginTop: '15px', textDecoration: 'none', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'}}>
+          <PhoneCall size={15}/> Falar com Suporte Técnico (Robert)
+        </a>
+
+        {email && <button className="secondary-btn logout-btn" onClick={onLogout} style={{marginTop: '15px'}}><LogOut size={16}/> Sair da conta</button>}
+      </section>
+    </div>
+  </div>
 }
 
 export default App;
