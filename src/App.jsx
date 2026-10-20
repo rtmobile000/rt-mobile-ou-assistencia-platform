@@ -19,11 +19,12 @@ const ADMIN_EMAIL = 'roberthaelley75@gmail.com';
 
 const seminovosList = [
   'iPhone 11', 'iPhone 11 Pro', 'iPhone 11 Pro Max',
-  'iPhone 12', 'iPhone 12 Pro', 'iPhone 12 Pro Max',
+  'iPhone 12', 'iPhone 12 mini', 'iPhone 12 Pro', 'iPhone 12 Pro Max',
   'iPhone 13', 'iPhone 13 Pro', 'iPhone 13 Pro Max',
   'iPhone 14', 'iPhone 14 Plus', 'iPhone 14 Pro', 'iPhone 14 Pro Max',
   'iPhone 15', 'iPhone 15 Plus', 'iPhone 15 Pro', 'iPhone 15 Pro Max',
   'iPhone 16', 'iPhone 16 Plus', 'iPhone 16 Pro', 'iPhone 16 Pro Max',
+  'iPhone 17', 'iPhone 17 Pro', 'iPhone 17 Pro Max',
 ];
 
 const lacradosList = [
@@ -593,7 +594,7 @@ function App() {
   const [pixKey, setPixKey] = useState('91989117332');
   const [storeAddress, setStoreAddress] = useState('Santa Izabel do Pará - PA');
   const [mapsUrl, setMapsUrl] = useState('https://maps.google.com');
-  const [techCommissionRate, setTechCommissionRate] = useState(10);
+  const [techCommissionRate, setTechCommissionRate] = useState(() => Number(localStorage.getItem('rt_phone_commission_fixed') || 50));
 
   // Auxiliar de Upgrade (Configurações com os 10 itens completos)
   const [upgradeAssistantEnabled, setUpgradeAssistantEnabled] = useState(true);
@@ -731,7 +732,7 @@ function App() {
 
   const navClient = useMemo(() => {
     const list = [{ id: 'stores_directory', label: 'Buscar Lojas Ativas', icon: Store }];
-    if (modules.iphones) list.push({ id: 'store', label: 'Celulares Novos e Seminovos', icon: Smartphone });
+    if (modules.iphones) list.push({ id: 'store', label: 'Comprar iPhones label: 'Celulares Novos e Seminovos' Aparelhos', icon: Smartphone });
     if (modules.inventory) list.push({ id: 'client_inventory', label: 'Acessórios', icon: Package });
     if (modules.orders) list.push({ id: 'track', label: 'Rastreio de OS', icon: Search });
     return list;
@@ -1100,6 +1101,18 @@ function App() {
       }
       const targetOrder = orders.find(o => o.rawId === rawId);
       setOrders(prev => prev.map(o => o.rawId === rawId ? { ...o, status: newStatus, color: statusClass(newStatus) } : o));
+      // Ao marcar uma OS como entregue, cria automaticamente um item na fila de pós-venda.
+      // O envio automático real exige integração com a API oficial do WhatsApp.
+      if (targetOrder && ['Entregue', 'Entregue ao cliente'].includes(newStatus)) {
+        try {
+          const key = 'rt_post_sale_v1';
+          const queue = JSON.parse(localStorage.getItem(key) || '[]');
+          if (!queue.some(item => item.orderId === targetOrder.id)) {
+            queue.unshift({ id: String(Date.now()), orderId: targetOrder.id, customer: targetOrder.customer || '', phone: targetOrder.phone || '', purchase: targetOrder.device || 'Aparelho/serviço da assistência', amount: targetOrder.amount || '', payment: 'Entrega confirmada', status: 'Pronto para enviar convite', createdAt: new Date().toISOString(), rating: 0, comment: '' });
+            localStorage.setItem(key, JSON.stringify(queue));
+          }
+        } catch (queueError) { console.warn('Não foi possível preparar o pós-venda automático', queueError); }
+      }
       if (targetOrder) addAuditLog(`Alterou status da ${targetOrder.id} para "${newStatus}"`);
       notify(`Status alterado para "${newStatus}".`);
     } catch (err) { notify('Erro ao atualizar status.'); }
@@ -1580,7 +1593,7 @@ function App() {
             {active==='stores_directory' && <StoresDirectoryPage stores={activeStores} onSelectStore={(s) => { setStoreName(s.name); setWhatsappNumber(s.phone); notify(`Estabelecimento "${s.name}" selecionado!`); setActive('store'); }} onRequestQuote={(s) => setShowQuoteModal(s)} />}
             {active==='store' && <StorePage whatsapp={whatsappNumber} storeName={storeName} onUpgrade={() => setShowUpgradeModal(true)} devices={usedDevices} usedDevicesEnabled={usedDevicesEnabled} />}
             {active==='track' && <TrackPage orders={orders} storeName={storeName} pixKey={pixKey} whatsapp={whatsappNumber} storeAddress={storeAddress} mapsUrl={mapsUrl} setOrders={setOrders} notify={notify} />}
-            {active==='finance' && userRole === 'tech' && userAccessLevel === 'owner' && <FinancePage orders={orders} commissionRate={techCommissionRate} setCommissionRate={setTechCommissionRate} />}
+            {active==='finance' && userRole === 'tech' && userAccessLevel === 'owner' && <FinancePage orders={orders} commissionRate={techCommissionRate} setCommissionRate={value => { setTechCommissionRate(value); localStorage.setItem('rt_phone_commission_fixed', String(value)); }} />}
             {active==='payments' && userRole === 'tech' && <PaymentsPage pixKey={pixKey} setPixKey={setPixKey} onShowPayModal={() => setShowPaymentModal(true)} />}
             {active==='settings' && userRole === 'tech' && <SettingsPage configured={supabaseConfigured} email={session?.user?.email} storeName={storeName} setStoreName={setStoreName} storeLogo={storeLogo} onLogoUpload={handleLogoUpload} whatsapp={whatsappNumber} setWhatsapp={setWhatsappNumber} pixKey={pixKey} setPixKey={setPixKey} storeAddress={storeAddress} setStoreAddress={setStoreAddress} mapsUrl={mapsUrl} setMapsUrl={setMapsUrl} modules={modules} setModules={setModules} onLogout={logout} teamMembers={teamMembers} onInviteMember={() => setShowInviteMemberModal(true)} auditLogs={auditLogs} userAccessLevel={userAccessLevel} isLifetimeAdmin={isLifetimeAdmin} upgradeAssistantEnabled={upgradeAssistantEnabled} setUpgradeAssistantEnabled={setUpgradeAssistantEnabled} upgradeDiscounts={upgradeDiscounts} setUpgradeDiscounts={setUpgradeDiscounts} />}
             
@@ -2537,68 +2550,21 @@ function InventoryPage({inventory, onNew, onUpdateQty, onDelete}) {
 }
 
 function FinancePage({orders, commissionRate, setCommissionRate}) {
-  const totalRevenue = orders.reduce((acc, o) => {
-    const val = parseFloat(o.amount.replace('R$', '').trim()) || 0;
-    return acc + val;
-  }, 0);
-
-  const totalPartsCost = orders.reduce((acc, o) => {
-    const val = parseFloat(o.partCost) || 0;
-    return acc + val;
-  }, 0);
-
+  const totalRevenue = orders.reduce((acc, o) => acc + (parseFloat(String(o.amount || '').replace(/[^0-9,.-]/g, '').replace(',', '.')) || 0), 0);
+  const totalPartsCost = orders.reduce((acc, o) => acc + (parseFloat(o.partCost) || 0), 0);
   const netProfit = totalRevenue - totalPartsCost;
-  const techCommissionTotal = (netProfit * (commissionRate / 100));
-
-  return <div className="page-content">
-    <div className="page-heading">
-      <div>
-        <div className="eyebrow"><span className="eyebrow-line"/> BALANÇO FINANCEIRO</div>
-        <h1>Financeiro & <span>Comissões.</span></h1>
-        <p>Acompanhe faturamento bruto, custos, lucro líquido e comissões da equipe.</p>
-      </div>
+  // Só contabiliza vendas explicitamente marcadas como venda de aparelho; OS de assistência não geram comissão de celular.
+  const phonesSold = orders.filter(o => (o.phoneSold === true || o.saleType === 'phone_sale') && ['Entregue', 'Concluído', 'Pago'].includes(o.status)).length;
+  const techCommissionTotal = phonesSold * (Number(commissionRate) || 0);
+  return <div className="page-content"><div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line"/> BALANÇO FINANCEIRO</div><h1>Financeiro & <span>Comissões.</span></h1><p>Comissão fixa por aparelho celular vendido, sem percentual sobre serviços de assistência.</p></div></div>
+    <div className="metrics-grid" style={{gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))'}}>
+      <div className="metric-card" style={{background:'#0a0a0d',border:'1px solid #18181b'}}><div className="metric-top"><span className="metric-period">BRUTO</span></div><div className="metric-value" style={{color:'#fff'}}>{moneyBR(totalRevenue)}</div><div className="metric-label">Faturamento registrado nas OS</div></div>
+      <div className="metric-card" style={{background:'#0a0a0d',border:'1px solid #18181b'}}><div className="metric-top"><span className="metric-period">CUSTOS</span></div><div className="metric-value" style={{color:'#ff4d4d'}}>{moneyBR(totalPartsCost)}</div><div className="metric-label">Custos de peças/insumos informados</div></div>
+      <div className="metric-card" style={{background:'#0a0a0d',border:'1px solid #18181b'}}><div className="metric-top"><span className="metric-period">APARELHOS</span></div><div className="metric-value" style={{color:'#60a5fa'}}>{phonesSold}</div><div className="metric-label">Celulares vendidos e entregues</div></div>
+      <div className="metric-card" style={{background:'#0a0a0d',border:'1px solid #18181b'}}><div className="metric-top"><span className="metric-period">COMISSÃO</span></div><div className="metric-value" style={{color:'#25D366'}}>{moneyBR(techCommissionTotal)}</div><div className="metric-label">Total de comissão fixa</div></div>
     </div>
-
-    <div className="metrics-grid" style={{gridTemplateColumns: 'repeat(4, 1fr)'}}>
-      <div className="metric-card" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
-        <div className="metric-top"><span className="metric-period">BRUTO</span></div>
-        <div className="metric-value" style={{color: '#fff'}}>R$ {totalRevenue.toFixed(2)}</div>
-        <div className="metric-label">Faturamento Total</div>
-      </div>
-
-      <div className="metric-card" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
-        <div className="metric-top"><span className="metric-period">CUSTOS</span></div>
-        <div className="metric-value" style={{color: '#ff4d4d'}}>R$ {totalPartsCost.toFixed(2)}</div>
-        <div className="metric-label">Custo com Insumos/Peças</div>
-      </div>
-
-      <div className="metric-card" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
-        <div className="metric-top"><span className="metric-period">LÍQUIDO</span></div>
-        <div className="metric-value" style={{color: '#25D366'}}>R$ {netProfit.toFixed(2)}</div>
-        <div className="metric-label">Lucro Líquido</div>
-      </div>
-
-      <div className="metric-card" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
-        <div className="metric-top"><span className="metric-period">COMISSÃO</span></div>
-        <div className="metric-value" style={{color: '#3b82f6'}}>R$ {techCommissionTotal.toFixed(2)}</div>
-        <div className="metric-label">Comissão da Equipe ({commissionRate}%)</div>
-      </div>
-    </div>
-
-    <div className="panel" style={{background: '#0a0a0d', border: '1px solid #18181b', padding: '20px', marginTop: '20px'}}>
-      <h3>Configuração da Comissão</h3>
-      <p className="muted">Porcentagem calculada sobre o lucro líquido de cada serviço executado.</p>
-      <div style={{display: 'flex', alignItems: 'center', gap: '10px', marginTop: '10px'}}>
-        <input 
-          type="number" 
-          value={commissionRate} 
-          onChange={e=>setCommissionRate(e.target.value)} 
-          style={{background: '#111', color: '#fff', border: '1px solid #333', padding: '8px 12px', borderRadius: '6px', width: '100px'}}
-        />
-        <span>% do lucro líquido por OS</span>
-      </div>
-    </div>
-  </div>
+    <div className="panel" style={{background:'#0a0a0d',border:'1px solid #18181b',padding:20,marginTop:20}}><h3>Configuração da comissão por aparelho</h3><p className="muted">O dono define um valor fixo por celular vendido: por exemplo, R$ 50,00 ou R$ 100,00. Não é porcentagem e não se aplica a reparos.</p><div style={{display:'flex',alignItems:'center',gap:10,marginTop:10,flexWrap:'wrap'}}><span>Comissão por celular vendido: R$</span><input type="number" min="0" step="0.01" value={commissionRate} onChange={e=>setCommissionRate(e.target.value)} style={{background:'#111',color:'#fff',border:'1px solid #333',padding:'8px 12px',borderRadius:6,width:130}}/></div><p className="muted" style={{marginTop:10}}>Observação: o contador só considera registros que estejam marcados como venda de aparelho. A tela de venda precisa marcar essa informação para calcular automaticamente o total.</p></div>
+  </div>;
 }
 
 function ClientInventoryPage({inventory, storeName, cart, addToCart, onOpenCart}) {
@@ -2890,7 +2856,8 @@ function StoresDirectoryPage({stores, onSelectStore, onRequestQuote}) {
 }
 
 function StorePage({whatsapp, storeName, onUpgrade, devices = [], usedDevicesEnabled = true}) {
-  const [tab, setTab] = useState('seminovos');
+  const [tab, setTab] = useState('lacrados');
+  const [modelSearch, setModelSearch] = useState('');
 
   const buyDirect = (modelName, type) => {
     const text = encodeURIComponent(`Olá ${storeName}! Gostaria de comprar o ${modelName} (${type}). Qual a disponibilidade e valores?`);
@@ -2904,17 +2871,18 @@ function StorePage({whatsapp, storeName, onUpgrade, devices = [], usedDevicesEna
   };
 
   const currentList = useMemo(() => {
-    if (tab === 'seminovos') return usedDevicesEnabled ? devices.filter(d => d && d.model) : [];
+    if (tab === 'seminovos') return seminovosList.filter(model => model.toLowerCase().includes(modelSearch.toLowerCase()));
+    if (tab === 'estoque') return usedDevicesEnabled ? devices.filter(d => d && d.model) : [];
     if (tab === 'lacrados') return lacradosList;
     if (tab === 'xiaomi') return xiaomiList;
     return realmeList;
-  }, [tab, devices, usedDevicesEnabled]);
+  }, [tab, devices, usedDevicesEnabled, modelSearch]);
 
   return <div className="page-content">
     <div className="page-heading">
       <div>
         <div className="eyebrow"><span className="eyebrow-line"/> CENTRAL DE VENDAS & VITRINE</div>
-        <h1>Celulares <span>Novos e Seminovos.</span></h1>
+        <h1>Comprar <span>iPhones & Aparelhos.</span></h1>
         <p>Negocie diretamente no WhatsApp da {storeName} (pronta entrega ou encomenda).</p>
       </div>
       <button className="primary-btn" onClick={onUpgrade} style={{background: 'linear-gradient(135deg, #25D366, #128C7E)', color: '#000', fontWeight: 'bold'}}>
@@ -2924,7 +2892,10 @@ function StorePage({whatsapp, storeName, onUpgrade, devices = [], usedDevicesEna
 
     <div className="list-toolbar" style={{gap: '10px', flexWrap: 'wrap'}}>
       <button className={`secondary-btn ${tab === 'seminovos' ? 'primary-btn' : ''}`} onClick={() => setTab('seminovos')} style={{borderRadius: '8px'}}>
-        iPhones Seminovos (estoque da loja)
+        iPhones Seminovos (sob encomenda)
+      </button>
+      <button className={`secondary-btn ${tab === 'estoque' ? 'primary-btn' : ''}`} onClick={() => setTab('estoque')} style={{borderRadius: '8px'}}>
+        Seminovos em estoque
       </button>
       <button className={`secondary-btn ${tab === 'lacrados' ? 'primary-btn' : ''}`} onClick={() => setTab('lacrados')} style={{borderRadius: '8px'}}>
         iPhones Lacrados / Novos
@@ -2937,11 +2908,12 @@ function StorePage({whatsapp, storeName, onUpgrade, devices = [], usedDevicesEna
       </button>
     </div>
 
+    {tab === 'seminovos' && <input style={{...fieldStyle, marginTop:14, maxWidth:420}} placeholder="Buscar modelo de iPhone seminovo..." value={modelSearch} onChange={e=>setModelSearch(e.target.value)} />}
     <div className="module-cards" style={{marginTop: '20px'}}>
       {currentList.map((item) => {
         const isUsedDevice = typeof item !== 'string';
         const model = isUsedDevice ? item.model : item;
-        const deviceType = isUsedDevice ? 'Seminovo' : (tab === 'seminovos' ? 'Seminovo' : tab === 'lacrados' ? 'Lacrado' : tab === 'xiaomi' ? 'Xiaomi / Poco' : 'Realme');
+        const deviceType = isUsedDevice ? 'Seminovo em estoque' : (tab === 'seminovos' ? 'Seminovo sob encomenda' : tab === 'lacrados' ? 'Lacrado / Novo' : tab === 'xiaomi' ? 'Xiaomi / Poco' : 'Realme');
         return (
         <div className="module-card" key={isUsedDevice ? item.id : model} style={{background: '#0d0d10', border: '1px solid #1a1a20'}}>
           <div className="module-card-top">
@@ -2955,7 +2927,7 @@ function StorePage({whatsapp, storeName, onUpgrade, devices = [], usedDevicesEna
             width: '100%', height: '140px', borderRadius: '10px', overflow: 'hidden', margin: '12px 0', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #222'
           }}>
             <img 
-              src={getModelImage(tab)} 
+              src={isUsedDevice && item.photo ? item.photo : getModelImage(tab === 'estoque' ? 'seminovos' : tab)} 
               alt={model} 
               style={{width: '100%', height: '100%', objectFit: 'cover', opacity: 0.85}}
             />
@@ -2965,13 +2937,13 @@ function StorePage({whatsapp, storeName, onUpgrade, devices = [], usedDevicesEna
           {isUsedDevice && <div style={{display:'flex',gap:8,flexWrap:'wrap',fontSize:12,color:'#aaa',marginBottom:8}}>{item.battery && <span>Bateria {item.battery}%</span>}<span>{item.condition || 'Seminovo'}</span>{item.warranty && <span>Garantia: {item.warranty}</span>}</div>}
           {isUsedDevice && Number(item.price) > 0 && <div style={{fontSize:20,fontWeight:800,color:'#25D366',margin:'8px 0'}}>{moneyBR(item.price)}</div>}
           <p style={{fontSize: '12px', color: '#888'}}>{isUsedDevice ? (item.notes || 'Aparelho seminovo disponível para consulta e reserva.') : `Disponível para consulta e reserva na ${storeName}.`}</p>
-          <button className="primary-btn full-btn" style={{marginTop: '15px', background: '#25D366', color: '#000', fontWeight: 'bold'}} onClick={() => buyDirect(model, isUsedDevice ? 'Seminovo' : tab)}>
+          <button className="primary-btn full-btn" style={{marginTop: '15px', background: '#25D366', color: '#000', fontWeight: 'bold'}} onClick={() => buyDirect(model, isUsedDevice ? 'Seminovo em estoque' : tab === 'seminovos' ? 'iPhone seminovo sob encomenda' : tab === 'lacrados' ? 'iPhone lacrado' : tab === 'xiaomi' ? 'Xiaomi / Poco' : 'Realme')}>
             <MessageCircle size={16}/> Comprar no WhatsApp da Loja
           </button>
         </div>
       );
       })}
-      {!currentList.length && <div className="empty-state" style={{gridColumn:'1 / -1'}}><Smartphone size={28}/><strong>{tab === 'seminovos' ? (usedDevicesEnabled ? 'Nenhum seminovo disponível no momento' : 'Vitrine de seminovos temporariamente indisponível') : 'Nenhum aparelho nesta categoria'}</strong><span>{tab === 'seminovos' ? 'Os aparelhos cadastrados pela loja aparecerão aqui.' : 'Consulte a loja pelo WhatsApp para verificar disponibilidade.'}</span></div>}
+      {!currentList.length && <div className="empty-state" style={{gridColumn:'1 / -1'}}><Smartphone size={28}/><strong>{tab === 'estoque' ? (usedDevicesEnabled ? 'Nenhum seminovo disponível no estoque' : 'Vitrine de estoque temporariamente indisponível') : 'Nenhum aparelho nesta categoria'}</strong><span>{tab === 'estoque' ? 'Os aparelhos cadastrados pela loja aparecerão aqui.' : 'Consulte a loja pelo WhatsApp para verificar disponibilidade.'}</span></div>}
     </div>
   </div>
 }
@@ -3591,10 +3563,11 @@ function QuotesPage({orders, onApprove, storeName, whatsapp}) {
  return <div className="page-content"><ModuleHeading eyebrow="PROPOSTAS COMERCIAIS" title={<>Orçamentos <span>Prévios.</span></>} description="Crie propostas com validade, envie pelo WhatsApp e registre a aprovação antes de transformar em serviço."/><form className="panel" onSubmit={create} style={{padding:18,background:'#0a0a0d',border:'1px solid #18181b'}}><h3>Gerar novo orçamento</h3><div style={formGrid}>{[['customer','Nome do cliente'],['phone','WhatsApp com DDI/DDD'],['device','Aparelho / serviço'],['description','Descrição do orçamento'],['amount','Valor total (R$)'],['validity','Validade em dias']].map(([k,label])=><input key={k} style={fieldStyle} placeholder={label} value={f[k]} onChange={e=>setF({...f,[k]:e.target.value})} required={['customer','device','description','amount'].includes(k)} type={k==='amount'||k==='validity'?'number':'text'} min={k==='amount'?'0':k==='validity'?'1':undefined}/>) }<select style={fieldStyle} value={f.orderId} onChange={e=>setF({...f,orderId:e.target.value})}><option value="">Vincular a uma OS (opcional)</option>{orders.map(o=><option key={o.id} value={o.id}>{o.id} — {o.customer} — {o.device}</option>)}</select></div><button className="primary-btn"><FileText size={16}/> Criar orçamento</button></form><div className="panel" style={{marginTop:16,background:'#0a0a0d',border:'1px solid #18181b'}}><div className="table-wrap"><table><thead><tr><th>CÓDIGO</th><th>CLIENTE</th><th>APARELHO / SERVIÇO</th><th>VALOR</th><th>VALIDADE</th><th>STATUS</th><th>AÇÕES</th></tr></thead><tbody>{quotes.map(q=><tr key={q.id}><td>{q.id}</td><td>{q.customer}<br/><small>{q.phone}</small></td><td>{q.device}<br/><small>{q.description}</small></td><td><strong>{moneyBR(q.amount)}</strong></td><td>{q.validity} dias</td><td>{q.status}</td><td style={{display:'flex',gap:6,flexWrap:'wrap'}}><button className="secondary-btn" onClick={()=>share(q)}><Send size={14}/> WhatsApp</button>{q.status!=='Aprovado'&&<button className="primary-btn" onClick={()=>approve(q)}><Check size={14}/> Registrar aprovação</button>}<button className="secondary-btn" onClick={()=>window.print()}><Printer size={14}/> PDF / Imprimir</button></td></tr>)}</tbody></table>{!quotes.length&&<div className="empty-state"><FileText/><strong>Nenhum orçamento gerado</strong></div>}</div></div><p className="muted">Observação: nesta versão, o lojista registra a aprovação manualmente; se o orçamento estiver vinculado a uma OS, o sistema tenta mover essa OS para Em manutenção. Para o próprio cliente aprovar por link e a resposta chegar automaticamente, será necessário publicar uma página pública segura com token no backend.</p></div>;
 }
 
-function UsedDevicesPage({storeName, devices, setDevices, enabled, setEnabled}) { const [f,setF]=useState({model:'',imei:'',capacity:'',battery:'',cost:'',price:'',condition:'Bom',warranty:'90 dias',seller:'',notes:''});
- const add=e=>{e.preventDefault();setDevices(p=>[{...f,id:String(Date.now()),createdAt:new Date().toISOString()},...p]);setF({model:'',imei:'',capacity:'',battery:'',cost:'',price:'',condition:'Bom',warranty:'90 dias',seller:'',notes:''});};
+function UsedDevicesPage({storeName, devices, setDevices, enabled, setEnabled}) { const [f,setF]=useState({model:'',imei:'',capacity:'',battery:'',cost:'',price:'',condition:'Bom',warranty:'90 dias',seller:'',notes:'',photo:''});
+ const add=e=>{e.preventDefault();setDevices(p=>[{...f,id:String(Date.now()),createdAt:new Date().toISOString()},...p]);setF({model:'',imei:'',capacity:'',battery:'',cost:'',price:'',condition:'Bom',warranty:'90 dias',seller:'',notes:'',photo:''});};
+ const handlePhoto=e=>{const file=e.target.files?.[0];if(!file)return;if(!file.type.startsWith('image/'))return alert('Selecione um arquivo de imagem.');const reader=new FileReader();reader.onload=()=>{const img=new Image();img.onload=()=>{const max=1000;const scale=Math.min(1,max/Math.max(img.width,img.height));const canvas=document.createElement('canvas');canvas.width=Math.round(img.width*scale);canvas.height=Math.round(img.height*scale);canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);setF(prev=>({...prev,photo:canvas.toDataURL('image/jpeg',0.76)}));};img.onerror=()=>alert('Não foi possível ler essa foto.');img.src=String(reader.result);};reader.readAsDataURL(file);};
  const val=k=>Number(k)||0;
- return <div className="page-content"><ModuleHeading eyebrow="APARELHOS USADOS" title={<>Seminovos & <span>Usados.</span></>} description="Cadastro independente de compra/upgrade: IMEI, bateria, conservação, custo, garantia e procedência."/><section className="panel" style={{padding:18,background:'#0a0a0d',border:'1px solid #18181b'}}><div style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'center',flexWrap:'wrap'}}><div><h3>Controle do módulo</h3><p className="muted">Vitrine de usados para {storeName}</p></div><button className={enabled?'primary-btn':'secondary-btn'} onClick={()=>{setEnabled(v=>{localStorage.setItem('rt_used_devices_enabled',String(!v));return !v;});}}>{enabled?'Módulo ligado':'Módulo desligado'}</button></div></section>{enabled&&<form className="panel" onSubmit={add} style={{padding:18,marginTop:14,background:'#0a0a0d',border:'1px solid #18181b'}}><h3>Ficha técnica do aparelho</h3><div style={formGrid}><input style={fieldStyle} placeholder="Modelo / versão" value={f.model} onChange={e=>setF({...f,model:e.target.value})} required/><input style={fieldStyle} placeholder="IMEI / serial" value={f.imei} onChange={e=>setF({...f,imei:e.target.value})}/><input style={fieldStyle} placeholder="Capacidade (GB)" value={f.capacity} onChange={e=>setF({...f,capacity:e.target.value})}/><input style={fieldStyle} placeholder="Saúde da bateria (%)" type="number" min="0" max="100" value={f.battery} onChange={e=>setF({...f,battery:e.target.value})}/><input style={fieldStyle} placeholder="Custo de aquisição" type="number" min="0" step="0.01" value={f.cost} onChange={e=>setF({...f,cost:e.target.value})}/><input style={fieldStyle} placeholder="Preço de revenda" type="number" min="0" step="0.01" value={f.price} onChange={e=>setF({...f,price:e.target.value})}/><select style={fieldStyle} value={f.condition} onChange={e=>setF({...f,condition:e.target.value})}><option>Excelente</option><option>Bom</option><option>Regular</option><option>Com detalhes</option></select><input style={fieldStyle} placeholder="Garantia de troca" value={f.warranty} onChange={e=>setF({...f,warranty:e.target.value})}/><input style={fieldStyle} placeholder="Quem vendeu / procedência" value={f.seller} onChange={e=>setF({...f,seller:e.target.value})}/><input style={fieldStyle} placeholder="Observações" value={f.notes} onChange={e=>setF({...f,notes:e.target.value})}/></div><button className="primary-btn"><Plus size={16}/> Cadastrar aparelho</button></form>}<div className="panel" style={{marginTop:14,background:'#0a0a0d',border:'1px solid #18181b'}}><div className="table-wrap"><table><thead><tr><th>APARELHO / IMEI</th><th>BATERIA</th><th>ESTADO</th><th>CUSTO</th><th>REVENDA</th><th>MARGEM BRUTA</th><th>GARANTIA / PROCEDÊNCIA</th><th>AÇÃO</th></tr></thead><tbody>{devices.map(d=><tr key={d.id}><td><strong>{d.model}</strong><br/><small>{d.imei||'IMEI não informado'} · {d.capacity} GB</small></td><td>{d.battery?`${d.battery}%`:'—'}</td><td>{d.condition}</td><td>{moneyBR(d.cost)}</td><td>{moneyBR(d.price)}</td><td style={{color:val(d.price)-val(d.cost)>=0?'#25D366':'#ef4444'}}>{moneyBR(val(d.price)-val(d.cost))}</td><td>{d.warranty}<br/><small>{d.seller||'Procedência não informada'}</small></td><td><button className="secondary-btn" onClick={()=>setDevices(ds=>ds.filter(x=>x.id!==d.id))}>Excluir</button></td></tr>)}</tbody></table>{!devices.length&&<div className="empty-state"><Smartphone/><strong>Nenhum aparelho usado cadastrado</strong></div>}</div></div></div>;
+ return <div className="page-content"><ModuleHeading eyebrow="APARELHOS USADOS" title={<>Seminovos & <span>Usados.</span></>} description="Cadastro independente de compra/upgrade: IMEI, bateria, conservação, custo, garantia e procedência."/><section className="panel" style={{padding:18,background:'#0a0a0d',border:'1px solid #18181b'}}><div style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'center',flexWrap:'wrap'}}><div><h3>Controle do módulo</h3><p className="muted">Vitrine de usados para {storeName}</p></div><button className={enabled?'primary-btn':'secondary-btn'} onClick={()=>{setEnabled(v=>{localStorage.setItem('rt_used_devices_enabled',String(!v));return !v;});}}>{enabled?'Módulo ligado':'Módulo desligado'}</button></div></section>{enabled&&<form className="panel" onSubmit={add} style={{padding:18,marginTop:14,background:'#0a0a0d',border:'1px solid #18181b'}}><h3>Ficha técnica do aparelho</h3><div style={formGrid}><input style={fieldStyle} placeholder="Modelo / versão" value={f.model} onChange={e=>setF({...f,model:e.target.value})} required/><input style={fieldStyle} placeholder="IMEI / serial" value={f.imei} onChange={e=>setF({...f,imei:e.target.value})}/><input style={fieldStyle} placeholder="Capacidade (GB)" value={f.capacity} onChange={e=>setF({...f,capacity:e.target.value})}/><input style={fieldStyle} placeholder="Saúde da bateria (%)" type="number" min="0" max="100" value={f.battery} onChange={e=>setF({...f,battery:e.target.value})}/><input style={fieldStyle} placeholder="Custo de aquisição" type="number" min="0" step="0.01" value={f.cost} onChange={e=>setF({...f,cost:e.target.value})}/><input style={fieldStyle} placeholder="Preço de revenda" type="number" min="0" step="0.01" value={f.price} onChange={e=>setF({...f,price:e.target.value})}/><select style={fieldStyle} value={f.condition} onChange={e=>setF({...f,condition:e.target.value})}><option>Excelente</option><option>Bom</option><option>Regular</option><option>Com detalhes</option></select><input style={fieldStyle} placeholder="Garantia de troca" value={f.warranty} onChange={e=>setF({...f,warranty:e.target.value})}/><input style={fieldStyle} placeholder="Quem vendeu / procedência" value={f.seller} onChange={e=>setF({...f,seller:e.target.value})}/><input style={fieldStyle} placeholder="Observações" value={f.notes} onChange={e=>setF({...f,notes:e.target.value})}/><label style={{...fieldStyle,display:'block'}}>Foto do aparelho<input type="file" accept="image/*" onChange={handlePhoto} style={{display:'block',marginTop:8}}/>{f.photo&&<img src={f.photo} alt="Prévia do aparelho" style={{width:120,height:100,objectFit:'cover',marginTop:8,borderRadius:8}}/>}</label></div><button className="primary-btn"><Plus size={16}/> Cadastrar aparelho</button></form>}<div className="panel" style={{marginTop:14,background:'#0a0a0d',border:'1px solid #18181b'}}><div className="table-wrap"><table><thead><tr><th>APARELHO / IMEI</th><th>BATERIA</th><th>ESTADO</th><th>CUSTO</th><th>REVENDA</th><th>MARGEM BRUTA</th><th>GARANTIA / PROCEDÊNCIA</th><th>AÇÃO</th></tr></thead><tbody>{devices.map(d=><tr key={d.id}><td>{d.photo&&<img src={d.photo} alt={d.model} style={{width:64,height:64,objectFit:'cover',borderRadius:8,display:'block',marginBottom:6}}/>}<strong>{d.model}</strong><br/><small>{d.imei||'IMEI não informado'} · {d.capacity} GB</small></td><td>{d.battery?`${d.battery}%`:'—'}</td><td>{d.condition}</td><td>{moneyBR(d.cost)}</td><td>{moneyBR(d.price)}</td><td style={{color:val(d.price)-val(d.cost)>=0?'#25D366':'#ef4444'}}>{moneyBR(val(d.price)-val(d.cost))}</td><td>{d.warranty}<br/><small>{d.seller||'Procedência não informada'}</small></td><td><button className="secondary-btn" onClick={()=>setDevices(ds=>ds.filter(x=>x.id!==d.id))}>Excluir</button></td></tr>)}</tbody></table>{!devices.length&&<div className="empty-state"><Smartphone/><strong>Nenhum aparelho usado cadastrado</strong></div>}</div></div></div>;
 }
 
 function ReportsPage({orders,cashRegister,inventory}) {
