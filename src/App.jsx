@@ -19,12 +19,11 @@ const ADMIN_EMAIL = 'roberthaelley75@gmail.com';
 
 const seminovosList = [
   'iPhone 11', 'iPhone 11 Pro', 'iPhone 11 Pro Max',
-  'iPhone 12', 'iPhone 12 mini', 'iPhone 12 Pro', 'iPhone 12 Pro Max',
+  'iPhone 12', 'iPhone 12 Pro', 'iPhone 12 Pro Max',
   'iPhone 13', 'iPhone 13 Pro', 'iPhone 13 Pro Max',
   'iPhone 14', 'iPhone 14 Plus', 'iPhone 14 Pro', 'iPhone 14 Pro Max',
   'iPhone 15', 'iPhone 15 Plus', 'iPhone 15 Pro', 'iPhone 15 Pro Max',
   'iPhone 16', 'iPhone 16 Plus', 'iPhone 16 Pro', 'iPhone 16 Pro Max',
-  'iPhone 17', 'iPhone 17 Pro', 'iPhone 17 Pro Max',
 ];
 
 const lacradosList = [
@@ -732,7 +731,7 @@ function App() {
 
   const navClient = useMemo(() => {
     const list = [{ id: 'stores_directory', label: 'Buscar Lojas Ativas', icon: Store }];
-    if (modules.iphones) list.push({ id: 'store', label: 'Comprar iPhones label: 'Celulares Novos e Seminovos' Aparelhos', icon: Smartphone });
+    if (modules.iphones) list.push({ id: 'store', label: 'Vitrine de Aparelhos', icon: Smartphone });
     if (modules.inventory) list.push({ id: 'client_inventory', label: 'Acessórios', icon: Package });
     if (modules.orders) list.push({ id: 'track', label: 'Rastreio de OS', icon: Search });
     return list;
@@ -1591,7 +1590,7 @@ function App() {
             {active==='reports' && userRole === 'tech' && userAccessLevel === 'owner' && <ReportsPage orders={orders} cashRegister={cashRegister} inventory={inventory} />}
             {active==='client_inventory' && <ClientInventoryPage inventory={inventory} storeName={storeName} cart={cart} addToCart={addToCart} onOpenCart={() => setShowCartModal(true)} />}
             {active==='stores_directory' && <StoresDirectoryPage stores={activeStores} onSelectStore={(s) => { setStoreName(s.name); setWhatsappNumber(s.phone); notify(`Estabelecimento "${s.name}" selecionado!`); setActive('store'); }} onRequestQuote={(s) => setShowQuoteModal(s)} />}
-            {active==='store' && <StorePage whatsapp={whatsappNumber} storeName={storeName} onUpgrade={() => setShowUpgradeModal(true)} devices={usedDevices} usedDevicesEnabled={usedDevicesEnabled} />}
+            {active==='store' && <StorePage whatsapp={whatsappNumber} storeName={storeName} onUpgrade={() => setShowUpgradeModal(true)} />}
             {active==='track' && <TrackPage orders={orders} storeName={storeName} pixKey={pixKey} whatsapp={whatsappNumber} storeAddress={storeAddress} mapsUrl={mapsUrl} setOrders={setOrders} notify={notify} />}
             {active==='finance' && userRole === 'tech' && userAccessLevel === 'owner' && <FinancePage orders={orders} commissionRate={techCommissionRate} setCommissionRate={value => { setTechCommissionRate(value); localStorage.setItem('rt_phone_commission_fixed', String(value)); }} />}
             {active==='payments' && userRole === 'tech' && <PaymentsPage pixKey={pixKey} setPixKey={setPixKey} onShowPayModal={() => setShowPaymentModal(true)} />}
@@ -2855,9 +2854,8 @@ function StoresDirectoryPage({stores, onSelectStore, onRequestQuote}) {
   </div>
 }
 
-function StorePage({whatsapp, storeName, onUpgrade, devices = [], usedDevicesEnabled = true}) {
-  const [tab, setTab] = useState('lacrados');
-  const [modelSearch, setModelSearch] = useState('');
+function StorePage({whatsapp, storeName, onUpgrade}) {
+  const [tab, setTab] = useState('seminovos');
 
   const buyDirect = (modelName, type) => {
     const text = encodeURIComponent(`Olá ${storeName}! Gostaria de comprar o ${modelName} (${type}). Qual a disponibilidade e valores?`);
@@ -2871,18 +2869,17 @@ function StorePage({whatsapp, storeName, onUpgrade, devices = [], usedDevicesEna
   };
 
   const currentList = useMemo(() => {
-    if (tab === 'seminovos') return seminovosList.filter(model => model.toLowerCase().includes(modelSearch.toLowerCase()));
-    if (tab === 'estoque') return usedDevicesEnabled ? devices.filter(d => d && d.model) : [];
+    if (tab === 'seminovos') return seminovosList;
     if (tab === 'lacrados') return lacradosList;
     if (tab === 'xiaomi') return xiaomiList;
     return realmeList;
-  }, [tab, devices, usedDevicesEnabled, modelSearch]);
+  }, [tab]);
 
   return <div className="page-content">
     <div className="page-heading">
       <div>
         <div className="eyebrow"><span className="eyebrow-line"/> CENTRAL DE VENDAS & VITRINE</div>
-        <h1>Comprar <span>iPhones & Aparelhos.</span></h1>
+        <h1>Comprar & <span>Upgrade de Aparelho.</span></h1>
         <p>Negocie diretamente no WhatsApp da {storeName} (pronta entrega ou encomenda).</p>
       </div>
       <button className="primary-btn" onClick={onUpgrade} style={{background: 'linear-gradient(135deg, #25D366, #128C7E)', color: '#000', fontWeight: 'bold'}}>
@@ -2892,13 +2889,10 @@ function StorePage({whatsapp, storeName, onUpgrade, devices = [], usedDevicesEna
 
     <div className="list-toolbar" style={{gap: '10px', flexWrap: 'wrap'}}>
       <button className={`secondary-btn ${tab === 'seminovos' ? 'primary-btn' : ''}`} onClick={() => setTab('seminovos')} style={{borderRadius: '8px'}}>
-        iPhones Seminovos (sob encomenda)
-      </button>
-      <button className={`secondary-btn ${tab === 'estoque' ? 'primary-btn' : ''}`} onClick={() => setTab('estoque')} style={{borderRadius: '8px'}}>
-        Seminovos em estoque
+        iPhones Seminovos
       </button>
       <button className={`secondary-btn ${tab === 'lacrados' ? 'primary-btn' : ''}`} onClick={() => setTab('lacrados')} style={{borderRadius: '8px'}}>
-        iPhones Lacrados / Novos
+        iPhones Lacrados
       </button>
       <button className={`secondary-btn ${tab === 'xiaomi' ? 'primary-btn' : ''}`} onClick={() => setTab('xiaomi')} style={{borderRadius: '8px'}}>
         Xiaomi & Poco
@@ -2908,17 +2902,12 @@ function StorePage({whatsapp, storeName, onUpgrade, devices = [], usedDevicesEna
       </button>
     </div>
 
-    {tab === 'seminovos' && <input style={{...fieldStyle, marginTop:14, maxWidth:420}} placeholder="Buscar modelo de iPhone seminovo..." value={modelSearch} onChange={e=>setModelSearch(e.target.value)} />}
     <div className="module-cards" style={{marginTop: '20px'}}>
-      {currentList.map((item) => {
-        const isUsedDevice = typeof item !== 'string';
-        const model = isUsedDevice ? item.model : item;
-        const deviceType = isUsedDevice ? 'Seminovo em estoque' : (tab === 'seminovos' ? 'Seminovo sob encomenda' : tab === 'lacrados' ? 'Lacrado / Novo' : tab === 'xiaomi' ? 'Xiaomi / Poco' : 'Realme');
-        return (
-        <div className="module-card" key={isUsedDevice ? item.id : model} style={{background: '#0d0d10', border: '1px solid #1a1a20'}}>
+      {currentList.map((model) => (
+        <div className="module-card" key={model} style={{background: '#0d0d10', border: '1px solid #1a1a20'}}>
           <div className="module-card-top">
             <span className={`status-pill ${tab === 'seminovos' ? 'blue' : tab === 'lacrados' ? 'green' : 'amber'}`}>
-              {deviceType}
+              {tab === 'seminovos' ? 'Seminovo' : tab === 'lacrados' ? 'Lacrado' : tab === 'xiaomi' ? 'Xiaomi / Poco' : 'Realme'}
             </span>
             <small style={{color: '#888'}}>Pronta entrega</small>
           </div>
@@ -2927,23 +2916,19 @@ function StorePage({whatsapp, storeName, onUpgrade, devices = [], usedDevicesEna
             width: '100%', height: '140px', borderRadius: '10px', overflow: 'hidden', margin: '12px 0', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #222'
           }}>
             <img 
-              src={isUsedDevice && item.photo ? item.photo : getModelImage(tab === 'estoque' ? 'seminovos' : tab)} 
+              src={getModelImage(tab)} 
               alt={model} 
               style={{width: '100%', height: '100%', objectFit: 'cover', opacity: 0.85}}
             />
           </div>
 
-          <h3 style={{fontSize: '16px'}}>{model}{isUsedDevice && item.capacity ? ` · ${item.capacity} GB` : ''}</h3>
-          {isUsedDevice && <div style={{display:'flex',gap:8,flexWrap:'wrap',fontSize:12,color:'#aaa',marginBottom:8}}>{item.battery && <span>Bateria {item.battery}%</span>}<span>{item.condition || 'Seminovo'}</span>{item.warranty && <span>Garantia: {item.warranty}</span>}</div>}
-          {isUsedDevice && Number(item.price) > 0 && <div style={{fontSize:20,fontWeight:800,color:'#25D366',margin:'8px 0'}}>{moneyBR(item.price)}</div>}
-          <p style={{fontSize: '12px', color: '#888'}}>{isUsedDevice ? (item.notes || 'Aparelho seminovo disponível para consulta e reserva.') : `Disponível para consulta e reserva na ${storeName}.`}</p>
-          <button className="primary-btn full-btn" style={{marginTop: '15px', background: '#25D366', color: '#000', fontWeight: 'bold'}} onClick={() => buyDirect(model, isUsedDevice ? 'Seminovo em estoque' : tab === 'seminovos' ? 'iPhone seminovo sob encomenda' : tab === 'lacrados' ? 'iPhone lacrado' : tab === 'xiaomi' ? 'Xiaomi / Poco' : 'Realme')}>
+          <h3 style={{fontSize: '16px'}}>{model}</h3>
+          <p style={{fontSize: '12px', color: '#888'}}>Disponível para consulta e reserva na {storeName}.</p>
+          <button className="primary-btn full-btn" style={{marginTop: '15px', background: '#25D366', color: '#000', fontWeight: 'bold'}} onClick={() => buyDirect(model, tab)}>
             <MessageCircle size={16}/> Comprar no WhatsApp da Loja
           </button>
         </div>
-      );
-      })}
-      {!currentList.length && <div className="empty-state" style={{gridColumn:'1 / -1'}}><Smartphone size={28}/><strong>{tab === 'estoque' ? (usedDevicesEnabled ? 'Nenhum seminovo disponível no estoque' : 'Vitrine de estoque temporariamente indisponível') : 'Nenhum aparelho nesta categoria'}</strong><span>{tab === 'estoque' ? 'Os aparelhos cadastrados pela loja aparecerão aqui.' : 'Consulte a loja pelo WhatsApp para verificar disponibilidade.'}</span></div>}
+      ))}
     </div>
   </div>
 }
