@@ -641,6 +641,9 @@ function App() {
   const [orders, setOrders] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [inventory, setInventory] = useState([]);
+  // Estoque de seminovos compartilhado entre o painel da loja e a vitrine do cliente.
+  const [usedDevices, setUsedDevices] = useLocalRecords('rt_used_devices_v1');
+  const [usedDevicesEnabled, setUsedDevicesEnabled] = useState(() => localStorage.getItem('rt_used_devices_enabled') !== 'false');
 
   const [allStores, setAllStores] = useState([
     { id: '1', name: 'RT MOBILE', phone: '5591989117332', status: 'active', desc: 'Especialista Apple, Xiaomi & Multimarcas', address: 'Santa Izabel do Pará - PA', rating: 5.0, reviewsCount: 1 }
@@ -728,7 +731,7 @@ function App() {
 
   const navClient = useMemo(() => {
     const list = [{ id: 'stores_directory', label: 'Buscar Lojas Ativas', icon: Store }];
-    if (modules.iphones) list.push({ id: 'store', label: 'Vitrine de Aparelhos', icon: Smartphone });
+    if (modules.iphones) list.push({ id: 'store', label: 'Celulares Novos e Seminovos', icon: Smartphone });
     if (modules.inventory) list.push({ id: 'client_inventory', label: 'Acessórios', icon: Package });
     if (modules.orders) list.push({ id: 'track', label: 'Rastreio de OS', icon: Search });
     return list;
@@ -1355,7 +1358,7 @@ function App() {
         />
       )}
 
-      <aside className={`sidebar ${mobileNav ? 'sidebar-open' : ''}`} style={{background: '#0a0a0c', borderRight: '1px solid #18181b'}}>
+      <aside className={`sidebar ${mobileNav ? 'sidebar-open' : ''}`} style={{background: '#0a0a0c', borderRight: '1px solid #18181b', height: '100dvh', maxHeight: '100dvh', overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y'}}>
         <div className="brand-lockup">
           <div className="brand-mark" style={{background: '#000', width: '38px', height: '38px', borderRadius: '8px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #222'}}>
             {storeLogo ? (
@@ -1429,7 +1432,7 @@ function App() {
         )}
         
         <div className="nav-caption">NAVEGAÇÃO</div>
-        <nav>{activeNav.map(item => <button key={item.id} className={`nav-item ${active===item.id?'active':''}`} onClick={()=>{setActive(item.id);setMobileNav(false)}}><item.icon size={18}/><span>{item.label}</span>{item.id==='orders' && <span className="nav-count">{orders.length}</span>}{item.id==='customers' && <span className="nav-count">{customers.length}</span>}{item.id==='inventory' && <span className="nav-count">{inventory.length}</span>}</button>)}</nav>
+        <nav style={{overflowY: 'visible', touchAction: 'pan-y'}}>{activeNav.map(item => <button key={item.id} className={`nav-item ${active===item.id?'active':''}`} onClick={()=>{setActive(item.id);setMobileNav(false)}}><item.icon size={18}/><span>{item.label}</span>{item.id==='orders' && <span className="nav-count">{orders.length}</span>}{item.id==='customers' && <span className="nav-count">{customers.length}</span>}{item.id==='inventory' && <span className="nav-count">{inventory.length}</span>}</button>)}</nav>
         
         <div className="sidebar-bottom">
           {userRole === 'tech' && !isAccountExpired && (
@@ -1570,12 +1573,12 @@ function App() {
             {active==='inventory' && userRole === 'tech' && <InventoryPage inventory={inventory} onNew={()=>setShowNewProduct(true)} onUpdateQty={updateProductQty} onDelete={deleteProduct} />}
             {active==='parts' && userRole === 'tech' && <PartsInventoryPage orders={orders} notify={notify} />}
             {active==='quotes' && userRole === 'tech' && <QuotesPage orders={orders} onApprove={(quote) => { const target = orders.find(o => o.id === quote.orderId); if (target?.rawId) handleUpdateStatus(target.rawId, 'Em manutenção'); }} storeName={storeName} whatsapp={whatsappNumber} />}
-            {active==='used_devices' && userRole === 'tech' && <UsedDevicesPage storeName={storeName} />}
+            {active==='used_devices' && userRole === 'tech' && <UsedDevicesPage storeName={storeName} devices={usedDevices} setDevices={setUsedDevices} enabled={usedDevicesEnabled} setEnabled={setUsedDevicesEnabled} />}
             {active==='post_sale' && userRole === 'tech' && <PostSalePage storeName={storeName} whatsapp={whatsappNumber} />}
             {active==='reports' && userRole === 'tech' && userAccessLevel === 'owner' && <ReportsPage orders={orders} cashRegister={cashRegister} inventory={inventory} />}
             {active==='client_inventory' && <ClientInventoryPage inventory={inventory} storeName={storeName} cart={cart} addToCart={addToCart} onOpenCart={() => setShowCartModal(true)} />}
             {active==='stores_directory' && <StoresDirectoryPage stores={activeStores} onSelectStore={(s) => { setStoreName(s.name); setWhatsappNumber(s.phone); notify(`Estabelecimento "${s.name}" selecionado!`); setActive('store'); }} onRequestQuote={(s) => setShowQuoteModal(s)} />}
-            {active==='store' && <StorePage whatsapp={whatsappNumber} storeName={storeName} onUpgrade={() => setShowUpgradeModal(true)} />}
+            {active==='store' && <StorePage whatsapp={whatsappNumber} storeName={storeName} onUpgrade={() => setShowUpgradeModal(true)} devices={usedDevices} usedDevicesEnabled={usedDevicesEnabled} />}
             {active==='track' && <TrackPage orders={orders} storeName={storeName} pixKey={pixKey} whatsapp={whatsappNumber} storeAddress={storeAddress} mapsUrl={mapsUrl} setOrders={setOrders} notify={notify} />}
             {active==='finance' && userRole === 'tech' && userAccessLevel === 'owner' && <FinancePage orders={orders} commissionRate={techCommissionRate} setCommissionRate={setTechCommissionRate} />}
             {active==='payments' && userRole === 'tech' && <PaymentsPage pixKey={pixKey} setPixKey={setPixKey} onShowPayModal={() => setShowPaymentModal(true)} />}
@@ -2886,7 +2889,7 @@ function StoresDirectoryPage({stores, onSelectStore, onRequestQuote}) {
   </div>
 }
 
-function StorePage({whatsapp, storeName, onUpgrade}) {
+function StorePage({whatsapp, storeName, onUpgrade, devices = [], usedDevicesEnabled = true}) {
   const [tab, setTab] = useState('seminovos');
 
   const buyDirect = (modelName, type) => {
@@ -2901,17 +2904,17 @@ function StorePage({whatsapp, storeName, onUpgrade}) {
   };
 
   const currentList = useMemo(() => {
-    if (tab === 'seminovos') return seminovosList;
+    if (tab === 'seminovos') return usedDevicesEnabled ? devices.filter(d => d && d.model) : [];
     if (tab === 'lacrados') return lacradosList;
     if (tab === 'xiaomi') return xiaomiList;
     return realmeList;
-  }, [tab]);
+  }, [tab, devices, usedDevicesEnabled]);
 
   return <div className="page-content">
     <div className="page-heading">
       <div>
         <div className="eyebrow"><span className="eyebrow-line"/> CENTRAL DE VENDAS & VITRINE</div>
-        <h1>Comprar & <span>Upgrade de Aparelho.</span></h1>
+        <h1>Celulares <span>Novos e Seminovos.</span></h1>
         <p>Negocie diretamente no WhatsApp da {storeName} (pronta entrega ou encomenda).</p>
       </div>
       <button className="primary-btn" onClick={onUpgrade} style={{background: 'linear-gradient(135deg, #25D366, #128C7E)', color: '#000', fontWeight: 'bold'}}>
@@ -2921,10 +2924,10 @@ function StorePage({whatsapp, storeName, onUpgrade}) {
 
     <div className="list-toolbar" style={{gap: '10px', flexWrap: 'wrap'}}>
       <button className={`secondary-btn ${tab === 'seminovos' ? 'primary-btn' : ''}`} onClick={() => setTab('seminovos')} style={{borderRadius: '8px'}}>
-        iPhones Seminovos
+        iPhones Seminovos (estoque da loja)
       </button>
       <button className={`secondary-btn ${tab === 'lacrados' ? 'primary-btn' : ''}`} onClick={() => setTab('lacrados')} style={{borderRadius: '8px'}}>
-        iPhones Lacrados
+        iPhones Lacrados / Novos
       </button>
       <button className={`secondary-btn ${tab === 'xiaomi' ? 'primary-btn' : ''}`} onClick={() => setTab('xiaomi')} style={{borderRadius: '8px'}}>
         Xiaomi & Poco
@@ -2935,11 +2938,15 @@ function StorePage({whatsapp, storeName, onUpgrade}) {
     </div>
 
     <div className="module-cards" style={{marginTop: '20px'}}>
-      {currentList.map((model) => (
-        <div className="module-card" key={model} style={{background: '#0d0d10', border: '1px solid #1a1a20'}}>
+      {currentList.map((item) => {
+        const isUsedDevice = typeof item !== 'string';
+        const model = isUsedDevice ? item.model : item;
+        const deviceType = isUsedDevice ? 'Seminovo' : (tab === 'seminovos' ? 'Seminovo' : tab === 'lacrados' ? 'Lacrado' : tab === 'xiaomi' ? 'Xiaomi / Poco' : 'Realme');
+        return (
+        <div className="module-card" key={isUsedDevice ? item.id : model} style={{background: '#0d0d10', border: '1px solid #1a1a20'}}>
           <div className="module-card-top">
             <span className={`status-pill ${tab === 'seminovos' ? 'blue' : tab === 'lacrados' ? 'green' : 'amber'}`}>
-              {tab === 'seminovos' ? 'Seminovo' : tab === 'lacrados' ? 'Lacrado' : tab === 'xiaomi' ? 'Xiaomi / Poco' : 'Realme'}
+              {deviceType}
             </span>
             <small style={{color: '#888'}}>Pronta entrega</small>
           </div>
@@ -2954,13 +2961,17 @@ function StorePage({whatsapp, storeName, onUpgrade}) {
             />
           </div>
 
-          <h3 style={{fontSize: '16px'}}>{model}</h3>
-          <p style={{fontSize: '12px', color: '#888'}}>Disponível para consulta e reserva na {storeName}.</p>
-          <button className="primary-btn full-btn" style={{marginTop: '15px', background: '#25D366', color: '#000', fontWeight: 'bold'}} onClick={() => buyDirect(model, tab)}>
+          <h3 style={{fontSize: '16px'}}>{model}{isUsedDevice && item.capacity ? ` · ${item.capacity} GB` : ''}</h3>
+          {isUsedDevice && <div style={{display:'flex',gap:8,flexWrap:'wrap',fontSize:12,color:'#aaa',marginBottom:8}}>{item.battery && <span>Bateria {item.battery}%</span>}<span>{item.condition || 'Seminovo'}</span>{item.warranty && <span>Garantia: {item.warranty}</span>}</div>}
+          {isUsedDevice && Number(item.price) > 0 && <div style={{fontSize:20,fontWeight:800,color:'#25D366',margin:'8px 0'}}>{moneyBR(item.price)}</div>}
+          <p style={{fontSize: '12px', color: '#888'}}>{isUsedDevice ? (item.notes || 'Aparelho seminovo disponível para consulta e reserva.') : `Disponível para consulta e reserva na ${storeName}.`}</p>
+          <button className="primary-btn full-btn" style={{marginTop: '15px', background: '#25D366', color: '#000', fontWeight: 'bold'}} onClick={() => buyDirect(model, isUsedDevice ? 'Seminovo' : tab)}>
             <MessageCircle size={16}/> Comprar no WhatsApp da Loja
           </button>
         </div>
-      ))}
+      );
+      })}
+      {!currentList.length && <div className="empty-state" style={{gridColumn:'1 / -1'}}><Smartphone size={28}/><strong>{tab === 'seminovos' ? (usedDevicesEnabled ? 'Nenhum seminovo disponível no momento' : 'Vitrine de seminovos temporariamente indisponível') : 'Nenhum aparelho nesta categoria'}</strong><span>{tab === 'seminovos' ? 'Os aparelhos cadastrados pela loja aparecerão aqui.' : 'Consulte a loja pelo WhatsApp para verificar disponibilidade.'}</span></div>}
     </div>
   </div>
 }
@@ -3580,8 +3591,7 @@ function QuotesPage({orders, onApprove, storeName, whatsapp}) {
  return <div className="page-content"><ModuleHeading eyebrow="PROPOSTAS COMERCIAIS" title={<>Orçamentos <span>Prévios.</span></>} description="Crie propostas com validade, envie pelo WhatsApp e registre a aprovação antes de transformar em serviço."/><form className="panel" onSubmit={create} style={{padding:18,background:'#0a0a0d',border:'1px solid #18181b'}}><h3>Gerar novo orçamento</h3><div style={formGrid}>{[['customer','Nome do cliente'],['phone','WhatsApp com DDI/DDD'],['device','Aparelho / serviço'],['description','Descrição do orçamento'],['amount','Valor total (R$)'],['validity','Validade em dias']].map(([k,label])=><input key={k} style={fieldStyle} placeholder={label} value={f[k]} onChange={e=>setF({...f,[k]:e.target.value})} required={['customer','device','description','amount'].includes(k)} type={k==='amount'||k==='validity'?'number':'text'} min={k==='amount'?'0':k==='validity'?'1':undefined}/>) }<select style={fieldStyle} value={f.orderId} onChange={e=>setF({...f,orderId:e.target.value})}><option value="">Vincular a uma OS (opcional)</option>{orders.map(o=><option key={o.id} value={o.id}>{o.id} — {o.customer} — {o.device}</option>)}</select></div><button className="primary-btn"><FileText size={16}/> Criar orçamento</button></form><div className="panel" style={{marginTop:16,background:'#0a0a0d',border:'1px solid #18181b'}}><div className="table-wrap"><table><thead><tr><th>CÓDIGO</th><th>CLIENTE</th><th>APARELHO / SERVIÇO</th><th>VALOR</th><th>VALIDADE</th><th>STATUS</th><th>AÇÕES</th></tr></thead><tbody>{quotes.map(q=><tr key={q.id}><td>{q.id}</td><td>{q.customer}<br/><small>{q.phone}</small></td><td>{q.device}<br/><small>{q.description}</small></td><td><strong>{moneyBR(q.amount)}</strong></td><td>{q.validity} dias</td><td>{q.status}</td><td style={{display:'flex',gap:6,flexWrap:'wrap'}}><button className="secondary-btn" onClick={()=>share(q)}><Send size={14}/> WhatsApp</button>{q.status!=='Aprovado'&&<button className="primary-btn" onClick={()=>approve(q)}><Check size={14}/> Registrar aprovação</button>}<button className="secondary-btn" onClick={()=>window.print()}><Printer size={14}/> PDF / Imprimir</button></td></tr>)}</tbody></table>{!quotes.length&&<div className="empty-state"><FileText/><strong>Nenhum orçamento gerado</strong></div>}</div></div><p className="muted">Observação: nesta versão, o lojista registra a aprovação manualmente; se o orçamento estiver vinculado a uma OS, o sistema tenta mover essa OS para Em manutenção. Para o próprio cliente aprovar por link e a resposta chegar automaticamente, será necessário publicar uma página pública segura com token no backend.</p></div>;
 }
 
-function UsedDevicesPage({storeName}) {
- const [devices,setDevices]=useLocalRecords('rt_used_devices_v1'); const [enabled,setEnabled]=useState(()=>localStorage.getItem('rt_used_devices_enabled')!=='false'); const [f,setF]=useState({model:'',imei:'',capacity:'',battery:'',cost:'',price:'',condition:'Bom',warranty:'90 dias',seller:'',notes:''});
+function UsedDevicesPage({storeName, devices, setDevices, enabled, setEnabled}) { const [f,setF]=useState({model:'',imei:'',capacity:'',battery:'',cost:'',price:'',condition:'Bom',warranty:'90 dias',seller:'',notes:''});
  const add=e=>{e.preventDefault();setDevices(p=>[{...f,id:String(Date.now()),createdAt:new Date().toISOString()},...p]);setF({model:'',imei:'',capacity:'',battery:'',cost:'',price:'',condition:'Bom',warranty:'90 dias',seller:'',notes:''});};
  const val=k=>Number(k)||0;
  return <div className="page-content"><ModuleHeading eyebrow="APARELHOS USADOS" title={<>Seminovos & <span>Usados.</span></>} description="Cadastro independente de compra/upgrade: IMEI, bateria, conservação, custo, garantia e procedência."/><section className="panel" style={{padding:18,background:'#0a0a0d',border:'1px solid #18181b'}}><div style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'center',flexWrap:'wrap'}}><div><h3>Controle do módulo</h3><p className="muted">Vitrine de usados para {storeName}</p></div><button className={enabled?'primary-btn':'secondary-btn'} onClick={()=>{setEnabled(v=>{localStorage.setItem('rt_used_devices_enabled',String(!v));return !v;});}}>{enabled?'Módulo ligado':'Módulo desligado'}</button></div></section>{enabled&&<form className="panel" onSubmit={add} style={{padding:18,marginTop:14,background:'#0a0a0d',border:'1px solid #18181b'}}><h3>Ficha técnica do aparelho</h3><div style={formGrid}><input style={fieldStyle} placeholder="Modelo / versão" value={f.model} onChange={e=>setF({...f,model:e.target.value})} required/><input style={fieldStyle} placeholder="IMEI / serial" value={f.imei} onChange={e=>setF({...f,imei:e.target.value})}/><input style={fieldStyle} placeholder="Capacidade (GB)" value={f.capacity} onChange={e=>setF({...f,capacity:e.target.value})}/><input style={fieldStyle} placeholder="Saúde da bateria (%)" type="number" min="0" max="100" value={f.battery} onChange={e=>setF({...f,battery:e.target.value})}/><input style={fieldStyle} placeholder="Custo de aquisição" type="number" min="0" step="0.01" value={f.cost} onChange={e=>setF({...f,cost:e.target.value})}/><input style={fieldStyle} placeholder="Preço de revenda" type="number" min="0" step="0.01" value={f.price} onChange={e=>setF({...f,price:e.target.value})}/><select style={fieldStyle} value={f.condition} onChange={e=>setF({...f,condition:e.target.value})}><option>Excelente</option><option>Bom</option><option>Regular</option><option>Com detalhes</option></select><input style={fieldStyle} placeholder="Garantia de troca" value={f.warranty} onChange={e=>setF({...f,warranty:e.target.value})}/><input style={fieldStyle} placeholder="Quem vendeu / procedência" value={f.seller} onChange={e=>setF({...f,seller:e.target.value})}/><input style={fieldStyle} placeholder="Observações" value={f.notes} onChange={e=>setF({...f,notes:e.target.value})}/></div><button className="primary-btn"><Plus size={16}/> Cadastrar aparelho</button></form>}<div className="panel" style={{marginTop:14,background:'#0a0a0d',border:'1px solid #18181b'}}><div className="table-wrap"><table><thead><tr><th>APARELHO / IMEI</th><th>BATERIA</th><th>ESTADO</th><th>CUSTO</th><th>REVENDA</th><th>MARGEM BRUTA</th><th>GARANTIA / PROCEDÊNCIA</th><th>AÇÃO</th></tr></thead><tbody>{devices.map(d=><tr key={d.id}><td><strong>{d.model}</strong><br/><small>{d.imei||'IMEI não informado'} · {d.capacity} GB</small></td><td>{d.battery?`${d.battery}%`:'—'}</td><td>{d.condition}</td><td>{moneyBR(d.cost)}</td><td>{moneyBR(d.price)}</td><td style={{color:val(d.price)-val(d.cost)>=0?'#25D366':'#ef4444'}}>{moneyBR(val(d.price)-val(d.cost))}</td><td>{d.warranty}<br/><small>{d.seller||'Procedência não informada'}</small></td><td><button className="secondary-btn" onClick={()=>setDevices(ds=>ds.filter(x=>x.id!==d.id))}>Excluir</button></td></tr>)}</tbody></table>{!devices.length&&<div className="empty-state"><Smartphone/><strong>Nenhum aparelho usado cadastrado</strong></div>}</div></div></div>;
