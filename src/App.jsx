@@ -561,6 +561,15 @@ function BrandSplash({ onFinish }) {
   );
 }
 
+function parseMoneyValue(value) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  const raw = String(value ?? '').replace(/R\$\s?/g, '').trim();
+  const normalized = raw.includes(',') ? raw.replace(/\./g, '').replace(',', '.') : raw;
+  const cleaned = normalized.replace(/[^0-9.-]/g, '');
+  const parsed = Number(cleaned);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 function App() {
   const [showSplash, setShowSplash] = useState(() => !sessionStorage.getItem('rt_splash_shown'));
   const [userRole, setUserRole] = useState(() => localStorage.getItem('rt_user_role') || 'client');
@@ -618,9 +627,9 @@ function App() {
   // Caixa da Loja
   const [cashRegister, setCashRegister] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('rt_cash_register_v1') || 'null') || { isOpen: true, openingBalance: 0.00, entries: [] };
+      return JSON.parse(localStorage.getItem('rt_cash_register_v1') || 'null') || { isOpen: false, openingBalance: 0.00, openedAt: null, openedBy: '', entries: [], closedSessions: [] };
     } catch {
-      return { isOpen: true, openingBalance: 0.00, entries: [] };
+      return { isOpen: false, openingBalance: 0.00, openedAt: null, openedBy: '', entries: [], closedSessions: [] };
     }
   });
 
@@ -663,6 +672,8 @@ function App() {
   const [showPrintModal, setShowPrintModal] = useState(null);
   const [showQuoteModal, setShowQuoteModal] = useState(null);
   const [showCashTransactionModal, setShowCashTransactionModal] = useState(false);
+  const [showOrderPaymentModal, setShowOrderPaymentModal] = useState(null);
+  const [orderPayment, setOrderPayment] = useState({ amount: '', method: 'Pix' });
   const [showInviteMemberModal, setShowInviteMemberModal] = useState(false);
 
   // Modais de Leitura de Código de Barras
@@ -700,7 +711,7 @@ function App() {
     housingScratched: false,
   });
 
-  const [cashTx, setCashTx] = useState({ type: 'in', category: 'Acessórios', seller: '', description: '', amount: '' });
+  const [cashTx, setCashTx] = useState({ type: 'in', category: 'Acessórios', seller: '', description: '', amount: '', paymentMethod: 'Dinheiro' });
   const [newMember, setNewMember] = useState({ name: '', email: '', role: 'technician' });
 
   const [passwordType, setPasswordType] = useState('text');
@@ -845,9 +856,14 @@ function App() {
       .select('id, order_number, customer_name, customer_phone, device_brand, device_model, issue_description, status, total_amount, created_at')
       .order('created_at', { ascending: false }).limit(50);
     if (oData) {
-      setOrders(oData.map((o) => ({
+      let savedOrderPayments = {}; try { savedOrderPayments = JSON.parse(localStorage.getItem(`rt_order_payments_${session?.user?.id || 'local'}_${storeName}`) || '{}'); } catch {}
+      setOrders(oData.map((o) => {
+        const displayOrderId = o.order_number || `OS-${String(o.id).slice(0, 6)}`;
+        const paymentData = savedOrderPayments[displayOrderId] || {};
+        return ({
         rawId: o.id,
-        id: o.order_number || `OS-${String(o.id).slice(0, 6)}`,
+        id: displayOrderId,
+        paidAmount: Number(paymentData.paidAmount || 0), payments: paymentData.payments || [],
         customer: o.customer_name,
         phone: o.customer_phone || '',
         device: [o.device_brand, o.device_model].filter(Boolean).join(' '),
@@ -862,7 +878,8 @@ function App() {
         createdAt: o.created_at,
         color: statusClass(o.status),
         checklist: { ...defaultChecklist }
-      })));
+      });
+      }));
     }
 
     const { data: cData } = await supabase.from('customers').select('id, name, phone, email, created_at').order('name', { ascending: true });
@@ -1069,7 +1086,7 @@ function App() {
     notify('Produto removido.');
   };
 
-  const handleSellProductByBarcode = (scannedCode) => {
+  const handleSellProductByBarcode = (scannedCode, paymentMethod = 'Dinheiro') => {
     const code = String(scannedCode).trim();
     if (!code) {
       notify('Código inválido.');
@@ -1087,18 +1104,19 @@ function App() {
       return;
     }
 
+    if (!cashRegister.isOpen) { notify('Abra o caixa antes de registrar vendas.'); return; }
     updateProductQty(found.id, -1);
 
-    const val = parseFloat(found.price);
+    const val = parseMoneyValue(found.price);
     const newEntry = {
       id: String(Date.now()),
       type: 'in',
       description: `Venda Balcão: ${found.name} (Bipado)`,
       category: 'Acessórios',
-      seller: '',
+      seller: '', paymentMethod: paymentMethod || 'Dinheiro', sourceType: 'sale', productId: found.id,
       commissionAmount: 0,
       amount: val,
-      time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      createdAt: new Date().toISOString(), time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
       user: userAccessLevel === 'owner' ? 'Dono' : 'Técnico'
     };
 
@@ -1164,23 +1182,72 @@ function App() {
     if (cashTx.type === 'in' && !cashTx.seller.trim()) {
       notify('Selecione o funcionário responsável pela venda para registrar o desempenho e a comissão.'); return;
     }
-    const val = parseFloat(cashTx.amount.replace(',', '.'));
+    if (!cashRegister.isOpen) { notify('Abra o caixa antes de registrar movimentações.'); return; }
+    const val = parseMoneyValue(cashTx.amount);
+    if (!(val > 0)) { notify('Informe um valor maior que zero.'); return; }
     const newEntry = {
-      id: String(Date.now()),
-      type: cashTx.type,
-      description: cashTx.description,
+      id: String(Date.now()), type: cashTx.type, description: cashTx.description,
       category: cashTx.type === 'in' ? cashTx.category : 'Saídas/Despesas',
-      seller: cashTx.type === 'in' ? cashTx.seller : '',
-      commissionAmount: cashTx.type === 'in' && cashTx.seller.trim() ? (localStorage.getItem('rt_commission_mode') === 'percent' ? val * (Number(localStorage.getItem('rt_phone_commission_fixed') || techCommissionRate) || 0) / 100 : Number(localStorage.getItem('rt_phone_commission_fixed') || techCommissionRate) || 0) : 0,
-      amount: val,
-      time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      seller: cashTx.type === 'in' ? cashTx.seller : '', paymentMethod: cashTx.type === 'in' ? (cashTx.paymentMethod || 'Dinheiro') : 'Dinheiro',
+      sourceType: 'manual', commissionAmount: cashTx.type === 'in' && cashTx.seller.trim() ? (localStorage.getItem('rt_commission_mode') === 'percent' ? val * (Number(localStorage.getItem('rt_phone_commission_fixed') || techCommissionRate) || 0) / 100 : Number(localStorage.getItem('rt_phone_commission_fixed') || techCommissionRate) || 0) : 0,
+      amount: val, createdAt: new Date().toISOString(), time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
       user: userAccessLevel === 'owner' ? 'Dono' : 'Técnico'
     };
     setCashRegister(prev => ({ ...prev, entries: [newEntry, ...prev.entries] }));
     addAuditLog(`Registrou ${cashTx.type === 'in' ? 'Entrada' : 'Sangria/Saída'} no caixa da loja: R$ ${val.toFixed(2)} (${cashTx.description})`);
     setShowCashTransactionModal(false);
-    setCashTx({ type: 'in', category: 'Acessórios', seller: '', description: '', amount: '' });
+    setCashTx({ type: 'in', category: 'Acessórios', seller: '', description: '', amount: '', paymentMethod: 'Dinheiro' });
     notify('Lançamento registrado no caixa da loja!');
+  };
+
+  const handleReceiveOrderPayment = (e) => {
+    e.preventDefault();
+    const order = showOrderPaymentModal;
+    if (!order) return;
+    if (!cashRegister.isOpen) { notify('Abra o caixa antes de receber pagamentos.'); return; }
+    const amount = parseMoneyValue(orderPayment.amount);
+    const total = parseMoneyValue(order.amount);
+    const paid = Number(order.paidAmount || 0);
+    const due = Math.max(0, total - paid);
+    if (!(amount > 0) || amount > due + 0.009) { notify(`Informe um valor válido. Saldo da OS: R$ ${due.toFixed(2).replace('.', ',')}`); return; }
+    const paymentId = `os-payment-${order.rawId || order.id}-${Date.now()}`;
+    const entry = { id: paymentId, type: 'in', description: `Pagamento OS ${order.id} — ${order.customer || 'Cliente'}`, category: 'Assistência técnica', seller: '', amount, paymentMethod: orderPayment.method, sourceType: 'os_payment', orderId: order.id, rawOrderId: order.rawId || null, createdAt: new Date().toISOString(), time: new Date().toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'}), user: userAccessLevel === 'owner' ? 'Dono' : 'Técnico' };
+    setCashRegister(prev => ({ ...prev, entries: [entry, ...prev.entries] }));
+    const paymentStorageKey = `rt_order_payments_${session?.user?.id || 'local'}_${storeName}`;
+    let storedPayments = {}; try { storedPayments = JSON.parse(localStorage.getItem(paymentStorageKey) || '{}'); } catch {}
+    const nextPaidAmount = Number(order.paidAmount || 0) + amount;
+    const nextPayments = [...(order.payments || []), { id: paymentId, amount, method: orderPayment.method, paidAt: new Date().toISOString() }];
+    storedPayments[order.id] = { paidAmount: nextPaidAmount, payments: nextPayments };
+    localStorage.setItem(paymentStorageKey, JSON.stringify(storedPayments));
+    setOrders(prev => prev.map(o => o.id === order.id ? { ...o, paidAmount: nextPaidAmount, payments: nextPayments } : o));
+    addAuditLog(`Recebeu R$ ${amount.toFixed(2)} da OS ${order.id} via ${orderPayment.method}`);
+    setShowOrderPaymentModal(null); setOrderPayment({ amount: '', method: 'Pix' });
+    notify(`Pagamento de R$ ${amount.toFixed(2).replace('.', ',')} registrado no caixa.`);
+  };
+
+  const handleOpenCash = () => {
+    const raw = window.prompt('Valor inicial em dinheiro (fundo de troco), em R$:', '0,00');
+    if (raw === null) return;
+    const openingBalance = parseMoneyValue(raw);
+    if (openingBalance < 0) { notify('O saldo inicial não pode ser negativo.'); return; }
+    setCashRegister(prev => {
+      const history = [...(prev.closedSessions || [])];
+      if (prev.isOpen === false && prev.closedAt && prev.entries?.length) history.unshift({ openingBalance: prev.openingBalance, openedAt: prev.openedAt, openedBy: prev.openedBy, closedAt: prev.closedAt, closedBy: prev.closedBy, countedCash: prev.countedCash, expectedCash: prev.expectedCash, difference: prev.difference, entries: prev.entries });
+      return { ...prev, isOpen: true, openingBalance, openedAt: new Date().toISOString(), openedBy: userAccessLevel === 'owner' ? 'Dono' : 'Técnico', closedAt: null, entries: [], closedSessions: history };
+    });
+    addAuditLog(`Abriu o caixa com fundo inicial de R$ ${openingBalance.toFixed(2)}`); notify('Caixa aberto.');
+  };
+
+  const handleCloseCash = () => {
+    if (!cashRegister.isOpen) return;
+    const moneyIn = cashRegister.entries.filter(e => e.type === 'in' && (e.paymentMethod || 'Dinheiro') === 'Dinheiro').reduce((sum,e)=>sum+Number(e.amount||0),0);
+    const moneyOut = cashRegister.entries.filter(e => e.type === 'out').reduce((sum,e)=>sum+Number(e.amount||0),0);
+    const expectedCash = Number(cashRegister.openingBalance || 0) + moneyIn - moneyOut;
+    const raw = window.prompt(`Dinheiro contado na gaveta (R$). Saldo esperado: ${expectedCash.toFixed(2).replace('.', ',')}`, expectedCash.toFixed(2).replace('.', ','));
+    if (raw === null) return;
+    const countedCash = parseMoneyValue(raw); const difference = countedCash - expectedCash;
+    setCashRegister(prev => ({ ...prev, isOpen: false, closedAt: new Date().toISOString(), closedBy: userAccessLevel === 'owner' ? 'Dono' : 'Técnico', expectedCash, countedCash, difference }));
+    addAuditLog(`Fechou o caixa. Esperado R$ ${expectedCash.toFixed(2)}, contado R$ ${countedCash.toFixed(2)}, diferença R$ ${difference.toFixed(2)}`); notify('Fechamento do caixa registrado.');
   };
 
   const handleInviteMember = (e) => {
@@ -1644,10 +1711,10 @@ function App() {
             </header>
             
             {active==='overview' && userRole === 'tech' && <Overview orders={orders} storeName={storeName} onNew={()=>setShowNewOrder(true)} onNavigate={setActive} modules={modules} inventory={inventory} onOpenTv={() => setShowTvMode(true)} />}
-            {active==='orders' && userRole === 'tech' && <OrdersPage orders={filteredOrders} search={search} setSearch={setSearch} onNew={()=>setShowNewOrder(true)} onStatus={handleUpdateStatus} onShare={shareOsStatusWhatsapp} onSendWarranty={sendWarrantyTermWhatsapp} onOpenChecklist={(o) => setShowChecklistModal(o)} onPrint={(o) => setShowPrintModal(o)} onPellicleReminder={sendPellicleReminder} />}
+            {active==='orders' && userRole === 'tech' && <OrdersPage orders={filteredOrders} search={search} setSearch={setSearch} onNew={()=>setShowNewOrder(true)} onPay={o=>{ const due=Math.max(0,parseMoneyValue(o.amount)-Number(o.paidAmount||0)); if(due<=0){notify('Esta OS já está quitada.');return;} setShowOrderPaymentModal(o); setOrderPayment({amount:due.toFixed(2),method:'Pix'}); }} onStatus={handleUpdateStatus} onShare={shareOsStatusWhatsapp} onSendWarranty={sendWarrantyTermWhatsapp} onOpenChecklist={(o) => setShowChecklistModal(o)} onPrint={(o) => setShowPrintModal(o)} onPellicleReminder={sendPellicleReminder} />}
             {active==='customers' && userRole === 'tech' && <CustomersPage customers={customers} onNew={()=>setShowNewCustomer(true)} />}
             {active==='crm' && userRole === 'tech' && <><CrmPage customers={customers} storeName={storeName} whatsapp={whatsappNumber} /><div style={{marginTop:24}}><PostSalePage storeName={storeName} whatsapp={whatsappNumber} /></div></>}
-            {active==='cash' && userRole === 'tech' && <><CashPage cashRegister={cashRegister} onNewTransaction={() => setShowCashTransactionModal(true)} onOpenBarcodeSale={() => setShowBarcodeSaleModal(true)} /><CashCalculator /></>}
+            {active==='cash' && userRole === 'tech' && <><CashPage cashRegister={cashRegister} onNewTransaction={() => cashRegister.isOpen ? setShowCashTransactionModal(true) : notify('Abra o caixa antes de lançar movimentações.')} onOpenBarcodeSale={() => cashRegister.isOpen ? setShowBarcodeSaleModal(true) : notify('Abra o caixa antes de registrar vendas.')} onOpenCash={handleOpenCash} onCloseCash={handleCloseCash} /><CashCalculator /></>}
             {active==='inventory' && userRole === 'tech' && <InventoryPage inventory={inventory} onNew={()=>setShowNewProduct(true)} onUpdateQty={updateProductQty} onDelete={deleteProduct} />}
             {active==='used_devices' && userRole === 'tech' && <UsedDevicesPage storeName={storeName} devices={usedDevices.filter(d => d.storeName === storeName || (!d.storeName && storeName === 'RT MOBILE'))} setDevices={setUsedDevices} enabled={usedDevicesEnabled} setEnabled={setUsedDevicesEnabled} />}
             {active==='reports' && userRole === 'tech' && userAccessLevel === 'owner' && <ReportsPage orders={orders} cashRegister={cashRegister} inventory={inventory} />}
@@ -1743,6 +1810,8 @@ function App() {
         />
       )}
 
+      {showOrderPaymentModal && <div className="modal-backdrop" onClick={()=>setShowOrderPaymentModal(null)}><form className="modal" onClick={e=>e.stopPropagation()} onSubmit={handleReceiveOrderPayment} style={{background:'#0f0f12',border:'1px solid #222',maxWidth:440}}><div className="modal-head"><div><div className="eyebrow">RECEBIMENTO DE OS</div><h2>Receber pagamento</h2><p className="muted">{showOrderPaymentModal.id} · {showOrderPaymentModal.customer}</p></div><button type="button" className="icon-btn" onClick={()=>setShowOrderPaymentModal(null)}><X size={19}/></button></div><div className="panel" style={{padding:12,marginBottom:12}}><div>Valor da OS: <strong>R$ {parseMoneyValue(showOrderPaymentModal.amount).toFixed(2).replace('.',',')}</strong></div><div>Já recebido: <strong>R$ {Number(showOrderPaymentModal.paidAmount||0).toFixed(2).replace('.',',')}</strong></div><div>Saldo restante: <strong style={{color:'#25D366'}}>R$ {Math.max(0,parseMoneyValue(showOrderPaymentModal.amount)-Number(showOrderPaymentModal.paidAmount||0)).toFixed(2).replace('.',',')}</strong></div></div><label>Valor recebido (R$)<input type="number" min="0.01" step="0.01" max={Math.max(0,parseMoneyValue(showOrderPaymentModal.amount)-Number(showOrderPaymentModal.paidAmount||0))} value={orderPayment.amount} onChange={e=>setOrderPayment({...orderPayment,amount:e.target.value})} required /></label><label style={{marginTop:10}}>Forma de pagamento<select value={orderPayment.method} onChange={e=>setOrderPayment({...orderPayment,method:e.target.value})}><option>Pix</option><option>Dinheiro</option><option>Cartão de débito</option><option>Cartão de crédito</option><option>Transferência</option></select></label><div className="modal-foot" style={{marginTop:18}}><button type="button" className="secondary-btn" onClick={()=>setShowOrderPaymentModal(null)}>Cancelar</button><button className="primary-btn">Confirmar recebimento</button></div></form></div>}
+
       {showCashTransactionModal && (
         <div className="modal-backdrop" onClick={()=>setShowCashTransactionModal(false)}>
           <form className="modal" onClick={e=>e.stopPropagation()} onSubmit={handleCashTransaction} style={{background: '#0f0f12', border: '1px solid #222', maxWidth: '420px'}}>
@@ -1773,6 +1842,9 @@ function App() {
               </label>
             </>}
 
+            {cashTx.type === 'in' && <label style={{marginTop:'10px'}}>Forma de pagamento
+              <select value={cashTx.paymentMethod || 'Dinheiro'} onChange={e=>setCashTx({...cashTx,paymentMethod:e.target.value})}><option>Dinheiro</option><option>Pix</option><option>Cartão de débito</option><option>Cartão de crédito</option><option>Transferência</option></select>
+            </label>}
             <label style={{marginTop: '10px'}}>Descrição do Lançamento
               <input value={cashTx.description} onChange={e=>setCashTx({...cashTx, description: e.target.value})} placeholder="Ex: Pagamento Fornecedor / Venda Balcão" required />
             </label>
@@ -2300,7 +2372,7 @@ function Metric({icon:Icon,label,value,trend,tone}) {return <div className="metr
 function StatusPill({status}) {return <span className={`status-pill ${statusClass(status)}`}><i/>{status}</span>}
 function QuickAction({icon:Icon,title,desc,onClick}) {return <button className="quick-action" onClick={onClick} style={{background: '#111115'}}><div className="quick-action-icon"><Icon size={17}/></div><span><strong>{title}</strong><small>{desc}</small></span><ArrowUpRight size={15} className="quick-arrow"/></button>}
 
-function OrdersPage({orders,search,setSearch,onNew,onStatus,onShare,onSendWarranty,onOpenChecklist,onPrint,onPellicleReminder}) {
+function OrdersPage({orders,search,setSearch,onNew,onPay,onStatus,onShare,onSendWarranty,onOpenChecklist,onPrint,onPellicleReminder}) {
   return <div className="page-content"><div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line"/> OPERAÇÃO</div><h1>Ordens de <span>serviço.</span></h1><p>Registre entradas e acompanhe cada atendimento do início à entrega.</p></div><button className="primary-btn" onClick={onNew}><Plus size={17}/> Nova ordem</button></div><div className="list-toolbar"><div className="search-box"><Search size={17}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar por cliente, aparelho ou ordem..."/></div><div className="toolbar-count">{orders.length} registros</div></div><div className="panel orders-full" style={{background: '#0a0a0d', border: '1px solid #18181b'}}><div className="table-wrap"><table><thead><tr><th>ORDEM / CLIENTE</th><th>APARELHO / DEFEITO</th><th>SENHA / PADRÃO</th><th>STATUS DO ATENDIMENTO</th><th>VISTORIA</th><th>AÇÕES / DISPAROS</th></tr></thead><tbody>{orders.map(o=><tr key={o.id}><td><div className="order-id">{o.id}</div><div className="cell-sub">{o.customer}</div></td><td><div className="device-cell"><div className="device-mini"><Smartphone size={15}/></div><span>{o.device}</span></div><div className="cell-sub">{o.issue}</div></td><td>
     <div style={{display: 'flex', alignItems: 'center', gap: '6px'}}>
       {o.patternDrawing ? (
@@ -2314,7 +2386,7 @@ function OrdersPage({orders,search,setSearch,onNew,onStatus,onShare,onSendWarran
         </div>
       )}
     </div>
-  </td><td><select className={`status-select ${statusClass(o.status)}`} value={o.status} onChange={e=>onStatus(o.rawId,e.target.value)}>{['Recebido','Em diagnóstico','Aguardando aprovação','Aguardando peça','Em manutenção','Pronto para retirada','Entregue'].map(s=><option key={s}>{s}</option>)}</select>{o.deliveredAt && (()=>{const remaining=Math.ceil((new Date(o.deliveredAt).getTime()+Number(o.warrantyDays||90)*86400000-Date.now())/86400000);return remaining>=0&&remaining<=7?<div style={{fontSize:10,color:'#f59e0b',marginTop:5}}>Garantia vence em {remaining} dia(s)</div>:null;})()}</td><td><button className="secondary-btn" onClick={()=>onOpenChecklist(o)} style={{display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '12px'}}><CheckSquare size={14} color="#3b82f6"/> Vistoria</button></td><td><div style={{display: 'flex', gap: '6px'}}><button className="secondary-btn" onClick={()=>onShare(o)} title="Disparar Status WhatsApp" style={{padding: '6px 10px'}}><MessageCircle size={14} color="#25D366"/></button><button className="secondary-btn" onClick={()=>onSendWarranty(o)} title="Enviar Termo de Garantia Legal WhatsApp" style={{padding: '6px 10px', color: '#3b82f6'}}><FileText size={14}/></button><button className="secondary-btn" onClick={()=>onPrint(o)} title="Imprimir Cupom Térmico" style={{padding: '6px 10px'}}><Printer size={14}/></button><button className="secondary-btn" onClick={()=>onPellicleReminder(o)} title="Lembrete / Revisão" style={{padding: '6px 10px', color: '#eab308'}}><Calendar size={14}/></button></div></td></tr>)}</tbody></table>{!orders.length && <div className="empty-state"><ClipboardList size={28}/><strong>Nenhuma ordem encontrada</strong><span>Tente mudar a busca ou registre uma nova ordem.</span></div>}</div></div></div>
+  </td><td><select className={`status-select ${statusClass(o.status)}`} value={o.status} onChange={e=>onStatus(o.rawId,e.target.value)}>{['Recebido','Em diagnóstico','Aguardando aprovação','Aguardando peça','Em manutenção','Pronto para retirada','Entregue'].map(s=><option key={s}>{s}</option>)}</select>{o.deliveredAt && (()=>{const remaining=Math.ceil((new Date(o.deliveredAt).getTime()+Number(o.warrantyDays||90)*86400000-Date.now())/86400000);return remaining>=0&&remaining<=7?<div style={{fontSize:10,color:'#f59e0b',marginTop:5}}>Garantia vence em {remaining} dia(s)</div>:null;})()}</td><td><button className="secondary-btn" onClick={()=>onOpenChecklist(o)} style={{display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '12px'}}><CheckSquare size={14} color="#3b82f6"/> Vistoria</button></td><td><div style={{display: 'flex', gap: '6px'}}><button className="secondary-btn" onClick={()=>onShare(o)} title="Disparar Status WhatsApp" style={{padding: '6px 10px'}}><MessageCircle size={14} color="#25D366"/></button><button className="secondary-btn" onClick={()=>onSendWarranty(o)} title="Enviar Termo de Garantia Legal WhatsApp" style={{padding: '6px 10px', color: '#3b82f6'}}><FileText size={14}/></button><button className="secondary-btn" onClick={()=>onPrint(o)} title="Imprimir Cupom Térmico" style={{padding: '6px 10px'}}><Printer size={14}/></button><button className="secondary-btn" onClick={()=>onPellicleReminder(o)} title="Lembrete / Revisão" style={{padding: '6px 10px', color: '#eab308'}}><Calendar size={14}/></button><button className="secondary-btn" onClick={()=>onPay(o)} title="Receber pagamento da OS" style={{padding:'6px 10px',color:'#25D366'}}><DollarSign size={14}/></button><div className="cell-sub">Pago: R$ {Number(o.paidAmount||0).toFixed(2).replace('.',',')}</div></div></td></tr>)}</tbody></table>{!orders.length && <div className="empty-state"><ClipboardList size={28}/><strong>Nenhuma ordem encontrada</strong><span>Tente mudar a busca ou registre uma nova ordem.</span></div>}</div></div></div>
 }
 
 function CustomersPage({customers, onNew}) {
@@ -2426,99 +2498,34 @@ function CrmPage({customers, storeName, whatsapp}) {
   </div>
 }
 
-function CashPage({cashRegister, onNewTransaction, onOpenBarcodeSale}) {
-  const totalEntries = cashRegister.entries.filter(e => e.type === 'in').reduce((a, b) => a + b.amount, 0);
-  const totalExits = cashRegister.entries.filter(e => e.type === 'out').reduce((a, b) => a + b.amount, 0);
-  const currentBalance = cashRegister.openingBalance + totalEntries - totalExits;
-
+function CashPage({cashRegister, onNewTransaction, onOpenBarcodeSale, onOpenCash, onCloseCash}) {
+  const entries = cashRegister.entries || [];
+  const totalEntries = entries.filter(e => e.type === 'in').reduce((a, b) => a + Number(b.amount || 0), 0);
+  const totalExits = entries.filter(e => e.type === 'out').reduce((a, b) => a + Number(b.amount || 0), 0);
+  const cashIn = entries.filter(e => e.type === 'in' && (e.paymentMethod || 'Dinheiro') === 'Dinheiro').reduce((a,b)=>a+Number(b.amount||0),0);
+  const digitalIn = entries.filter(e => e.type === 'in' && (e.paymentMethod || 'Dinheiro') !== 'Dinheiro').reduce((a,b)=>a+Number(b.amount||0),0);
+  const currentBalance = Number(cashRegister.openingBalance || 0) + cashIn - totalExits;
+  const money = value => `R$ ${Number(value||0).toFixed(2).replace('.', ',')}`;
   return <div className="page-content">
-    <div className="page-heading">
-      <div>
-        <div className="eyebrow"><span className="eyebrow-line"/> FLUXO DE CAIXA DO ESTABELECIMENTO</div>
-        <h1>Caixa da <span>Loja.</span></h1>
-        <p>Controle entradas, suprimentos de troco, sangrias e despesas do dia a dia.</p>
-      </div>
-      <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap'}}>
-        <button className="secondary-btn" onClick={onOpenBarcodeSale} style={{background: '#1f2937', color: '#25D366', border: '1px solid #25D366', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px'}}>
-          <BarcodeIcon size={17}/> Bipar / Vender Produto
-        </button>
-        <button className="primary-btn" onClick={onNewTransaction} style={{background: '#25D366', color: '#000', fontWeight: 'bold'}}>
-          <Plus size={17}/> Lançar Manual
-        </button>
-      </div>
+    <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line"/> FLUXO DE CAIXA DO ESTABELECIMENTO</div><h1>Caixa da <span>Loja.</span></h1><p>Controle abertura, recebimentos por OS e vendas, sangrias e fechamento diário.</p><div style={{marginTop:10}}><span className={`status-pill ${cashRegister.isOpen?'green':'amber'}`}><i/>{cashRegister.isOpen?'CAIXA ABERTO':'CAIXA FECHADO'}</span>{cashRegister.openedAt&&<small className="muted" style={{marginLeft:10}}>Abertura: {new Date(cashRegister.openedAt).toLocaleString('pt-BR')}</small>}</div></div>
+      <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{cashRegister.isOpen ? <><button className="secondary-btn" onClick={onOpenBarcodeSale} style={{background:'#1f2937',color:'#25D366',border:'1px solid #25D366',fontWeight:'bold',display:'flex',alignItems:'center',gap:6}}><BarcodeIcon size={17}/> Bipar / Vender Produto</button><button className="primary-btn" onClick={onNewTransaction}><Plus size={17}/> Lançar Manual</button><button className="secondary-btn" onClick={onCloseCash} style={{border:'1px solid #f59e0b',color:'#f59e0b'}}><Lock size={16}/> Fechar caixa</button></> : <button className="primary-btn" onClick={onOpenCash}><CheckCircle2 size={17}/> Abrir caixa do dia</button>}</div>
     </div>
-
-    <div className="metrics-grid" style={{gridTemplateColumns: 'repeat(4, 1fr)'}}>
-      <div className="metric-card" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
-        <div className="metric-top"><span className="metric-period">ABERTURA</span></div>
-        <div className="metric-value" style={{color: '#aaa'}}>R$ {cashRegister.openingBalance.toFixed(2)}</div>
-        <div className="metric-label">Fundo de Troco Inicial</div>
-      </div>
-
-      <div className="metric-card" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
-        <div className="metric-top"><span className="metric-period">ENTRADAS</span></div>
-        <div className="metric-value" style={{color: '#25D366'}}>+ R$ {totalEntries.toFixed(2)}</div>
-        <div className="metric-label">Serviços & Vendas</div>
-      </div>
-
-      <div className="metric-card" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
-        <div className="metric-top"><span className="metric-period">SANGRIA / SAÍDAS</span></div>
-        <div className="metric-value" style={{color: '#ff4d4d'}}>- R$ {totalExits.toFixed(2)}</div>
-        <div className="metric-label">Despesas & Insumos</div>
-      </div>
-
-      <div className="metric-card" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
-        <div className="metric-top"><span className="metric-period">SALDO EM GAVETA</span></div>
-        <div className="metric-value" style={{color: '#3b82f6'}}>R$ {currentBalance.toFixed(2)}</div>
-        <div className="metric-label">Saldo Atual Estimado</div>
-      </div>
+    <div className="metrics-grid" style={{gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))'}}>
+      <div className="metric-card" style={{background:'#0a0a0d',border:'1px solid #18181b'}}><div className="metric-top"><span className="metric-period">FUNDO INICIAL</span></div><div className="metric-value" style={{color:'#aaa'}}>{money(cashRegister.openingBalance)}</div><div className="metric-label">Dinheiro na abertura</div></div>
+      <div className="metric-card" style={{background:'#0a0a0d',border:'1px solid #18181b'}}><div className="metric-top"><span className="metric-period">RECEBIMENTOS</span></div><div className="metric-value" style={{color:'#25D366'}}>{money(totalEntries)}</div><div className="metric-label">Total de entradas (todas as formas)</div></div>
+      <div className="metric-card" style={{background:'#0a0a0d',border:'1px solid #18181b'}}><div className="metric-top"><span className="metric-period">DINHEIRO ESPERADO</span></div><div className="metric-value" style={{color:'#3b82f6'}}>{money(currentBalance)}</div><div className="metric-label">Fundo inicial + dinheiro − saídas</div></div>
+      <div className="metric-card" style={{background:'#0a0a0d',border:'1px solid #18181b'}}><div className="metric-top"><span className="metric-period">PIX / CARTÕES</span></div><div className="metric-value" style={{color:'#a78bfa'}}>{money(digitalIn)}</div><div className="metric-label">Entradas não recebidas em espécie</div></div>
+      <div className="metric-card" style={{background:'#0a0a0d',border:'1px solid #18181b'}}><div className="metric-top"><span className="metric-period">SAÍDAS</span></div><div className="metric-value" style={{color:'#ff4d4d'}}>{money(totalExits)}</div><div className="metric-label">Sangrias e despesas registradas</div></div>
     </div>
-
-    <div className="panel orders-full" style={{background: '#0a0a0d', border: '1px solid #18181b', marginTop: '20px'}}>
-      <div className="panel-heading">
-        <div><h3>Histórico de Lançamentos do Dia</h3><p>Registro das movimentações</p></div>
-      </div>
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>HORÁRIO</th>
-              <th>DESCRIÇÃO DO LANÇAMENTO</th>
-              <th>CATEGORIA</th>
-              <th>OPERADOR</th>
-              <th>TIPO</th>
-              <th>VALOR</th>
-            </tr>
-          </thead>
-          <tbody>
-            {cashRegister.entries.map(item => (
-              <tr key={item.id}>
-                <td>{item.time}</td>
-                <td><strong>{item.description}</strong>{item.seller && <div className="muted" style={{fontSize:11}}>Vendedor: {item.seller}</div>}</td>
-                <td>{item.category || '—'}</td>
-                <td>{item.user}</td>
-                <td>
-                  <span className={`status-pill ${item.type === 'in' ? 'green' : 'amber'}`}>
-                    {item.type === 'in' ? 'Entrada / Suprimento' : 'Sangria / Saída'}
-                  </span>
-                </td>
-                <td>
-                  <strong style={{color: item.type === 'in' ? '#25D366' : '#ff4d4d'}}>
-                    {item.type === 'in' ? '+' : '-'} R$ {item.amount.toFixed(2)}
-                  </strong>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    {!cashRegister.isOpen && cashRegister.closedAt && <div className="panel" style={{background:'#0a0a0d',border:'1px solid #f59e0b',padding:16,marginTop:18}}><h3>Resumo do último fechamento</h3><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:12}}><div>Saldo esperado<br/><strong>{money(cashRegister.expectedCash)}</strong></div><div>Dinheiro contado<br/><strong>{money(cashRegister.countedCash)}</strong></div><div>Diferença<br/><strong style={{color:Number(cashRegister.difference)===0?'#25D366':'#f59e0b'}}>{money(cashRegister.difference)}</strong></div></div><p className="muted">Fechado em {new Date(cashRegister.closedAt).toLocaleString('pt-BR')} por {cashRegister.closedBy||'—'}.</p></div>}
+    <div className="panel orders-full" style={{background:'#0a0a0d',border:'1px solid #18181b',marginTop:20}}><div className="panel-heading"><div><h3>Movimentações do caixa</h3><p>Pagamentos de OS, vendas e lançamentos manuais desta sessão</p></div></div><div className="table-wrap"><table><thead><tr><th>HORÁRIO</th><th>DESCRIÇÃO</th><th>CATEGORIA</th><th>FORMA</th><th>OPERADOR</th><th>TIPO</th><th>VALOR</th></tr></thead><tbody>{entries.map(item=><tr key={item.id}><td>{item.time|| (item.createdAt?new Date(item.createdAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'—')}</td><td><strong>{item.description}</strong>{item.seller&&<div className="muted" style={{fontSize:11}}>Vendedor: {item.seller}</div>}</td><td>{item.category||'—'}</td><td>{item.paymentMethod||'Dinheiro'}</td><td>{item.user||'—'}</td><td><span className={`status-pill ${item.type==='in'?'green':'amber'}`}><i/>{item.type==='in'?'Entrada':'Saída'}</span></td><td><strong style={{color:item.type==='in'?'#25D366':'#ff4d4d'}}>{item.type==='in'?'+':'−'} {money(item.amount)}</strong></td></tr>)}</tbody></table>{!entries.length&&<div className="empty-state"><Wallet size={28}/><strong>Nenhuma movimentação nesta sessão</strong><span>Recebimentos de OS e vendas aparecerão aqui quando registrados.</span></div>}</div></div>
   </div>
 }
 
 /* MODAL DE VENDA NO CAIXA POR CÓDIGO DE BARRAS */
 function BarcodeSaleModal({ inventory, onDetectedBarcode, onClose }) {
   const [manualCode, setManualCode] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('Dinheiro');
   const [useCamera, setUseCamera] = useState(false);
   const inputRef = useRef(null);
 
@@ -2529,7 +2536,7 @@ function BarcodeSaleModal({ inventory, onDetectedBarcode, onClose }) {
   const handleManualSubmit = (e) => {
     e.preventDefault();
     if (manualCode.trim()) {
-      onDetectedBarcode(manualCode.trim());
+      onDetectedBarcode(manualCode.trim(), paymentMethod);
     }
   };
 
@@ -2548,6 +2555,7 @@ function BarcodeSaleModal({ inventory, onDetectedBarcode, onClose }) {
           Bipe com o leitor óptico USB/Bluetooth ou use a câmera do seu celular para registrar no caixa e abater o estoque.
         </p>
 
+        <label>Forma de pagamento<select value={paymentMethod} onChange={e=>setPaymentMethod(e.target.value)} style={{marginTop:6}}><option>Dinheiro</option><option>Pix</option><option>Cartão de débito</option><option>Cartão de crédito</option><option>Transferência</option></select></label>
         <form onSubmit={handleManualSubmit} style={{margin: '15px 0'}}>
           <label>Código de Barras (Leitor ou Digitação)
             <div style={{display: 'flex', gap: '8px', marginTop: '6px'}}>
@@ -2583,7 +2591,7 @@ function BarcodeSaleModal({ inventory, onDetectedBarcode, onClose }) {
           <BarcodeCameraScanner
             onDetected={(code) => {
               setUseCamera(false);
-              onDetectedBarcode(code);
+              onDetectedBarcode(code, paymentMethod);
             }}
             onClose={() => setUseCamera(false)}
           />
