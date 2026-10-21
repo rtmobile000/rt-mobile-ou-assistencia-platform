@@ -1010,16 +1010,32 @@ function App() {
     setSaving(true);
     try {
       if (supabaseConfigured && session) {
-        const { data: memberships } = await supabase.from('organization_members').select('organization_id').eq('user_id', session.user.id).limit(1);
-        const orgId = memberships?.[0]?.organization_id;
-        const { error } = await supabase.from('customers').insert({
-          organization_id: orgId || null,
-          name: newCustomer.name.trim(),
-          phone: newCustomer.phone.trim() || null,
-          email: newCustomer.email.trim() || null,
-        });
-        if (error) throw error;
-        await fetchData();
+        const { data: memberships, error: membershipError } = await supabase
+  .from('organization_members')
+  .select('organization_id')
+  .eq('user_id', session.user.id)
+  .limit(1);
+
+if (membershipError) throw membershipError;
+
+const orgId = memberships?.[0]?.organization_id;
+
+if (!orgId) {
+  throw new Error(
+    'Sua conta não está vinculada a uma loja. Verifique o vínculo do usuário.'
+  );
+}
+
+const { error } = await supabase.from('customers').insert({
+  organization_id: orgId,
+  Nome: newCustomer.name.trim(),
+  telefone: newCustomer.phone.trim() || null,
+  'E-mail': newCustomer.email.trim() || null,
+});
+
+if (error) throw error;
+
+await fetchData();
       }
       addAuditLog(`Cadastrou o cliente ${newCustomer.name.trim()}`);
       setShowNewCustomer(false);
