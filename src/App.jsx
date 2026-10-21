@@ -1026,11 +1026,11 @@ if (!orgId) {
   );
 }
 
-const { error } = await supabase.from('customers').insert({
-  organization_id: orgId,
+const { error } = await supabase.from('Clientes').insert({
+  'organization id': orgId,
   Nome: newCustomer.name.trim(),
   telefone: newCustomer.phone.trim() || null,
-  'E-mail': newCustomer.email.trim() || null,
+  email: newCustomer.email.trim() || null,
 });
 
 if (error) throw error;
