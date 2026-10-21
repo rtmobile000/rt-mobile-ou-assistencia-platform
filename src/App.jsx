@@ -594,6 +594,7 @@ function App() {
   const [storeAddress, setStoreAddress] = useState('Santa Izabel do Pará - PA');
   const [mapsUrl, setMapsUrl] = useState('https://maps.google.com');
   const [techCommissionRate, setTechCommissionRate] = useState(() => Number(localStorage.getItem('rt_phone_commission_fixed') || 50));
+  const [techCommissionMode, setTechCommissionMode] = useState(() => localStorage.getItem('rt_commission_mode') || 'fixed');
 
   // Auxiliar de Upgrade (Configurações com os 10 itens completos)
   const [upgradeAssistantEnabled, setUpgradeAssistantEnabled] = useState(true);
@@ -721,7 +722,6 @@ function App() {
     if (modules.crm) list.push({ id: 'crm', label: 'Pós-Venda & Cuidado', icon: HeartHandshake });
     if (modules.cashRegister) list.push({ id: 'cash', label: 'Caixa da Loja', icon: Wallet });
     if (modules.inventory) list.push({ id: 'inventory', label: 'Acessórios de Balcão', icon: Package });
-    if (modules.inventory) list.push({ id: 'parts', label: 'Peças & Insumos', icon: Wrench });
     if (modules.orders) list.push({ id: 'quotes', label: 'Orçamentos Prévios', icon: FileText });
     if (modules.iphones) list.push({ id: 'store', label: 'Comprar & Upgrade', icon: Smartphone });
     if (modules.iphones) list.push({ id: 'used_devices', label: 'Seminovos & Usados', icon: Smartphone });
@@ -1139,7 +1139,7 @@ function App() {
         if (error) throw error;
       }
       const targetOrder = orders.find(o => o.rawId === rawId);
-      setOrders(prev => prev.map(o => o.rawId === rawId ? { ...o, status: newStatus, color: statusClass(newStatus) } : o));
+      setOrders(prev => prev.map(o => o.rawId === rawId ? { ...o, status: newStatus, color: statusClass(newStatus), deliveredAt: ['Entregue','Entregue ao cliente'].includes(newStatus) ? (o.deliveredAt || new Date().toISOString()) : o.deliveredAt } : o));
       // Ao marcar uma OS como entregue, cria automaticamente um item na fila de pós-venda.
       // O envio automático real exige integração com a API oficial do WhatsApp.
       if (targetOrder && ['Entregue', 'Entregue ao cliente'].includes(newStatus)) {
@@ -1162,8 +1162,8 @@ function App() {
     if (!cashTx.description || !cashTx.amount) {
       notify('Preencha a descrição e o valor.'); return;
     }
-    if (cashTx.type === 'in' && cashTx.category === 'iPhones' && !cashTx.seller.trim()) {
-      notify('Selecione quem vendeu o iPhone para calcular a comissão.'); return;
+    if (cashTx.type === 'in' && !cashTx.seller.trim()) {
+      notify('Selecione o funcionário responsável pela venda para registrar o desempenho e a comissão.'); return;
     }
     const val = parseFloat(cashTx.amount.replace(',', '.'));
     const newEntry = {
@@ -1171,8 +1171,8 @@ function App() {
       type: cashTx.type,
       description: cashTx.description,
       category: cashTx.type === 'in' ? cashTx.category : 'Saídas/Despesas',
-      seller: cashTx.category === 'iPhones' ? cashTx.seller : '',
-      commissionAmount: cashTx.type === 'in' && cashTx.category === 'iPhones' && cashTx.seller.trim() ? Number(techCommissionRate) || 0 : 0,
+      seller: cashTx.type === 'in' ? cashTx.seller : '',
+      commissionAmount: cashTx.type === 'in' && cashTx.seller.trim() ? (localStorage.getItem('rt_commission_mode') === 'percent' ? val * (Number(localStorage.getItem('rt_phone_commission_fixed') || techCommissionRate) || 0) / 100 : Number(localStorage.getItem('rt_phone_commission_fixed') || techCommissionRate) || 0) : 0,
       amount: val,
       time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
       user: userAccessLevel === 'owner' ? 'Dono' : 'Técnico'
@@ -1296,10 +1296,17 @@ function App() {
   };
 
   const sendWarrantyTermWhatsapp = (order) => {
+    const warrantyStart = order.deliveredAt ? new Date(order.deliveredAt).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR');
+    const warrantyEnd = new Date(new Date(order.deliveredAt || new Date().toISOString()).getTime() + (Number(order.warrantyDays || 90) * 86400000)).toLocaleDateString('pt-BR');
     const msg = encodeURIComponent(`📜 *TERMO DE GARANTIA & CONDIÇÕES TÉCNICAS* - ${storeName.toUpperCase()}\n\n` +
       `Ordem de Serviço: *${order.id}*\n` +
+      `Cliente: *${order.customer || 'Não informado'}*\n` +
       `Aparelho: *${order.device}*\n` +
-      `Garantia: *${order.warrantyDays} Dias*\n\n` +
+      `Defeito/serviço registrado: *${order.issue || 'Conforme diagnóstico da OS'}*\n` +
+      `Valor registrado: *${order.amount || 'A definir'}*\n` +
+      `Data de início da garantia: *${warrantyStart}*\n` +
+      `Data estimada de término: *${warrantyEnd}*\n` +
+      `Prazo de garantia: *${order.warrantyDays || 90} dias*\n\n` +
       `⚠️ *CONDIÇÕES LEGAIS DE GARANTIA:*\n` +
       `1. A garantia cobre exclusivamente o serviço realizado e a peça substituída.\n` +
       `2. A garantia será *ANULADA* em casos de: Danos físicos, tela trincada/quebrada, contato com líquidos/umidade, selo de garantia violado ou intervenção por terceiros.\n` +
@@ -1309,6 +1316,20 @@ function App() {
     
     const targetPhone = order.phone || whatsappNumber;
     window.open(`https://wa.me/${targetPhone}?text=${msg}`, '_blank');
+  };
+
+  const sendChecklistReportWhatsapp = (order) => {
+    const checklistLabels = { screen: 'Tela / Touchscreen & Display', faceId: 'Face ID / Touch ID', cameras: 'Câmeras', charging: 'Conector de carga & bateria', audio: 'Áudio & microfone', wifi: 'Wi-Fi, Bluetooth & sinal', housing: 'Carcaça & vidro traseiro' };
+    const checklistRows = Object.entries(checklistLabels).map(([key,label]) => `<tr><td>${label}</td><td>${order.checklist?.[key] === 'ok' ? 'OK' : order.checklist?.[key] === 'issue' ? 'Avaria registrada' : 'Não verificado'}</td></tr>`).join('');
+    const report = window.open('', '_blank');
+    if (report) {
+      report.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Check-in ${order.id}</title><style>body{font:14px Arial,sans-serif;margin:32px;color:#111}h1{font-size:22px}table{border-collapse:collapse;width:100%;margin-top:16px}td,th{border:1px solid #bbb;padding:8px;text-align:left}.note{margin-top:24px;color:#555;font-size:12px}@media print{button{display:none}}</style></head><body><h1>${storeName} — Comprovante de Check-in</h1><p><b>OS:</b> ${order.id}</p><p><b>Cliente:</b> ${order.customer || ''}</p><p><b>WhatsApp:</b> ${order.phone || ''}</p><p><b>Aparelho:</b> ${order.device || ''}</p><p><b>Defeito informado:</b> ${order.issue || ''}</p><p><b>Data:</b> ${new Date().toLocaleString('pt-BR')}</p><table><thead><tr><th>Item vistoriado</th><th>Condição registrada</th></tr></thead><tbody>${checklistRows}</tbody></table><h2>Fotos do check-in</h2><div>${(order.checkinPhotos||[]).map((src,i)=>`<img src="${src}" alt="Foto ${i+1}" style="width:180px;height:180px;object-fit:contain;margin:6px;border:1px solid #bbb"/>`).join('')}</div><p class="note">Este comprovante registra somente os itens marcados no check-in. Guarde uma cópia junto à ordem de serviço.</p><button onclick="window.print()">Imprimir / Salvar em PDF</button></body></html>`);
+      report.document.close();
+    }
+    const phone = String(order.phone || '').replace(/\D/g, '');
+    const message = encodeURIComponent(`Olá ${order.customer || ''}! Seu check-in foi registrado na ${storeName}. Código exclusivo para acompanhar sua OS: ${order.id}. Entre no painel do cliente, abra “Rastreio de OS” e informe esse código. O comprovante do check-in foi aberto para salvar em PDF; anexe o arquivo nesta conversa antes de enviar.`);
+    if (phone) window.open(`https://wa.me/${phone}?text=${message}`, '_blank');
+    else notify(`Código de rastreio: ${order.id}. Não há WhatsApp cadastrado para abrir a conversa.`);
   };
 
   const sendPellicleReminder = (order) => {
@@ -1629,7 +1650,6 @@ function App() {
             {active==='crm' && userRole === 'tech' && <><CrmPage customers={customers} storeName={storeName} whatsapp={whatsappNumber} /><div style={{marginTop:24}}><PostSalePage storeName={storeName} whatsapp={whatsappNumber} /></div></>}
             {active==='cash' && userRole === 'tech' && <><CashPage cashRegister={cashRegister} onNewTransaction={() => setShowCashTransactionModal(true)} onOpenBarcodeSale={() => setShowBarcodeSaleModal(true)} /><CashCalculator /></>}
             {active==='inventory' && userRole === 'tech' && <InventoryPage inventory={inventory} onNew={()=>setShowNewProduct(true)} onUpdateQty={updateProductQty} onDelete={deleteProduct} />}
-            {active==='parts' && userRole === 'tech' && <PartsInventoryPage orders={orders} notify={notify} />}
             {active==='quotes' && userRole === 'tech' && <QuotesPage orders={orders} onApprove={(quote) => { const target = orders.find(o => o.id === quote.orderId); if (target?.rawId) handleUpdateStatus(target.rawId, 'Em manutenção'); }} storeName={storeName} whatsapp={whatsappNumber} />}
             {active==='used_devices' && userRole === 'tech' && <UsedDevicesPage storeName={storeName} devices={usedDevices.filter(d => d.storeName === storeName || (!d.storeName && storeName === 'RT MOBILE'))} setDevices={setUsedDevices} enabled={usedDevicesEnabled} setEnabled={setUsedDevicesEnabled} />}
             {active==='reports' && userRole === 'tech' && userAccessLevel === 'owner' && <ReportsPage orders={orders} cashRegister={cashRegister} inventory={inventory} />}
@@ -1638,7 +1658,7 @@ function App() {
             {active==='stores_directory' && <StoresDirectoryPage stores={activeStores} onSelectStore={(s) => { setStoreName(s.name); setWhatsappNumber(s.phone); notify(`Estabelecimento "${s.name}" selecionado!`); setActive('store'); }} onRequestQuote={(s) => setShowQuoteModal(s)} />}
             {active==='store' && <StorePage whatsapp={whatsappNumber} storeName={storeName} onUpgrade={() => setShowUpgradeModal(true)} usedDevices={[]} usedDevicesEnabled={false} />}
             {active==='track' && <TrackPage orders={orders} storeName={storeName} pixKey={pixKey} whatsapp={whatsappNumber} storeAddress={storeAddress} mapsUrl={mapsUrl} setOrders={setOrders} notify={notify} />}
-            {active==='finance' && userRole === 'tech' && userAccessLevel === 'owner' && <FinancePage orders={orders} cashRegister={cashRegister} commissionRate={techCommissionRate} setCommissionRate={value => { setTechCommissionRate(value); localStorage.setItem('rt_phone_commission_fixed', String(value)); }} />}
+            {active==='finance' && userRole === 'tech' && userAccessLevel === 'owner' && <FinancePage orders={orders} teamMembers={teamMembers} cashRegister={cashRegister} commissionRate={techCommissionRate} setCommissionRate={value => { setTechCommissionRate(value); localStorage.setItem('rt_phone_commission_fixed', String(value)); }} commissionMode={techCommissionMode} setCommissionMode={value => { setTechCommissionMode(value); localStorage.setItem('rt_commission_mode', value); }} />}
             {active==='payments' && userRole === 'tech' && <PaymentsPage pixKey={pixKey} setPixKey={setPixKey} onShowPayModal={() => setShowPaymentModal(true)} />}
             {active==='settings' && userRole === 'tech' && <SettingsPage configured={supabaseConfigured} email={session?.user?.email} storeName={storeName} setStoreName={setStoreName} storeLogo={storeLogo} onLogoUpload={handleLogoUpload} whatsapp={whatsappNumber} setWhatsapp={setWhatsappNumber} pixKey={pixKey} setPixKey={setPixKey} storeAddress={storeAddress} setStoreAddress={setStoreAddress} mapsUrl={mapsUrl} setMapsUrl={setMapsUrl} modules={modules} setModules={setModules} onLogout={logout} teamMembers={teamMembers} onInviteMember={() => setShowInviteMemberModal(true)} auditLogs={auditLogs} userAccessLevel={userAccessLevel} isLifetimeAdmin={isLifetimeAdmin} upgradeAssistantEnabled={upgradeAssistantEnabled} setUpgradeAssistantEnabled={setUpgradeAssistantEnabled} upgradeDiscounts={upgradeDiscounts} setUpgradeDiscounts={setUpgradeDiscounts} onShowTutorial={() => setShowFirstLoginTutorial(true)} />}
             
@@ -1745,14 +1765,14 @@ function App() {
                   <option value="Seminovos e usados">Celulares seminovos e usados</option>
                 </select>
               </label>
-              {cashTx.category === 'iPhones' && <label style={{marginTop:'10px'}}>Quem vendeu o iPhone?
+              <label style={{marginTop:'10px'}}>Funcionário responsável pela venda?
                 <select value={cashTx.seller} onChange={e=>setCashTx({...cashTx,seller:e.target.value})} required>
                   <option value="">Selecione o vendedor</option>
                   {teamMembers.map(m=><option key={m.id} value={m.name}>{m.name}</option>)}
                   {!teamMembers.length && <option value="Dono">Dono</option>}
                 </select>
-                <small className="muted">A comissão fixa configurada no Financeiro será contabilizada para este vendedor.</small>
-              </label>}
+                <small className="muted">O responsável ficará vinculado ao lançamento para acompanhamento de desempenho. A regra atual de comissão é um valor fixo geral por venda.</small>
+              </label>
             </>}
 
             <label style={{marginTop: '10px'}}>Descrição do Lançamento
@@ -1877,6 +1897,7 @@ function App() {
             </div>
             
             <p className="muted">Aparelho: <strong>{showChecklistModal.device}</strong> | Senha: <strong style={{color: '#25D366'}}>{showChecklistModal.devicePassword || 'Sem Senha'}</strong></p>
+            <section style={{margin:'14px 0',padding:12,background:'#121215',border:'1px solid #292929',borderRadius:8}}><strong>Fotos do check-in</strong><p className="muted" style={{fontSize:12}}>Use a câmera do celular ou selecione fotos para registrar a condição do aparelho.</p><input type="file" accept="image/*" capture="environment" multiple onChange={e=>{const files=Array.from(e.target.files||[]);Promise.all(files.map(file=>new Promise(resolve=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>resolve(null);reader.readAsDataURL(file);}))).then(images=>setShowChecklistModal(prev=>({...prev,checkinPhotos:[...(prev?.checkinPhotos||[]),...images.filter(Boolean)]})));e.target.value='';}}/><div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:10}}>{(showChecklistModal.checkinPhotos||[]).map((src,i)=><div key={i} style={{position:'relative'}}><img src={src} alt={`Foto check-in ${i+1}`} style={{width:82,height:82,objectFit:'cover',borderRadius:6,border:'1px solid #333'}}/><button type="button" className="secondary-btn" onClick={()=>setShowChecklistModal(prev=>({...prev,checkinPhotos:(prev.checkinPhotos||[]).filter((_,idx)=>idx!==i)}))} style={{display:'block',fontSize:10,padding:'3px 5px',marginTop:3}}>Remover</button></div>)}</div></section>
 
             <div style={{display: 'flex', flexDirection: 'column', gap: '10px', margin: '15px 0'}}>
               {[
@@ -1921,7 +1942,7 @@ function App() {
             </div>
 
             <div className="modal-foot">
-              <button className="primary-btn full-btn" onClick={()=>{ notify('Vistoria salva nesta sessão. Para sincronizar entre aparelhos, a checklist precisa de uma coluna/tabela no Supabase.'); setShowChecklistModal(null); }}>Salvar Relatório de Vistoria</button>
+              <button className="primary-btn full-btn" onClick={()=>{ const savedOrder = { ...showChecklistModal, checklist: { ...showChecklistModal.checklist } }; setOrders(prev => prev.map(o => o.id === savedOrder.id ? { ...o, checklist: savedOrder.checklist, checkinCompletedAt: new Date().toISOString() } : o)); sendChecklistReportWhatsapp(savedOrder); notify(`Check-in registrado. Código de rastreio: ${savedOrder.id}. Salve o comprovante em PDF e anexe-o manualmente no WhatsApp.`); setShowChecklistModal(null); }}>Salvar check-in, gerar comprovante e abrir WhatsApp</button>
             </div>
           </div>
         </div>
@@ -2295,7 +2316,7 @@ function OrdersPage({orders,search,setSearch,onNew,onStatus,onShare,onSendWarran
         </div>
       )}
     </div>
-  </td><td><select className={`status-select ${statusClass(o.status)}`} value={o.status} onChange={e=>onStatus(o.rawId,e.target.value)}>{['Recebido','Em diagnóstico','Aguardando aprovação','Aguardando peça','Em manutenção','Pronto para retirada','Entregue'].map(s=><option key={s}>{s}</option>)}</select></td><td><button className="secondary-btn" onClick={()=>onOpenChecklist(o)} style={{display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '12px'}}><CheckSquare size={14} color="#3b82f6"/> Vistoria</button></td><td><div style={{display: 'flex', gap: '6px'}}><button className="secondary-btn" onClick={()=>onShare(o)} title="Disparar Status WhatsApp" style={{padding: '6px 10px'}}><MessageCircle size={14} color="#25D366"/></button><button className="secondary-btn" onClick={()=>onSendWarranty(o)} title="Enviar Termo de Garantia Legal WhatsApp" style={{padding: '6px 10px', color: '#3b82f6'}}><FileText size={14}/></button><button className="secondary-btn" onClick={()=>onPrint(o)} title="Imprimir Cupom Térmico" style={{padding: '6px 10px'}}><Printer size={14}/></button><button className="secondary-btn" onClick={()=>onPellicleReminder(o)} title="Lembrete / Revisão" style={{padding: '6px 10px', color: '#eab308'}}><Calendar size={14}/></button></div></td></tr>)}</tbody></table>{!orders.length && <div className="empty-state"><ClipboardList size={28}/><strong>Nenhuma ordem encontrada</strong><span>Tente mudar a busca ou registre uma nova ordem.</span></div>}</div></div></div>
+  </td><td><select className={`status-select ${statusClass(o.status)}`} value={o.status} onChange={e=>onStatus(o.rawId,e.target.value)}>{['Recebido','Em diagnóstico','Aguardando aprovação','Aguardando peça','Em manutenção','Pronto para retirada','Entregue'].map(s=><option key={s}>{s}</option>)}</select>{o.deliveredAt && (()=>{const remaining=Math.ceil((new Date(o.deliveredAt).getTime()+Number(o.warrantyDays||90)*86400000-Date.now())/86400000);return remaining>=0&&remaining<=7?<div style={{fontSize:10,color:'#f59e0b',marginTop:5}}>Garantia vence em {remaining} dia(s)</div>:null;})()}</td><td><button className="secondary-btn" onClick={()=>onOpenChecklist(o)} style={{display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '12px'}}><CheckSquare size={14} color="#3b82f6"/> Vistoria</button></td><td><div style={{display: 'flex', gap: '6px'}}><button className="secondary-btn" onClick={()=>onShare(o)} title="Disparar Status WhatsApp" style={{padding: '6px 10px'}}><MessageCircle size={14} color="#25D366"/></button><button className="secondary-btn" onClick={()=>onSendWarranty(o)} title="Enviar Termo de Garantia Legal WhatsApp" style={{padding: '6px 10px', color: '#3b82f6'}}><FileText size={14}/></button><button className="secondary-btn" onClick={()=>onPrint(o)} title="Imprimir Cupom Térmico" style={{padding: '6px 10px'}}><Printer size={14}/></button><button className="secondary-btn" onClick={()=>onPellicleReminder(o)} title="Lembrete / Revisão" style={{padding: '6px 10px', color: '#eab308'}}><Calendar size={14}/></button></div></td></tr>)}</tbody></table>{!orders.length && <div className="empty-state"><ClipboardList size={28}/><strong>Nenhuma ordem encontrada</strong><span>Tente mudar a busca ou registre uma nova ordem.</span></div>}</div></div></div>
 }
 
 function CustomersPage({customers, onNew}) {
@@ -2644,24 +2665,36 @@ function InventoryPage({inventory, onNew, onUpdateQty, onDelete}) {
   </div>
 }
 
-function FinancePage({orders, cashRegister, commissionRate, setCommissionRate}) {
+function FinancePage({orders, teamMembers = [], cashRegister, commissionRate, setCommissionRate, commissionMode, setCommissionMode}) {
+  const [goals, setGoals] = useState(() => { try { return JSON.parse(localStorage.getItem('rt_monthly_goals_v1') || '{"revenue":10000,"orders":80,"sales":40}'); } catch { return { revenue: 10000, orders: 80, sales: 40 }; } });
+  const [employeeGoals, setEmployeeGoals] = useState(() => { try { return JSON.parse(localStorage.getItem('rt_employee_goals_v1') || '{}'); } catch { return {}; } });
+  const saveEmployeeGoals = (next) => { setEmployeeGoals(next); localStorage.setItem('rt_employee_goals_v1', JSON.stringify(next)); };
+  const saveGoals = (next) => { setGoals(next); localStorage.setItem('rt_monthly_goals_v1', JSON.stringify(next)); };
+  const now = new Date();
+  const thisMonthOrders = orders.filter(o => { const d = new Date(o.createdAt || o.created_at || Date.now()); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); });
+  const thisMonthSales = (cashRegister?.entries || []).filter(e => e.type === 'in' && ['Acessórios','iPhones','Seminovos e usados'].includes(e.category)).length;
+  const monthRevenue = thisMonthOrders.reduce((sum,o) => sum + (parseFloat(String(o.amount || '').replace(/[^0-9,.-]/g,'').replace(',','.')) || 0), 0);
+  const goalPct = (v,t) => Math.min(100, Math.round((Number(t)>0 ? Number(v)/Number(t)*100 : 0)));
   const totalRevenue = orders.reduce((acc, o) => acc + (parseFloat(String(o.amount || '').replace(/[^0-9,.-]/g, '').replace(',', '.')) || 0), 0);
   const totalPartsCost = orders.reduce((acc, o) => acc + (parseFloat(o.partCost) || 0), 0);
   const netProfit = totalRevenue - totalPartsCost;
   // Só contabiliza vendas explicitamente marcadas como venda de aparelho; OS de assistência não geram comissão de celular.
   const phonesSold = orders.filter(o => (o.phoneSold === true || o.saleType === 'phone_sale') && ['Entregue', 'Concluído', 'Pago'].includes(o.status)).length;
-  const phoneSales = (cashRegister?.entries || []).filter(e => e.type === 'in' && e.category === 'iPhones' && e.seller);
+  const saleEntries = (cashRegister?.entries || []).filter(e => e.type === 'in' && ['Acessórios','iPhones','Seminovos e usados'].includes(e.category) && e.seller);
+  const phoneSales = saleEntries.filter(e => e.category === 'iPhones');
   const totalPhonesSold = phonesSold + phoneSales.length;
-  const techCommissionTotal = phoneSales.reduce((sum, e) => sum + (Number(e.commissionAmount ?? commissionRate) || 0), 0) + phonesSold * (Number(commissionRate) || 0);
-  const commissionBySeller = phoneSales.reduce((acc, e) => { const name = e.seller || 'Não informado'; acc[name] = (acc[name] || 0) + (Number(e.commissionAmount ?? commissionRate) || 0); return acc; }, {});
-  return <div className="page-content"><div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line"/> BALANÇO FINANCEIRO</div><h1>Financeiro & <span>Comissões.</span></h1><p>Comissão fixa por aparelho celular vendido, sem percentual sobre serviços de assistência.</p></div></div>
+  const techCommissionTotal = saleEntries.reduce((sum, e) => sum + (Number(e.commissionAmount ?? commissionRate) || 0), 0) + phonesSold * (Number(commissionRate) || 0);
+  const commissionBySeller = saleEntries.reduce((acc, e) => { const name = e.seller || 'Não informado'; acc[name] = (acc[name] || 0) + (Number(e.commissionAmount ?? commissionRate) || 0); return acc; }, {});
+  return <div className="page-content"><div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line"/> BALANÇO FINANCEIRO</div><h1>Financeiro & <span>Comissões.</span></h1><p>Configure uma regra geral de comissão para as vendas registradas no caixa.</p></div></div>
     <div className="metrics-grid" style={{gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))'}}>
       <div className="metric-card" style={{background:'#0a0a0d',border:'1px solid #18181b'}}><div className="metric-top"><span className="metric-period">BRUTO</span></div><div className="metric-value" style={{color:'#fff'}}>{moneyBR(totalRevenue)}</div><div className="metric-label">Faturamento registrado nas OS</div></div>
       <div className="metric-card" style={{background:'#0a0a0d',border:'1px solid #18181b'}}><div className="metric-top"><span className="metric-period">CUSTOS</span></div><div className="metric-value" style={{color:'#ff4d4d'}}>{moneyBR(totalPartsCost)}</div><div className="metric-label">Custos de peças/insumos informados</div></div>
       <div className="metric-card" style={{background:'#0a0a0d',border:'1px solid #18181b'}}><div className="metric-top"><span className="metric-period">APARELHOS</span></div><div className="metric-value" style={{color:'#60a5fa'}}>{totalPhonesSold}</div><div className="metric-label">Celulares vendidos e entregues</div></div>
-      <div className="metric-card" style={{background:'#0a0a0d',border:'1px solid #18181b'}}><div className="metric-top"><span className="metric-period">COMISSÃO</span></div><div className="metric-value" style={{color:'#25D366'}}>{moneyBR(techCommissionTotal)}</div><div className="metric-label">Total de comissão fixa</div></div>
+      <div className="metric-card" style={{background:'#0a0a0d',border:'1px solid #18181b'}}><div className="metric-top"><span className="metric-period">COMISSÃO</span></div><div className="metric-value" style={{color:'#25D366'}}>{moneyBR(techCommissionTotal)}</div><div className="metric-label">Comissões registradas</div></div>
     </div>
-    <div className="panel" style={{background:'#0a0a0d',border:'1px solid #18181b',padding:20,marginTop:20}}><h3>Configuração da comissão por aparelho</h3><p className="muted">O dono define um valor fixo por celular vendido: por exemplo, R$ 50,00 ou R$ 100,00. Não é porcentagem e não se aplica a reparos.</p><div style={{display:'flex',alignItems:'center',gap:10,marginTop:10,flexWrap:'wrap'}}><span>Comissão por celular vendido: R$</span><input type="number" min="0" step="0.01" value={commissionRate} onChange={e=>setCommissionRate(e.target.value)} style={{background:'#111',color:'#fff',border:'1px solid #333',padding:'8px 12px',borderRadius:6,width:130}}/></div><p className="muted" style={{marginTop:10}}>Observação: o contador só considera registros que estejam marcados como venda de aparelho. A tela de venda precisa marcar essa informação para calcular automaticamente o total.</p></div>
+    <div className="panel" style={{background:'#0a0a0d',border:'1px solid #18181b',padding:20,marginTop:20}}><h3>Metas mensais da equipe</h3><p className="muted">Configure metas para acompanhar o resultado da loja neste mês. Os dados de vendas vêm dos lançamentos do caixa e as OS vêm dos registros cadastrados.</p><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:12,marginTop:12}}><label>Meta de faturamento (R$)<input type="number" min="0" value={goals.revenue} onChange={e=>saveGoals({...goals,revenue:e.target.value})} style={{display:'block',width:'100%',marginTop:6,background:'#111',color:'#fff',border:'1px solid #333',padding:9,borderRadius:6}}/></label><label>Meta de OS no mês<input type="number" min="0" value={goals.orders} onChange={e=>saveGoals({...goals,orders:e.target.value})} style={{display:'block',width:'100%',marginTop:6,background:'#111',color:'#fff',border:'1px solid #333',padding:9,borderRadius:6}}/></label><label>Meta de vendas no caixa<input type="number" min="0" value={goals.sales} onChange={e=>saveGoals({...goals,sales:e.target.value})} style={{display:'block',width:'100%',marginTop:6,background:'#111',color:'#fff',border:'1px solid #333',padding:9,borderRadius:6}}/></label></div>{[{label:'Faturamento em OS',value:monthRevenue,target:goals.revenue,display:moneyBR(monthRevenue)},{label:'Ordens cadastradas',value:thisMonthOrders.length,target:goals.orders,display:String(thisMonthOrders.length)},{label:'Vendas no caixa',value:thisMonthSales,target:goals.sales,display:String(thisMonthSales)}].map(g=><div key={g.label} style={{marginTop:16}}><div style={{display:'flex',justifyContent:'space-between',gap:8,fontSize:13,marginBottom:6}}><span>{g.label}</span><strong>{g.display} / {g.label==='Faturamento em OS'?moneyBR(g.target):g.target}</strong></div><div style={{height:8,background:'#222',borderRadius:8,overflow:'hidden'}}><div style={{height:'100%',width:goalPct(g.value,g.target)+'%',background:'#25D366'}}/></div><small className="muted">{goalPct(g.value,g.target)}% da meta</small></div>)}</div>
+    <div className="panel" style={{background:'#0a0a0d',border:'1px solid #18181b',padding:20,marginTop:20}}><h3>Desempenho individual da equipe</h3><p className="muted">As vendas do caixa aparecem vinculadas ao funcionário selecionado no lançamento. As OS só entram no resultado individual quando tiverem um técnico responsável registrado.</p>{teamMembers.length ? teamMembers.map(member=>{const memberSales=saleEntries.filter(e=>e.seller===member.name);const memberCommission=memberSales.reduce((sum,e)=>sum+(Number(e.commissionAmount)||0),0);const memberOs=thisMonthOrders.filter(o=>(o.technician||o.assignedTo||o.technician_name)===member.name).length;const goal=employeeGoals[member.name]||{sales:10,orders:20};return <div key={member.id||member.name} style={{borderTop:'1px solid #242424',paddingTop:12,marginTop:12}}><strong>{member.name}</strong><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:10,marginTop:8}}><div className="metric-card"><div className="metric-value" style={{fontSize:20}}>{memberSales.length}</div><div className="metric-label">Vendas registradas</div></div><div className="metric-card"><div className="metric-value" style={{fontSize:20,color:'#25D366'}}>{moneyBR(memberCommission)}</div><div className="metric-label">Comissão registrada</div></div><div className="metric-card"><div className="metric-value" style={{fontSize:20}}>{memberOs}</div><div className="metric-label">OS atribuídas no mês</div></div></div><div style={{display:'flex',gap:10,flexWrap:'wrap',marginTop:8}}><label style={{fontSize:12}}>Meta de vendas<input type="number" min="0" value={goal.sales} onChange={e=>saveEmployeeGoals({...employeeGoals,[member.name]:{...goal,sales:e.target.value}})} style={{display:'block',marginTop:4,width:120,background:'#111',color:'#fff',border:'1px solid #333',padding:7,borderRadius:6}}/></label><label style={{fontSize:12}}>Meta de OS<input type="number" min="0" value={goal.orders} onChange={e=>saveEmployeeGoals({...employeeGoals,[member.name]:{...goal,orders:e.target.value}})} style={{display:'block',marginTop:4,width:120,background:'#111',color:'#fff',border:'1px solid #333',padding:7,borderRadius:6}}/></label></div><p className="muted" style={{fontSize:12}}>Progresso de vendas: {goalPct(memberSales.length,goal.sales)}% · Progresso de OS: {goalPct(memberOs,goal.orders)}%</p></div>}) : <p className="muted">Cadastre funcionários em Configurações para acompanhar o desempenho individual.</p>}</div>
+    <div className="panel" style={{background:'#0a0a0d',border:'1px solid #18181b',padding:20,marginTop:20}}><h3>Configuração da comissão por venda</h3><p className="muted">Esta versão permite uma regra geral para a loja. A comissão é gravada no lançamento no momento da venda.</p><div style={{display:'flex',alignItems:'center',gap:10,marginTop:10,flexWrap:'wrap'}}><label>Tipo de comissão<select value={commissionMode} onChange={e=>setCommissionMode(e.target.value)} style={{display:'block',marginTop:6,background:'#111',color:'#fff',border:'1px solid #333',padding:'8px 12px',borderRadius:6}}><option value="fixed">Valor fixo por venda (R$)</option><option value="percent">Percentual sobre a venda (%)</option></select></label><label>{commissionMode==='percent' ? 'Percentual (%)' : 'Valor fixo (R$)'}<input type="number" min="0" step="0.01" value={commissionRate} onChange={e=>setCommissionRate(e.target.value)} style={{display:'block',marginTop:6,background:'#111',color:'#fff',border:'1px solid #333',padding:'8px 12px',borderRadius:6,width:150}}/></label></div><p className="muted" style={{marginTop:10}}>Limitação atual: a regra ainda é geral, não individual por funcionário, e não calcula comissão por serviço de OS. Para isso, cada OS precisa ter técnico responsável e regras próprias por funcionário/categoria.</p></div>
   </div>;
 }
 
@@ -3072,7 +3105,7 @@ function TrackPage({orders, storeName, pixKey, whatsapp, storeAddress, mapsUrl, 
 
   const getRemainingWarrantyDays = (order) => {
     if (!order.createdAt || !order.warrantyDays) return order.warrantyDays || 90;
-    const start = new Date(order.createdAt);
+    const start = new Date(order.deliveredAt || order.createdAt);
     const now = new Date();
     const diffTime = Math.abs(now - start);
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -3107,7 +3140,7 @@ function TrackPage({orders, storeName, pixKey, whatsapp, storeAddress, mapsUrl, 
       <div>
         <div className="eyebrow"><span className="eyebrow-line"/> ÁREA DO CLIENTE</div>
         <h1>Acompanhar <span>Atendimento.</span></h1>
-        <p>Digite o número da sua Ordem de Serviço para ver o status em tempo real.</p>
+        <p>Use o código exclusivo enviado pela assistência no WhatsApp. Ele corresponde ao número da sua Ordem de Serviço.</p>
       </div>
     </div>
 
@@ -3162,8 +3195,12 @@ function TrackPage({orders, storeName, pixKey, whatsapp, storeAddress, mapsUrl, 
 
           <p style={{margin: '5px 0', fontSize: '14px', color: '#aaa'}}><strong>Cliente:</strong> {foundOs.customer}</p>
           <p style={{margin: '5px 0', fontSize: '14px', color: '#aaa'}}><strong>Item / Aparelho:</strong> {foundOs.device}</p>
-          <p style={{margin: '5px 0', fontSize: '14px', color: '#aaa'}}><strong>Descrição:</strong> {foundOs.issue}</p>
-          <p style={{margin: '5px 0', fontSize: '14px', color: '#aaa'}}><strong>Valor do Serviço:</strong> <span style={{color: '#25D366', fontWeight: 'bold'}}>{foundOs.amount}</span></p>
+          <p style={{margin: '5px 0', fontSize: '14px', color: '#aaa'}}><strong>Defeito informado:</strong> {foundOs.issue || 'Não informado'}</p>
+          <p style={{margin: '5px 0', fontSize: '14px', color: '#aaa'}}><strong>Diagnóstico técnico:</strong> {foundOs.diagnosis || 'Aguardando avaliação técnica'}</p>
+          <p style={{margin: '5px 0', fontSize: '14px', color: '#aaa'}}><strong>Orçamento:</strong> <span style={{color: '#25D366', fontWeight: 'bold'}}>{foundOs.amount || 'A definir'}</span></p>
+          {foundOs.checklist && <div style={{marginTop:12,padding:12,background:'#0a0a0d',border:'1px solid #222',borderRadius:8}}><strong style={{fontSize:13}}>Resumo do check-in</strong>{Object.entries({screen:'Tela / Touchscreen',faceId:'Face ID / Touch ID',cameras:'Câmeras',charging:'Carga / Bateria',audio:'Áudio / Microfone',wifi:'Wi-Fi / Bluetooth / Chip',housing:'Carcaça / Vidro traseiro'}).map(([key,label])=><p key={key} style={{fontSize:12,margin:'6px 0',color:'#aaa'}}>{label}: <strong style={{color:foundOs.checklist[key]==='ok'?'#25D366':foundOs.checklist[key]==='issue'?'#ff6464':'#ddd'}}>{foundOs.checklist[key]==='ok'?'OK':foundOs.checklist[key]==='issue'?'Com avaria':'Não registrado'}</strong></p>)}</div>}
+          {!!foundOs.checkinPhotos?.length && <div style={{marginTop:12}}><strong style={{fontSize:13}}>Fotos registradas no check-in</strong><div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:8}}>{foundOs.checkinPhotos.map((src,i)=><img key={i} src={src} alt={`Foto do check-in ${i+1}`} style={{width:100,height:100,objectFit:'cover',borderRadius:8,border:'1px solid #333'}}/>)}</div></div>}
+          <p style={{margin: '5px 0', fontSize: '14px', color: '#aaa'}}><strong>Garantia:</strong> {foundOs.warrantyDays || 90} dias a partir da entrega do aparelho, conforme o serviço registrado.</p>
 
           {foundOs.status === 'Aguardando aprovação' && (
             <div style={{marginTop: '20px', background: '#1c1917', border: '1px solid #78350f', padding: '16px', borderRadius: '10px', textAlign: 'center'}}>
@@ -3641,45 +3678,6 @@ const fieldStyle = { background: '#111', color: '#fff', border: '1px solid #333'
 const formGrid = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: '10px', marginBottom: '14px' };
 function ModuleHeading({eyebrow, title, description}) { return <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line"/>{eyebrow}</div><h1>{title}</h1><p>{description}</p></div></div>; }
 
-function PartsInventoryPage({orders, notify}) {
-  const [parts, setParts] = useLocalRecords('rt_parts_inventory_v1');
-  const [name, setName] = useState('');
-  const [qty, setQty] = useState('1');
-  const add = e => {
-    e.preventDefault();
-    if (!name.trim()) return notify?.('Digite o nome da peça.');
-    const quantity = Math.max(1, Number(qty) || 1);
-    setParts(prev => [{ id: String(Date.now()), name: name.trim(), qty: quantity, min: 2 }, ...prev]);
-    setName(''); setQty('1'); notify?.('Peça adicionada ao estoque.');
-  };
-  const changeQty = (id, delta) => setParts(prev => prev.map(p => p.id === id ? { ...p, qty: Math.max(0, Number(p.qty || 0) + delta) } : p));
-  return <div className="page-content">
-    <ModuleHeading eyebrow="ESTOQUE DA BANCADA" title={<>Peças & <span>Insumos.</span></>} description="Cadastre peças, ajuste quantidades e veja o que está acabando."/>
-    <form className="panel" onSubmit={add} style={{padding:18,background:'#0a0a0d',border:'1px solid #18181b'}}>
-      <h3>Adicionar peça</h3>
-      <div style={formGrid}>
-        <input style={fieldStyle} placeholder="Nome da peça (ex.: Tela iPhone 13)" value={name} onChange={e=>setName(e.target.value)} required/>
-        <input style={fieldStyle} type="number" min="1" placeholder="Quantidade" value={qty} onChange={e=>setQty(e.target.value)} required/>
-      </div>
-      <button className="primary-btn"><Plus size={16}/> Adicionar ao estoque</button>
-    </form>
-    <section className="panel" style={{marginTop:16,background:'#0a0a0d',border:'1px solid #18181b'}}>
-      <div className="table-wrap"><table><thead><tr><th>PEÇA</th><th>QUANTIDADE</th><th>STATUS</th><th>AÇÕES</th></tr></thead><tbody>
-        {parts.map(p=><tr key={p.id}><td><strong>{p.name}</strong></td><td><strong>{p.qty}</strong></td><td><span className={`status-pill ${p.qty<=2?'amber':'green'}`}>{p.qty<=2?'Estoque baixo':'Disponível'}</span></td><td style={{display:'flex',gap:6,flexWrap:'wrap'}}><button className="secondary-btn" onClick={()=>changeQty(p.id,-1)} disabled={p.qty<=0}>− 1</button><button className="secondary-btn" onClick={()=>changeQty(p.id,1)}>+ 1</button><button className="secondary-btn" onClick={()=>setParts(prev=>prev.filter(x=>x.id!==p.id))}><Trash2 size={14}/> Excluir</button></td></tr>)}
-      </tbody></table>{!parts.length&&<div className="empty-state"><Wrench/><strong>Nenhuma peça cadastrada</strong><span>Use o formulário acima para começar.</span></div>}</div>
-    </section>
-    <p className="muted">Este estoque é separado dos acessórios vendidos no balcão. Os dados ficam salvos neste navegador; para compartilhar entre usuários e aparelhos, é necessário conectar o módulo ao Supabase.</p>
-  </div>;
-}
-
-function QuotesPage({orders, onApprove, storeName, whatsapp}) {
- const [quotes,setQuotes] = useLocalRecords('rt_quotes_v1'); const [f,setF]=useState({customer:'',phone:'',device:'',description:'',amount:'',validity:'7',orderId:''});
- const create=e=>{e.preventDefault();const q={...f,id:`ORC-${Date.now().toString().slice(-6)}`,status:'Aguardando aprovação',createdAt:new Date().toISOString()};setQuotes(p=>[q,...p]);setF({customer:'',phone:'',device:'',description:'',amount:'',validity:'7',orderId:''});};
- const share=q=>{const msg=encodeURIComponent(`Olá ${q.customer}! Segue o orçamento ${q.id} da ${storeName}.\nAparelho/serviço: ${q.device}\nDescrição: ${q.description}\nValor: ${moneyBR(q.amount)}\nValidade: ${q.validity} dias.\nPara aprovar, responda APROVO a esta mensagem.`);window.open(`https://wa.me/${(q.phone||whatsapp||'').replace(/\D/g,'')}?text=${msg}`,'_blank');};
- const approve=q=>{setQuotes(ps=>ps.map(x=>x.id===q.id?{...x,status:'Aprovado',approvedAt:new Date().toISOString()}:x));if(q.orderId)onApprove?.(q);};
- return <div className="page-content"><ModuleHeading eyebrow="PROPOSTAS COMERCIAIS" title={<>Orçamentos <span>Prévios.</span></>} description="Crie propostas com validade, envie pelo WhatsApp e registre a aprovação antes de transformar em serviço."/><form className="panel" onSubmit={create} style={{padding:18,background:'#0a0a0d',border:'1px solid #18181b'}}><h3>Gerar novo orçamento</h3><div style={formGrid}>{[['customer','Nome do cliente'],['phone','WhatsApp com DDI/DDD'],['device','Aparelho / serviço'],['description','Descrição do orçamento'],['amount','Valor total (R$)'],['validity','Validade em dias']].map(([k,label])=><input key={k} style={fieldStyle} placeholder={label} value={f[k]} onChange={e=>setF({...f,[k]:e.target.value})} required={['customer','device','description','amount'].includes(k)} type={k==='amount'||k==='validity'?'number':'text'} min={k==='amount'?'0':k==='validity'?'1':undefined}/>) }<select style={fieldStyle} value={f.orderId} onChange={e=>setF({...f,orderId:e.target.value})}><option value="">Vincular a uma OS (opcional)</option>{orders.map(o=><option key={o.id} value={o.id}>{o.id} — {o.customer} — {o.device}</option>)}</select></div><button className="primary-btn"><FileText size={16}/> Criar orçamento</button></form><div className="panel" style={{marginTop:16,background:'#0a0a0d',border:'1px solid #18181b'}}><div className="table-wrap"><table><thead><tr><th>CÓDIGO</th><th>CLIENTE</th><th>APARELHO / SERVIÇO</th><th>VALOR</th><th>VALIDADE</th><th>STATUS</th><th>AÇÕES</th></tr></thead><tbody>{quotes.map(q=><tr key={q.id}><td>{q.id}</td><td>{q.customer}<br/><small>{q.phone}</small></td><td>{q.device}<br/><small>{q.description}</small></td><td><strong>{moneyBR(q.amount)}</strong></td><td>{q.validity} dias</td><td>{q.status}</td><td style={{display:'flex',gap:6,flexWrap:'wrap'}}><button className="secondary-btn" onClick={()=>share(q)}><Send size={14}/> WhatsApp</button>{q.status!=='Aprovado'&&<button className="primary-btn" onClick={()=>approve(q)}><Check size={14}/> Registrar aprovação</button>}<button className="secondary-btn" onClick={()=>window.print()}><Printer size={14}/> PDF / Imprimir</button></td></tr>)}</tbody></table>{!quotes.length&&<div className="empty-state"><FileText/><strong>Nenhum orçamento gerado</strong></div>}</div></div><p className="muted">Observação: nesta versão, o lojista registra a aprovação manualmente; se o orçamento estiver vinculado a uma OS, o sistema tenta mover essa OS para Em manutenção. Para o próprio cliente aprovar por link e a resposta chegar automaticamente, será necessário publicar uma página pública segura com token no backend.</p></div>;
-}
-
 function ClientUsedDevicesPage({storeName, whatsapp, devices, enabled}) {
   const available = (devices || []).filter(d => d.available !== false && d.status !== 'Vendido');
   return <div className="page-content">
@@ -3725,7 +3723,8 @@ function PostSalePage({storeName,whatsapp}) {
  const add=e=>{e.preventDefault();setItems(p=>[{...f,id:String(Date.now()),status:'Aguardando avaliação',createdAt:new Date().toISOString(),rating:0,comment:''},...p]);setF({customer:'',phone:'',purchase:'',amount:'',payment:'Confirmado'});};
  const send=x=>{const msg=encodeURIComponent(`Olá ${x.customer}! Obrigado por comprar na ${storeName}. Sua compra de ${x.purchase} (${moneyBR(x.amount)}) foi registrada. Avalie sua experiência neste link: ${window.location.origin}/avaliar/${x.id}`);window.open(`https://wa.me/${(x.phone||whatsapp||'').replace(/\D/g,'')}?text=${msg}`,'_blank');setItems(ps=>ps.map(i=>i.id===x.id?{...i,status:'Convite enviado'}:i));};
  const saveReview=(id)=>{const r=rating[id]||{};setItems(ps=>ps.map(i=>i.id===id?{...i,rating:Number(r.stars)||5,comment:r.comment||'',status:'Avaliação registrada'}:i));};
- return <div className="page-content"><ModuleHeading eyebrow="RELACIONAMENTO COM CLIENTES" title={<>Chat de <span>Pós-Venda.</span></>} description="As OS marcadas como Entregue entram automaticamente nesta fila. Envie o convite pelo WhatsApp e acompanhe as avaliações recebidas."/><form className="panel" onSubmit={add} style={{padding:18,background:'#0a0a0d',border:'1px solid #18181b'}}><h3>Registrar compra paga (vendas fora da OS)</h3><div style={formGrid}><input style={fieldStyle} placeholder="Nome do cliente" value={f.customer} onChange={e=>setF({...f,customer:e.target.value})} required/><input style={fieldStyle} placeholder="WhatsApp do cliente" value={f.phone} onChange={e=>setF({...f,phone:e.target.value})} required/><input style={fieldStyle} placeholder="Produto / aparelho comprado" value={f.purchase} onChange={e=>setF({...f,purchase:e.target.value})} required/><input style={fieldStyle} type="number" min="0" step="0.01" placeholder="Valor pago" value={f.amount} onChange={e=>setF({...f,amount:e.target.value})} required/><select style={fieldStyle} value={f.payment} onChange={e=>setF({...f,payment:e.target.value})}><option>Confirmado</option><option>Pix confirmado</option><option>Cartão confirmado</option><option>Dinheiro confirmado</option></select></div><button className="primary-btn"><CheckCircle2 size={16}/> Registrar compra confirmada</button></form><div className="panel" style={{marginTop:16,background:'#0a0a0d',border:'1px solid #18181b'}}><div className="table-wrap"><table><thead><tr><th>CLIENTE / COMPRA</th><th>VALOR</th><th>STATUS</th><th>AVALIAÇÃO</th><th>AÇÕES</th></tr></thead><tbody>{items.map(x=><tr key={x.id}><td><strong>{x.customer}</strong><br/>{x.purchase}<br/><small>{x.phone}</small></td><td>{moneyBR(x.amount)}</td><td>{x.status}</td><td>{x.rating?`${x.rating}/5 estrelas — ${x.comment||'Sem comentário'}`:<div style={{minWidth:180}}><select style={fieldStyle} value={rating[x.id]?.stars||'5'} onChange={e=>setRating(r=>({...r,[x.id]:{...r[x.id],stars:e.target.value}}))}><option value="5">5 estrelas</option><option value="4">4 estrelas</option><option value="3">3 estrelas</option><option value="2">2 estrelas</option><option value="1">1 estrela</option></select><input style={{...fieldStyle,marginTop:5}} placeholder="Comentário do cliente" value={rating[x.id]?.comment||''} onChange={e=>setRating(r=>({...r,[x.id]:{...r[x.id],comment:e.target.value}}))}/><button className="secondary-btn" style={{marginTop:5}} onClick={()=>saveReview(x.id)}>Salvar avaliação</button></div>}</td><td><button className="primary-btn" onClick={()=>send(x)}><MessageCircle size={14}/> Enviar WhatsApp</button><button className="secondary-btn" style={{marginLeft:5}} onClick={()=>setItems(ps=>ps.filter(i=>i.id!==x.id))}>Excluir</button></td></tr>)}</tbody></table>{!items.length&&<div className="empty-state"><HeartHandshake/><strong>Nenhuma compra no pós-venda</strong></div>}</div></div><p className="muted">As OS marcadas como Entregue entram automaticamente na fila. Por segurança, o WhatsApp ainda precisa ser aberto/enviado pelo operador nesta versão. Para o cliente registrar estrelas e comentário e isso aparecer automaticamente aqui, precisamos publicar uma página pública de avaliação conectada ao Supabase e integrar o envio pela API oficial do WhatsApp; o link demonstrativo atual ainda não recebe avaliações.</p></div>;
+ const sendFollowup=(x,days)=>{const msg=encodeURIComponent(`Olá ${x.customer}! Aqui é da ${storeName}. Estamos entrando em contato ${days} dias após seu atendimento referente a ${x.purchase}. Está tudo funcionando bem? Se precisar de ajuda, estamos à disposição.`);window.open(`https://wa.me/${String(x.phone||whatsapp||'').replace(/\D/g,'')}?text=${msg}`,'_blank');};
+ return <div className="page-content"><ModuleHeading eyebrow="RELACIONAMENTO COM CLIENTES" title={<>Chat de <span>Pós-Venda.</span></>} description="As OS marcadas como Entregue entram automaticamente nesta fila. Envie o convite pelo WhatsApp e acompanhe as avaliações recebidas."/><form className="panel" onSubmit={add} style={{padding:18,background:'#0a0a0d',border:'1px solid #18181b'}}><h3>Registrar compra paga (vendas fora da OS)</h3><div style={formGrid}><input style={fieldStyle} placeholder="Nome do cliente" value={f.customer} onChange={e=>setF({...f,customer:e.target.value})} required/><input style={fieldStyle} placeholder="WhatsApp do cliente" value={f.phone} onChange={e=>setF({...f,phone:e.target.value})} required/><input style={fieldStyle} placeholder="Produto / aparelho comprado" value={f.purchase} onChange={e=>setF({...f,purchase:e.target.value})} required/><input style={fieldStyle} type="number" min="0" step="0.01" placeholder="Valor pago" value={f.amount} onChange={e=>setF({...f,amount:e.target.value})} required/><select style={fieldStyle} value={f.payment} onChange={e=>setF({...f,payment:e.target.value})}><option>Confirmado</option><option>Pix confirmado</option><option>Cartão confirmado</option><option>Dinheiro confirmado</option></select></div><button className="primary-btn"><CheckCircle2 size={16}/> Registrar compra confirmada</button></form><div className="panel" style={{marginTop:16,background:'#0a0a0d',border:'1px solid #18181b'}}><div className="table-wrap"><table><thead><tr><th>CLIENTE / COMPRA</th><th>VALOR</th><th>STATUS</th><th>AVALIAÇÃO</th><th>AÇÕES</th></tr></thead><tbody>{items.map(x=><tr key={x.id}><td><strong>{x.customer}</strong><br/>{x.purchase}<br/><small>{x.phone}</small></td><td>{moneyBR(x.amount)}</td><td>{x.status}<div style={{marginTop:6,display:'flex',gap:4,flexWrap:'wrap'}}>{[30,60,90].map(days=><button key={days} type="button" className="secondary-btn" style={{fontSize:10,padding:'4px 6px'}} onClick={()=>sendFollowup(x,days)}>Contato {days}d</button>)}</div></td><td>{x.rating?`${x.rating}/5 estrelas — ${x.comment||'Sem comentário'}`:<div style={{minWidth:180}}><select style={fieldStyle} value={rating[x.id]?.stars||'5'} onChange={e=>setRating(r=>({...r,[x.id]:{...r[x.id],stars:e.target.value}}))}><option value="5">5 estrelas</option><option value="4">4 estrelas</option><option value="3">3 estrelas</option><option value="2">2 estrelas</option><option value="1">1 estrela</option></select><input style={{...fieldStyle,marginTop:5}} placeholder="Comentário do cliente" value={rating[x.id]?.comment||''} onChange={e=>setRating(r=>({...r,[x.id]:{...r[x.id],comment:e.target.value}}))}/><button className="secondary-btn" style={{marginTop:5}} onClick={()=>saveReview(x.id)}>Salvar avaliação</button></div>}</td><td><button className="primary-btn" onClick={()=>send(x)}><MessageCircle size={14}/> Enviar WhatsApp</button><button className="secondary-btn" style={{marginLeft:5}} onClick={()=>setItems(ps=>ps.filter(i=>i.id!==x.id))}>Excluir</button></td></tr>)}</tbody></table>{!items.length&&<div className="empty-state"><HeartHandshake/><strong>Nenhuma compra no pós-venda</strong></div>}</div></div><p className="muted">As OS marcadas como Entregue entram automaticamente na fila. Os contatos de 30, 60 e 90 dias são preparados para envio manual pelo WhatsApp nesta versão. Para o cliente registrar estrelas e comentário e isso aparecer automaticamente aqui, precisamos publicar uma página pública de avaliação conectada ao Supabase e integrar o envio pela API oficial do WhatsApp; o link demonstrativo atual ainda não recebe avaliações.</p></div>;
 }
 
 export default App;
