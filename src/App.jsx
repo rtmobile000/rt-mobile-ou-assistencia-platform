@@ -701,6 +701,9 @@ function App() {
       return { isOpen: false, openingBalance: 0.00, openedAt: null, openedBy: '', entries: [], closedSessions: [] };
     }
   });
+  // O caixa e o estoque são sincronizados por organização no Supabase após a leitura inicial.
+  const [activeOrganizationId, setActiveOrganizationId] = useState(null);
+  const [remotePersistenceReady, setRemotePersistenceReady] = useState(false);
 
   // Equipe
   const [teamMembers, setTeamMembers] = useState([]);
@@ -841,6 +844,7 @@ function App() {
 
   const fetchData = async () => {
     if (!supabaseConfigured || !session) return;
+    setRemotePersistenceReady(false);
     const userEmail = session.user?.email?.toLowerCase();
     const isOwnerByEmail = userEmail === ADMIN_EMAIL.toLowerCase();
 
@@ -854,6 +858,18 @@ function App() {
       .select('*')
       .eq('owner_user_id', session.user.id)
       .limit(1);
+
+    // Se o usuário é membro/funcionário e não dono direto da loja, recupera sua organização vinculada.
+    if (!orgData || orgData.length === 0) {
+      const { data: memberships } = await supabase.from('organization_members')
+        .select('organization_id').eq('user_id', session.user.id).limit(1);
+      const memberOrgId = memberships?.[0]?.organization_id;
+      if (memberOrgId) {
+        const { data: memberOrg, error: memberOrgError } = await supabase.from('organizations')
+          .select('*').eq('id', memberOrgId).maybeSingle();
+        if (!memberOrgError && memberOrg) orgData = [memberOrg];
+      }
+    }
 
     if ((!orgData || orgData.length === 0) && userRole === 'tech' && !isOwnerByEmail) {
       const defaultName = `Loja ${session.user.email.split('@')[0].toUpperCase()}`;
@@ -870,6 +886,29 @@ function App() {
     }
 
     const org = orgData?.[0];
+    const organizationId = org?.id || null;
+    setActiveOrganizationId(organizationId);
+
+    if (organizationId) {
+      const [cashStateResult, inventoryStateResult] = await Promise.all([
+        supabase.from('rt_cash_register_state').select('state').eq('organization_id', organizationId).maybeSingle(),
+        supabase.from('rt_inventory_state').select('items').eq('organization_id', organizationId).maybeSingle()
+      ]);
+      if (cashStateResult.error || inventoryStateResult.error) {
+        console.warn('Persistência remota do caixa/estoque ainda não está disponível. Execute o SQL de integração e recarregue o app.', cashStateResult.error || inventoryStateResult.error);
+        setRemotePersistenceReady(false);
+      } else {
+        // Se a organização ainda não possui registro remoto, mantém os dados locais existentes
+        // e o efeito abaixo os envia ao banco na primeira sincronização.
+        if (cashStateResult.data?.state && typeof cashStateResult.data.state === 'object') {
+          setCashRegister({ isOpen: false, openingBalance: 0, openedAt: null, openedBy: '', entries: [], closedSessions: [], ...cashStateResult.data.state });
+        }
+        if (Array.isArray(inventoryStateResult.data?.items)) setInventory(inventoryStateResult.data.items);
+        setRemotePersistenceReady(true);
+      }
+    } else {
+      setRemotePersistenceReady(false);
+    }
 
     if (org || isOwnerByEmail) {
       if (org?.name) setStoreName(org.name);
@@ -1001,11 +1040,29 @@ function App() {
 
   useEffect(() => {
     try { localStorage.setItem('rt_cash_register_v1', JSON.stringify(cashRegister)); } catch (err) { console.warn('Não foi possível salvar o caixa neste navegador.', err); }
-  }, [cashRegister]);
+    if (!remotePersistenceReady || !activeOrganizationId || !session?.user?.id) return;
+    supabase.from('rt_cash_register_state').upsert({
+      organization_id: activeOrganizationId,
+      state: cashRegister,
+      updated_by: session.user.id,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'organization_id' }).then(({ error }) => {
+      if (error) console.warn('Não foi possível sincronizar o caixa com o Supabase:', error.message);
+    });
+  }, [cashRegister, activeOrganizationId, remotePersistenceReady, session?.user?.id]);
 
   useEffect(() => {
     try { localStorage.setItem('rt_inventory_v1', JSON.stringify(inventory)); } catch (err) { console.warn('Não foi possível salvar o estoque neste navegador.', err); }
-  }, [inventory]);
+    if (!remotePersistenceReady || !activeOrganizationId || !session?.user?.id) return;
+    supabase.from('rt_inventory_state').upsert({
+      organization_id: activeOrganizationId,
+      items: inventory,
+      updated_by: session.user.id,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'organization_id' }).then(({ error }) => {
+      if (error) console.warn('Não foi possível sincronizar o estoque com o Supabase:', error.message);
+    });
+  }, [inventory, activeOrganizationId, remotePersistenceReady, session?.user?.id]);
 
   useEffect(() => { fetchData(); }, [session]);
 
