@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity, ArrowUpRight, Bell, Camera, Check, ChevronDown, CircleHelp,
   ClipboardList, Clock3, CreditCard, Gauge, LogOut, Menu, MessageCircle,
-  Plus, RefreshCw, Search, Settings, ShieldCheck, Smartphone, Sparkles, Store, Users, Wrench, X, Upload, PhoneCall, QrCode, Package, Sliders, Trash2, CheckSquare, Printer, Star, DollarSign, Send, Calendar, Clock, Lock, UserPlus, AlertTriangle, History, Wallet, MapPin, Copy, FileText, HeartHandshake, Key, CheckCircle2, XCircle, Eraser, ShoppingCart, Truck, UserCheck, CheckCircle, Tv, Maximize2, Minimize2
+  Plus, RefreshCw, Search, Settings, ShieldCheck, Smartphone, Sparkles, Store, Users, Wrench, X, Upload, PhoneCall, QrCode, Package, Sliders, Trash2, CheckSquare, Printer, Star, DollarSign, Send, Calendar, Clock, Lock, UserPlus, AlertTriangle, History, Wallet, MapPin, Copy, FileText, HeartHandshake, Key, CheckCircle2, XCircle, Eraser, ShoppingCart, Truck, UserCheck, CheckCircle, Tv, Maximize2, Minimize2, Pencil
 } from 'lucide-react';
 import { supabase, supabaseConfigured } from './lib/supabase';
 
@@ -90,6 +90,8 @@ function BarcodeCameraScanner({ onDetected, onClose }) {
   const videoRef = useRef(null);
   const [errorMsg, setErrorMsg] = useState('');
   const streamRef = useRef(null);
+  const onDetectedRef = useRef(onDetected);
+  useEffect(() => { onDetectedRef.current = onDetected; }, [onDetected]);
 
   useEffect(() => {
     let active = true;
@@ -104,6 +106,8 @@ function BarcodeCameraScanner({ onDetected, onClose }) {
         detector = null;
       }
     }
+
+    if (!detector) setErrorMsg('Este navegador abriu a câmera, mas não oferece leitura de código de barras integrada. Use um leitor USB/Bluetooth ou digite o código.');
 
     navigator.mediaDevices?.getUserMedia({ video: { facingMode: 'environment' } })
       .then(stream => {
@@ -120,7 +124,7 @@ function BarcodeCameraScanner({ onDetected, onClose }) {
               try {
                 const barcodes = await detector.detect(videoRef.current);
                 if (barcodes.length > 0) {
-                  onDetected(barcodes[0].rawValue);
+                  onDetectedRef.current?.(barcodes[0].rawValue);
                   return;
                 }
               } catch (e) {
@@ -143,7 +147,7 @@ function BarcodeCameraScanner({ onDetected, onClose }) {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
     };
-  }, [onDetected]);
+  }, []);
 
   return (
     <div className="modal-backdrop" onClick={onClose} style={{zIndex: 99999}}>
@@ -669,6 +673,7 @@ function App() {
   const [showNewOrder, setShowNewOrder] = useState(false);
   const [showNewCustomer, setShowNewCustomer] = useState(false);
   const [showNewProduct, setShowNewProduct] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showChecklistModal, setShowChecklistModal] = useState(null);
   const [showPrintModal, setShowPrintModal] = useState(null);
@@ -1073,6 +1078,92 @@ await fetchData();
     notify('Produto adicionado ao estoque!');
   };
 
+  const editProduct = (id) => {
+    const product = inventory.find(p => String(p.id) === String(id));
+    if (!product) return;
+    const name = window.prompt('Nome do produto:', product.name);
+    if (name === null) return;
+    const category = window.prompt('Categoria:', product.category || 'Acessórios');
+    if (category === null) return;
+    const priceText = window.prompt('Preço de venda (ex.: 29,90):', String(product.price ?? ''));
+    if (priceText === null) return;
+    const price = Number(String(priceText).replace(',', '.'));
+    if (!name.trim() || !Number.isFinite(price) || price < 0) { notify('Nome ou preço inválido.'); return; }
+    const qtyText = window.prompt('Quantidade em estoque:', String(product.qty ?? 0));
+    if (qtyText === null) return;
+    const qty = Number(qtyText);
+    if (!Number.isInteger(qty) || qty < 0) { notify('Quantidade inválida.'); return; }
+    const barcode = window.prompt('Código de barras (deixe vazio para remover):', product.barcode || '');
+    if (barcode === null) return;
+    const duplicate = inventory.some(p => String(p.id) !== String(id) && barcode.trim() && String(p.barcode || '').trim() === barcode.trim());
+    if (duplicate) { notify('Esse código de barras já está cadastrado em outro produto.'); return; }
+    setInventory(prev => prev.map(p => String(p.id) === String(id) ? { ...p, name: name.trim(), category: category.trim(), price: price.toFixed(2), qty, barcode: barcode.trim() } : p));
+    addAuditLog(`Editou o produto ${name.trim()}`);
+    notify('Produto atualizado.');
+  };
+
+  const editCustomer = async (customer) => {
+    const name = window.prompt('Nome do cliente:', customer.name || ''); if (name === null) return;
+    const phone = window.prompt('Telefone / WhatsApp:', customer.phone || ''); if (phone === null) return;
+    const email = window.prompt('E-mail:', customer.email || ''); if (email === null) return;
+    if (!name.trim()) { notify('O nome do cliente é obrigatório.'); return; }
+    try {
+      if (supabaseConfigured && session && customer.id) {
+        const { error } = await supabase.from('customers').update({ name: name.trim(), phone: phone.trim() || null, email: email.trim() || null }).eq('id', customer.id);
+        if (error) throw error;
+        await fetchData();
+      } else {
+        setCustomers(prev => prev.map(c => String(c.id) === String(customer.id) ? { ...c, name: name.trim(), phone: phone.trim(), email: email.trim() } : c));
+      }
+      addAuditLog(`Editou o cadastro do cliente ${name.trim()}`); notify('Cliente atualizado.');
+    } catch (err) { notify(err.message || 'Não foi possível atualizar o cliente.'); }
+  };
+
+  const deleteCustomer = async (customer) => {
+    const linked = orders.some(o => String(o.customer || '').trim().toLowerCase() === String(customer.name || '').trim().toLowerCase());
+    if (linked) { notify('Este cliente tem OS no histórico. Para preservar o histórico, não é possível excluir o cadastro agora.'); return; }
+    if (!window.confirm(`Excluir o cliente ${customer.name}? Esta ação não pode ser desfeita.`)) return;
+    try {
+      if (supabaseConfigured && session && customer.id) {
+        const { error } = await supabase.from('customers').delete().eq('id', customer.id);
+        if (error) throw error;
+        await fetchData();
+      } else setCustomers(prev => prev.filter(c => String(c.id) !== String(customer.id)));
+      addAuditLog(`Excluiu o cliente ${customer.name}`); notify('Cliente excluído.');
+    } catch (err) { notify(err.message || 'Não foi possível excluir o cliente.'); }
+  };
+
+  const editOrder = async (order) => {
+    const customer = window.prompt('Nome do cliente:', order.customer || ''); if (customer === null) return;
+    const phone = window.prompt('Telefone / WhatsApp:', order.phone || ''); if (phone === null) return;
+    const device = window.prompt('Aparelho / modelo:', order.device || ''); if (device === null) return;
+    const issue = window.prompt('Defeito relatado:', order.issue || ''); if (issue === null) return;
+    const amountText = window.prompt('Valor total da OS (ex.: 150,00):', String(parseMoneyValue(order.amount))); if (amountText === null) return;
+    const amount = Number(String(amountText).replace(',', '.'));
+    if (!customer.trim() || !device.trim() || !issue.trim() || !Number.isFinite(amount) || amount < 0) { notify('Confira os dados informados.'); return; }
+    try {
+      if (supabaseConfigured && session && order.rawId) {
+        const deviceParts = device.trim().split(/\s+/);
+        const { error } = await supabase.from('repair_orders').update({ customer_name: customer.trim(), customer_phone: phone.trim() || null, device_brand: deviceParts[0] || 'Outro', device_model: deviceParts.slice(1).join(' ') || device.trim(), issue_description: issue.trim(), total_amount: amount }).eq('id', order.rawId);
+        if (error) throw error;
+        await fetchData();
+      } else setOrders(prev => prev.map(o => String(o.rawId || o.id) === String(order.rawId || order.id) ? { ...o, customer: customer.trim(), phone: phone.trim(), device: device.trim(), issue: issue.trim(), amount: `R$ ${amount.toFixed(2)}` } : o));
+      addAuditLog(`Editou a ordem ${order.id}`); notify('Ordem de serviço atualizada.');
+    } catch (err) { notify(err.message || 'Não foi possível atualizar a OS.'); }
+  };
+
+  const deleteOrder = async (order) => {
+    if (!window.confirm(`Excluir a ordem ${order.id} de ${order.customer}? Confira antes se existem pagamentos ou garantias vinculados.`)) return;
+    try {
+      if (supabaseConfigured && session && order.rawId) {
+        const { error } = await supabase.from('repair_orders').delete().eq('id', order.rawId);
+        if (error) throw error;
+        await fetchData();
+      } else setOrders(prev => prev.filter(o => String(o.rawId || o.id) !== String(order.rawId || order.id)));
+      addAuditLog(`Excluiu a ordem ${order.id}`); notify('Ordem excluída.');
+    } catch (err) { notify(err.message || 'Não foi possível excluir a OS. O banco pode bloquear a exclusão por haver registros vinculados.'); }
+  };
+
   const handleProductPhotoUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -1105,7 +1196,10 @@ await fetchData();
   };
 
   const deleteProduct = (id) => {
-    setInventory(prev => prev.filter(p => p.id !== id));
+    const product = inventory.find(p => String(p.id) === String(id));
+    if (!product) return;
+    if (!window.confirm(`Excluir o produto ${product.name}? O histórico de vendas já registradas não será apagado.`)) return;
+    setInventory(prev => prev.filter(p => String(p.id) !== String(id)));
     notify('Produto removido.');
   };
 
@@ -1161,6 +1255,7 @@ await fetchData();
       category: 'Acessórios',
       seller: '', paymentMethod: paymentMethod || 'Dinheiro', sourceType: 'sale', productId: found.id,
       commissionAmount: 0,
+      quantity: 1, unitPrice: val,
       amount: val,
       createdAt: new Date().toISOString(), time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
       user: userAccessLevel === 'owner' ? 'Dono' : 'Técnico'
@@ -1757,11 +1852,11 @@ await fetchData();
             </header>
             
             {active==='overview' && userRole === 'tech' && <Overview orders={orders} storeName={storeName} onNew={()=>setShowNewOrder(true)} onNavigate={setActive} modules={modules} inventory={inventory} onOpenTv={() => setShowTvMode(true)} />}
-            {active==='orders' && userRole === 'tech' && <OrdersPage orders={filteredOrders} search={search} setSearch={setSearch} onNew={()=>setShowNewOrder(true)} onPay={o=>{ const due=Math.max(0,parseMoneyValue(o.amount)-Number(o.paidAmount||0)); if(due<=0){notify('Esta OS já está quitada.');return;} setShowOrderPaymentModal(o); setOrderPayment({amount:due.toFixed(2),method:'Pix'}); }} onStatus={handleUpdateStatus} onShare={shareOsStatusWhatsapp} onSendWarranty={sendWarrantyTermWhatsapp} onOpenChecklist={(o) => setShowChecklistModal(o)} onPrint={(o) => setShowPrintModal(o)} onPellicleReminder={sendPellicleReminder} />}
-            {active==='customers' && userRole === 'tech' && <CustomersPage customers={customers} onNew={()=>setShowNewCustomer(true)} />}
+            {active==='orders' && userRole === 'tech' && <OrdersPage orders={filteredOrders} search={search} setSearch={setSearch} onNew={()=>setShowNewOrder(true)} onEdit={editOrder} onDelete={deleteOrder} onPay={o=>{ const due=Math.max(0,parseMoneyValue(o.amount)-Number(o.paidAmount||0)); if(due<=0){notify('Esta OS já está quitada.');return;} setShowOrderPaymentModal(o); setOrderPayment({amount:due.toFixed(2),method:'Pix'}); }} onStatus={handleUpdateStatus} onShare={shareOsStatusWhatsapp} onSendWarranty={sendWarrantyTermWhatsapp} onOpenChecklist={(o) => setShowChecklistModal(o)} onPrint={(o) => setShowPrintModal(o)} onPellicleReminder={sendPellicleReminder} />}
+            {active==='customers' && userRole === 'tech' && <CustomersPage customers={customers} onNew={()=>setShowNewCustomer(true)} onEdit={editCustomer} onDelete={deleteCustomer} />}
             {active==='crm' && userRole === 'tech' && <><CrmPage customers={customers} storeName={storeName} whatsapp={whatsappNumber} /><div style={{marginTop:24}}><PostSalePage storeName={storeName} whatsapp={whatsappNumber} /></div></>}
             {active==='cash' && userRole === 'tech' && <><CashPage cashRegister={cashRegister} onNewTransaction={() => cashRegister.isOpen ? setShowCashTransactionModal(true) : notify('Abra o caixa antes de lançar movimentações.')} onOpenBarcodeSale={() => cashRegister.isOpen ? setShowBarcodeSaleModal(true) : notify('Abra o caixa antes de registrar vendas.')} onOpenProductSale={() => cashRegister.isOpen ? setShowProductSaleModal(true) : notify('Abra o caixa antes de registrar vendas.')} onOpenCash={handleOpenCash} onCloseCash={handleCloseCash} /><CashCalculator /></>}
-            {active==='inventory' && userRole === 'tech' && <InventoryPage inventory={inventory} onNew={()=>setShowNewProduct(true)} onUpdateQty={updateProductQty} onDelete={deleteProduct} />}
+            {active==='inventory' && userRole === 'tech' && <InventoryPage inventory={inventory} onNew={()=>setShowNewProduct(true)} onUpdateQty={updateProductQty} onEdit={editProduct} onDelete={deleteProduct} />}
             {active==='used_devices' && userRole === 'tech' && <UsedDevicesPage storeName={storeName} devices={usedDevices.filter(d => d.storeName === storeName || (!d.storeName && storeName === 'RT MOBILE'))} setDevices={setUsedDevices} enabled={usedDevicesEnabled} setEnabled={setUsedDevicesEnabled} />}
             {active==='reports' && userRole === 'tech' && userAccessLevel === 'owner' && <ReportsPage orders={orders} cashRegister={cashRegister} inventory={inventory} />}
             {active==='client_inventory' && <ClientInventoryPage inventory={inventory} storeName={storeName} cart={cart} addToCart={addToCart} onOpenCart={() => setShowCartModal(true)} />}
@@ -2422,7 +2517,7 @@ function Metric({icon:Icon,label,value,trend,tone}) {return <div className="metr
 function StatusPill({status}) {return <span className={`status-pill ${statusClass(status)}`}><i/>{status}</span>}
 function QuickAction({icon:Icon,title,desc,onClick}) {return <button className="quick-action" onClick={onClick} style={{background: '#111115'}}><div className="quick-action-icon"><Icon size={17}/></div><span><strong>{title}</strong><small>{desc}</small></span><ArrowUpRight size={15} className="quick-arrow"/></button>}
 
-function OrdersPage({orders,search,setSearch,onNew,onPay,onStatus,onShare,onSendWarranty,onOpenChecklist,onPrint,onPellicleReminder}) {
+function OrdersPage({orders,search,setSearch,onNew,onEdit,onDelete,onPay,onStatus,onShare,onSendWarranty,onOpenChecklist,onPrint,onPellicleReminder}) {
   return <div className="page-content"><div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line"/> OPERAÇÃO</div><h1>Ordens de <span>serviço.</span></h1><p>Registre entradas e acompanhe cada atendimento do início à entrega.</p></div><button className="primary-btn" onClick={onNew}><Plus size={17}/> Nova ordem</button></div><div className="list-toolbar"><div className="search-box"><Search size={17}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar por cliente, aparelho ou ordem..."/></div><div className="toolbar-count">{orders.length} registros</div></div><div className="panel orders-full" style={{background: '#0a0a0d', border: '1px solid #18181b'}}><div className="table-wrap"><table><thead><tr><th>ORDEM / CLIENTE</th><th>APARELHO / DEFEITO</th><th>SENHA / PADRÃO</th><th>STATUS DO ATENDIMENTO</th><th>VISTORIA</th><th>AÇÕES / DISPAROS</th></tr></thead><tbody>{orders.map(o=><tr key={o.id}><td><div className="order-id">{o.id}</div><div className="cell-sub">{o.customer}</div></td><td><div className="device-cell"><div className="device-mini"><Smartphone size={15}/></div><span>{o.device}</span></div><div className="cell-sub">{o.issue}</div></td><td>
     <div style={{display: 'flex', alignItems: 'center', gap: '6px'}}>
       {o.patternDrawing ? (
@@ -2436,10 +2531,10 @@ function OrdersPage({orders,search,setSearch,onNew,onPay,onStatus,onShare,onSend
         </div>
       )}
     </div>
-  </td><td><select className={`status-select ${statusClass(o.status)}`} value={o.status} onChange={e=>onStatus(o.rawId,e.target.value)}>{['Recebido','Em diagnóstico','Aguardando aprovação','Aguardando peça','Em manutenção','Pronto para retirada','Entregue'].map(s=><option key={s}>{s}</option>)}</select>{o.deliveredAt && (()=>{const remaining=Math.ceil((new Date(o.deliveredAt).getTime()+Number(o.warrantyDays||90)*86400000-Date.now())/86400000);return remaining>=0&&remaining<=7?<div style={{fontSize:10,color:'#f59e0b',marginTop:5}}>Garantia vence em {remaining} dia(s)</div>:null;})()}</td><td><button className="secondary-btn" onClick={()=>onOpenChecklist(o)} style={{display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '12px'}}><CheckSquare size={14} color="#3b82f6"/> Vistoria</button></td><td><div style={{display: 'flex', gap: '6px'}}><button className="secondary-btn" onClick={()=>onShare(o)} title="Disparar Status WhatsApp" style={{padding: '6px 10px'}}><MessageCircle size={14} color="#25D366"/></button><button className="secondary-btn" onClick={()=>onSendWarranty(o)} title="Enviar Termo de Garantia Legal WhatsApp" style={{padding: '6px 10px', color: '#3b82f6'}}><FileText size={14}/></button><button className="secondary-btn" onClick={()=>onPrint(o)} title="Imprimir Cupom Térmico" style={{padding: '6px 10px'}}><Printer size={14}/></button><button className="secondary-btn" onClick={()=>onPellicleReminder(o)} title="Lembrete / Revisão" style={{padding: '6px 10px', color: '#eab308'}}><Calendar size={14}/></button><button className="secondary-btn" onClick={()=>onPay(o)} title="Receber pagamento da OS" style={{padding:'6px 10px',color:'#25D366'}}><DollarSign size={14}/></button><div className="cell-sub">Pago: R$ {Number(o.paidAmount||0).toFixed(2).replace('.',',')}</div></div></td></tr>)}</tbody></table>{!orders.length && <div className="empty-state"><ClipboardList size={28}/><strong>Nenhuma ordem encontrada</strong><span>Tente mudar a busca ou registre uma nova ordem.</span></div>}</div></div></div>
+  </td><td><select className={`status-select ${statusClass(o.status)}`} value={o.status} onChange={e=>onStatus(o.rawId,e.target.value)}>{['Recebido','Em diagnóstico','Aguardando aprovação','Aguardando peça','Em manutenção','Pronto para retirada','Entregue'].map(s=><option key={s}>{s}</option>)}</select>{o.deliveredAt && (()=>{const remaining=Math.ceil((new Date(o.deliveredAt).getTime()+Number(o.warrantyDays||90)*86400000-Date.now())/86400000);return remaining>=0&&remaining<=7?<div style={{fontSize:10,color:'#f59e0b',marginTop:5}}>Garantia vence em {remaining} dia(s)</div>:null;})()}</td><td><button className="secondary-btn" onClick={()=>onOpenChecklist(o)} style={{display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '12px'}}><CheckSquare size={14} color="#3b82f6"/> Vistoria</button></td><td><div style={{display: 'flex', gap: '6px'}}><button className="secondary-btn" onClick={()=>onShare(o)} title="Disparar Status WhatsApp" style={{padding: '6px 10px'}}><MessageCircle size={14} color="#25D366"/></button><button className="secondary-btn" onClick={()=>onSendWarranty(o)} title="Enviar Termo de Garantia Legal WhatsApp" style={{padding: '6px 10px', color: '#3b82f6'}}><FileText size={14}/></button><button className="secondary-btn" onClick={()=>onPrint(o)} title="Imprimir Cupom Térmico" style={{padding: '6px 10px'}}><Printer size={14}/></button><button className="secondary-btn" onClick={()=>onPellicleReminder(o)} title="Lembrete / Revisão" style={{padding: '6px 10px', color: '#eab308'}}><Calendar size={14}/></button><button className="secondary-btn" onClick={()=>onEdit(o)} title="Editar OS" style={{padding:'6px 10px',color:'#eab308'}}><Pencil size={14}/></button><button className="secondary-btn" onClick={()=>onDelete(o)} title="Excluir OS" style={{padding:'6px 10px',color:'#ff4d4d'}}><Trash2 size={14}/></button><button className="secondary-btn" onClick={()=>onPay(o)} title="Receber pagamento da OS" style={{padding:'6px 10px',color:'#25D366'}}><DollarSign size={14}/></button><div className="cell-sub">Pago: R$ {Number(o.paidAmount||0).toFixed(2).replace('.',',')}</div></div></td></tr>)}</tbody></table>{!orders.length && <div className="empty-state"><ClipboardList size={28}/><strong>Nenhuma ordem encontrada</strong><span>Tente mudar a busca ou registre uma nova ordem.</span></div>}</div></div></div>
 }
 
-function CustomersPage({customers, onNew}) {
+function CustomersPage({customers, onNew, onEdit, onDelete}) {
   return <div className="page-content">
     <div className="page-heading">
       <div>
@@ -2457,7 +2552,7 @@ function CustomersPage({customers, onNew}) {
               <th>NOME</th>
               <th>TELEFONE / WHATSAPP</th>
               <th>E-MAIL</th>
-              <th>CADASTRADO EM</th>
+              <th>CADASTRADO EM</th><th>AÇÕES</th>
             </tr>
           </thead>
           <tbody>
@@ -2466,7 +2561,7 @@ function CustomersPage({customers, onNew}) {
                 <td><strong>{c.name}</strong></td>
                 <td>{c.phone || 'Não informado'}</td>
                 <td>{c.email || 'Não informado'}</td>
-                <td className="time-cell">{new Date(c.created_at).toLocaleDateString('pt-BR')}</td>
+                <td className="time-cell">{c.created_at ? new Date(c.created_at).toLocaleDateString('pt-BR') : '—'}</td><td><div style={{display:'flex',gap:6}}><button className="secondary-btn" title="Editar cliente" onClick={()=>onEdit(c)}><Pencil size={14}/></button><button className="icon-btn" title="Excluir cliente" onClick={()=>onDelete(c)} style={{color:'#ff4d4d'}}><Trash2 size={15}/></button></div></td>
               </tr>
             ))}
           </tbody>
@@ -2675,7 +2770,7 @@ function BarcodeSaleModal({ inventory, onDetectedBarcode, onClose }) {
   );
 }
 
-function InventoryPage({inventory, onNew, onUpdateQty, onDelete}) {
+function InventoryPage({inventory, onNew, onUpdateQty, onEdit, onDelete}) {
   return <div className="page-content">
     <div className="page-heading">
       <div>
@@ -2733,7 +2828,7 @@ function InventoryPage({inventory, onNew, onUpdateQty, onDelete}) {
                   </div>
                 </td>
                 <td>
-                  <button className="icon-btn" onClick={() => onDelete(item.id)} style={{color: '#ff4d4d'}}><Trash2 size={16}/></button>
+                  <div style={{display:'flex',gap:6}}><button className="secondary-btn" title="Editar produto" onClick={() => onEdit(item.id)}><Pencil size={14}/></button><button className="icon-btn" title="Excluir produto" onClick={() => onDelete(item.id)} style={{color: '#ff4d4d'}}><Trash2 size={16}/></button></div>
                 </td>
               </tr>
             ))}
