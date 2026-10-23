@@ -4044,9 +4044,58 @@ function UsedDevicesPage({storeName, devices, setDevices, enabled, setEnabled}) 
 }
 
 function ReportsPage({orders,cashRegister,inventory}) {
- const revenue=orders.reduce((a,o)=>a+(Number(String(o.amount||'').replace(/[^0-9,.-]/g,'').replace(',','.'))||0),0); const costs=orders.reduce((a,o)=>a+(Number(o.partCost)||0),0); const completed=orders.filter(o=>['Entregue','Pronto para retirada'].includes(o.status)); const avg=orders.length?revenue/orders.length:0; const net=revenue-costs;
- const bars=[{label:'Faturamento estimado',value:revenue,color:'#25D366'},{label:'Custo de peças informado',value:costs,color:'#f59e0b'},{label:'Margem estimada',value:net,color:'#60a5fa'}];
- return <div className="page-content"><ModuleHeading eyebrow="BUSINESS INTELLIGENCE" title={<>Relatórios & <span>Indicadores.</span></>} description="Resumo gerencial com faturamento de OS, ticket médio, custos informados e status de atendimentos."/><div className="metrics-grid" style={{gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))'}}>{[{l:'Faturamento em OS',v:moneyBR(revenue)},{l:'Ticket médio',v:moneyBR(avg)},{l:'Margem estimada',v:moneyBR(net)},{l:'OS prontas/entregues',v:String(completed.length)},{l:'Acessórios cadastrados',v:String(inventory.length)}].map(x=><div key={x.l} className="metric-card" style={{background:'#0a0a0d',border:'1px solid #18181b'}}><div className="metric-value" style={{fontSize:22}}>{x.v}</div><div className="metric-label">{x.l}</div></div>)}</div><section className="panel" style={{padding:18,marginTop:16,background:'#0a0a0d',border:'1px solid #18181b'}}><h3>Indicadores visuais</h3>{bars.map(b=><div key={b.label} style={{margin:'18px 0'}}><div style={{display:'flex',justifyContent:'space-between',gap:10,marginBottom:6}}><span>{b.label}</span><strong>{moneyBR(b.value)}</strong></div><div style={{height:10,background:'#222',borderRadius:8,overflow:'hidden'}}><div style={{height:'100%',width:`${Math.min(100,Math.max(0,revenue?b.value/revenue*100:0))}%`,background:b.color,borderRadius:8}}/></div></div>)}<p className="muted">Os valores dependem dos custos preenchidos nas OS. A comparação real entre mês atual e mês anterior requer que os lançamentos tenham datas e custos salvos de forma consistente no banco.</p><button className="secondary-btn" onClick={()=>window.print()}><Printer size={15}/> Imprimir relatório</button></section></div>;
+ const today = new Date();
+ const localDate = (date) => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+ const [startDate,setStartDate] = useState(() => localDate(today));
+ const [endDate,setEndDate] = useState(() => localDate(today));
+ const [periodDays,setPeriodDays] = useState('');
+ const applyDays = (raw) => {
+   const days = Math.max(1, Math.min(36500, Math.floor(Number(raw)||1)));
+   const end = new Date(); const start = new Date(); start.setDate(start.getDate()-(days-1));
+   setStartDate(localDate(start)); setEndDate(localDate(end)); setPeriodDays(String(days));
+ };
+ const moneyValue = (value) => Number(String(value ?? '').replace(/[^0-9,.-]/g,'').replace(',','.')) || 0;
+ // Junta lançamentos da sessão atual e dos fechamentos anteriores sem duplicar IDs.
+ const allEntries = [...(cashRegister?.entries || []), ...(cashRegister?.closedSessions || []).flatMap(s => s.entries || [])];
+ const uniqueEntries = Array.from(new Map(allEntries.map((entry,index) => [entry.id || `${entry.createdAt || 'sem-data'}-${entry.description || ''}-${entry.amount || 0}-${index}`,entry])).values());
+ const from = startDate ? new Date(`${startDate}T00:00:00`) : null;
+ const through = endDate ? new Date(`${endDate}T23:59:59.999`) : null;
+ const inRange = (dateValue) => { if(!dateValue) return false; const d = new Date(dateValue); return !Number.isNaN(d.getTime()) && (!from || d >= from) && (!through || d <= through); };
+ const entries = uniqueEntries.filter(e => inRange(e.createdAt));
+ const incomeEntries = entries.filter(e => e.type === 'in');
+ const expenseEntries = entries.filter(e => e.type === 'out');
+ const received = incomeEntries.reduce((sum,e)=>sum+Number(e.amount||0),0);
+ const cashReceived = incomeEntries.filter(e => (e.paymentMethod || 'Dinheiro') === 'Dinheiro').reduce((sum,e)=>sum+Number(e.amount||0),0);
+ const digitalReceived = received-cashReceived;
+ const expenses = expenseEntries.reduce((sum,e)=>sum+Number(e.amount||0),0);
+ const osReceived = incomeEntries.filter(e=>e.sourceType==='os_payment').reduce((sum,e)=>sum+Number(e.amount||0),0);
+ const productSales = incomeEntries.filter(e=>e.sourceType==='sale').reduce((sum,e)=>sum+Number(e.amount||0),0);
+ const manualIncome = incomeEntries.filter(e=>!['os_payment','sale'].includes(e.sourceType)).reduce((sum,e)=>sum+Number(e.amount||0),0);
+ const outstanding = orders.reduce((sum,o)=>sum+Math.max(0,moneyValue(o.amount)-Number(o.paidAmount||0)),0);
+ const net = received-expenses;
+ const bars=[{label:'Total recebido no período',value:received,color:'#25D366'},{label:'Despesas registradas',value:expenses,color:'#f59e0b'},{label:'Resultado de caixa no período',value:net,color:'#60a5fa'}];
+ const setPreset = (preset) => {
+   const end = new Date(); let start = new Date();
+   if(preset==='today') start = new Date();
+   else if(preset==='yesterday'){ start.setDate(start.getDate()-1); end.setDate(end.getDate()-1); }
+   else if(preset==='month') start = new Date(end.getFullYear(),end.getMonth(),1);
+   setStartDate(localDate(start)); setEndDate(localDate(end)); setPeriodDays('');
+ };
+ return <div className="page-content"><ModuleHeading eyebrow="BUSINESS INTELLIGENCE" title={<>Relatórios & <span>Indicadores.</span></>} description="Consulte recebimentos reais, vendas, pagamentos de OS e despesas por qualquer período."/>
+ <section className="panel" style={{padding:18,marginTop:14,background:'#0a0a0d',border:'1px solid #18181b'}}>
+  <h3 style={{marginTop:0}}>Período do relatório</h3>
+  <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:14}}>
+   <button type="button" className="secondary-btn" onClick={()=>setPreset('today')}>Hoje</button>
+   <button type="button" className="secondary-btn" onClick={()=>setPreset('yesterday')}>Ontem</button>
+   <button type="button" className="secondary-btn" onClick={()=>setPreset('month')}>Este mês</button>
+   <div style={{display:'flex',gap:6,alignItems:'center'}}><input aria-label="Quantidade de dias" type="number" min="1" max="36500" value={periodDays} onChange={e=>setPeriodDays(e.target.value)} placeholder="Ex.: 8, 60, 365" style={{...fieldStyle,width:145}}/><button type="button" className="secondary-btn" onClick={()=>applyDays(periodDays)}>Aplicar dias</button></div>
+  </div>
+  <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:12}}><label>Data inicial<input type="date" value={startDate} onChange={e=>{setStartDate(e.target.value);setPeriodDays('');}} style={{...fieldStyle,display:'block',width:'100%',marginTop:6}}/></label><label>Data final<input type="date" value={endDate} min={startDate||undefined} onChange={e=>{setEndDate(e.target.value);setPeriodDays('');}} style={{...fieldStyle,display:'block',width:'100%',marginTop:6}}/></label></div>
+  {startDate && endDate && startDate>endDate && <p style={{color:'#ff7777',marginBottom:0}}>A data inicial precisa ser anterior ou igual à data final.</p>}
+ </section>
+ <div className="metrics-grid" style={{gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',marginTop:16}}>{[{l:'Total recebido no período',v:moneyBR(received)},{l:'Recebido em dinheiro',v:moneyBR(cashReceived)},{l:'Pix/cartão/outros',v:moneyBR(digitalReceived)},{l:'Pagamentos de OS recebidos',v:moneyBR(osReceived)},{l:'Vendas de produtos',v:moneyBR(productSales)},{l:'Entradas manuais',v:moneyBR(manualIncome)},{l:'Despesas no período',v:moneyBR(expenses)},{l:'Resultado do período',v:moneyBR(net)},{l:'A receber nas OS',v:moneyBR(outstanding)},{l:'Acessórios cadastrados',v:String(inventory.length)}].map(x=><div key={x.l} className="metric-card" style={{background:'#0a0a0d',border:'1px solid #18181b'}}><div className="metric-value" style={{fontSize:22}}>{x.v}</div><div className="metric-label">{x.l}</div></div>)}</div>
+ <section className="panel" style={{padding:18,marginTop:16,background:'#0a0a0d',border:'1px solid #18181b'}}><h3>Movimentações incluídas no período</h3><p className="muted">O relatório considera a data do lançamento/recebimento, não a data de criação da OS. OS ainda não pagas não entram como dinheiro recebido; o saldo pendente aparece em “A receber nas OS”.</p><div className="table-wrap"><table><thead><tr><th>DATA</th><th>DESCRIÇÃO</th><th>FORMA</th><th>TIPO</th><th>VALOR</th></tr></thead><tbody>{entries.slice().sort((a,b)=>new Date(b.createdAt||0)-new Date(a.createdAt||0)).map(e=><tr key={e.id}><td>{e.createdAt?new Date(e.createdAt).toLocaleString('pt-BR'):'—'}</td><td>{e.description||'—'}</td><td>{e.paymentMethod||'Dinheiro'}</td><td>{e.type==='in'?'Entrada':'Saída'}</td><td style={{color:e.type==='in'?'#25D366':'#ff7777'}}>{e.type==='in'?'+':'−'} {moneyBR(e.amount)}</td></tr>)}</tbody></table>{!entries.length&&<div className="empty-state"><Wallet size={26}/><strong>Nenhuma movimentação neste período</strong><span>Quando houver pagamentos, vendas ou despesas registradas, eles aparecerão aqui.</span></div>}</div><div style={{marginTop:14}}><button className="secondary-btn" onClick={()=>window.print()}><Printer size={15}/> Imprimir relatório</button></div></section>
+ <section className="panel" style={{padding:18,marginTop:16,background:'#0a0a0d',border:'1px solid #18181b'}}><h3>Resumo visual</h3>{bars.map(b=><div key={b.label} style={{margin:'18px 0'}}><div style={{display:'flex',justifyContent:'space-between',gap:10,marginBottom:6}}><span>{b.label}</span><strong>{moneyBR(b.value)}</strong></div><div style={{height:10,background:'#222',borderRadius:8,overflow:'hidden'}}><div style={{height:'100%',width:`${Math.min(100,Math.max(0,received?Math.abs(b.value)/Math.max(received,expenses,1)*100:0))}%`,background:b.color,borderRadius:8}}/></div></div>)}<p className="muted">Atenção: este relatório usa os lançamentos disponíveis no caixa deste navegador/conta. Para sincronização confiável entre dispositivos e isolamento por assistência, os lançamentos precisam estar persistidos no Supabase com organização e permissões verificadas no banco.</p></section></div>;
 }
 
 function CashCalculator() {
