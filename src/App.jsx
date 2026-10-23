@@ -17,6 +17,25 @@ function BarcodeIcon({ size = 16, color = "currentColor", style = {} }) {
 
 const ADMIN_EMAIL = 'roberthaelley75@gmail.com';
 
+function createRtOperationId(prefix = 'op') {
+  const randomPart = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return `${prefix}-${randomPart}`;
+}
+
+function getOrCreateRtAttemptId(storageKey, prefix = 'op') {
+  try {
+    const existing = sessionStorage.getItem(storageKey);
+    if (existing) return existing;
+    const created = createRtOperationId(prefix);
+    sessionStorage.setItem(storageKey, created);
+    return created;
+  } catch {
+    return createRtOperationId(prefix);
+  }
+}
+
 const seminovosList = [
   'iPhone 11', 'iPhone 11 Pro', 'iPhone 11 Pro Max',
   'iPhone 12', 'iPhone 12 Pro', 'iPhone 12 Pro Max',
@@ -1390,68 +1409,74 @@ await fetchData();
     notify('Produto removido.');
   };
 
-  const handleSellProductFromList = (productId, quantity, paymentMethod = 'Dinheiro') => {
+  const handleSellProductFromList = async (productId, quantity, paymentMethod = 'Dinheiro', saleAttemptId) => {
     const found = inventory.find(p => String(p.id) === String(productId));
     const qty = Math.floor(Number(quantity));
     if (!found) { notify('Selecione um produto válido.'); return; }
     if (!Number.isFinite(qty) || qty < 1) { notify('Informe uma quantidade válida.'); return; }
     if (!cashRegister.isOpen) { notify('Abra o caixa antes de registrar vendas.'); return; }
     if (Number(found.qty) < qty) { notify(`Estoque insuficiente. Há apenas ${found.qty} unidade(s) de ${found.name}.`); return; }
-    const unitPrice = parseMoneyValue(found.price);
-    const total = unitPrice * qty;
-    setInventory(prev => prev.map(p => String(p.id) === String(found.id) ? { ...p, qty: Math.max(0, Number(p.qty) - qty) } : p));
-    const newEntry = {
-      id: String(Date.now()), type: 'in', description: `Venda Balcão: ${qty}x ${found.name}`,
-      category: 'Acessórios', seller: '', paymentMethod: paymentMethod || 'Dinheiro', sourceType: 'sale',
-      productId: found.id, quantity: qty, unitPrice, commissionAmount: 0, amount: total,
-      createdAt: new Date().toISOString(), time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-      user: userAccessLevel === 'owner' ? 'Dono' : 'Técnico'
-    };
-    setCashRegister(prev => ({ ...prev, entries: [newEntry, ...prev.entries] }));
-    addAuditLog(`Vendeu ${qty}x ${found.name} no caixa: R$ ${total.toFixed(2)}`);
-    setShowProductSaleModal(false);
-    notify(`Venda confirmada: ${qty}x ${found.name}. Total R$ ${total.toFixed(2).replace('.', ',')} e estoque atualizado!`);
+    if (!supabaseConfigured || !session?.user?.id || !activeOrganizationId) {
+      notify('Não foi possível registrar a venda: entre na conta da loja e aguarde a sincronização com o Supabase.'); return;
+    }
+    const operationId = saleAttemptId || createRtOperationId('sale');
+    try {
+      const { data, error } = await supabase.rpc('rt_register_inventory_sale', {
+        p_organization_id: activeOrganizationId,
+        p_sale_id: operationId,
+        p_product_id: String(found.id),
+        p_quantity: qty,
+        p_payment_method: paymentMethod || 'Dinheiro',
+        p_user_label: userAccessLevel === 'owner' ? 'Dono' : 'Técnico'
+      });
+      if (error) throw error;
+      const sale = Array.isArray(data) ? data[0] : data;
+      if (!sale?.inventory_items || !sale?.cash_state) throw new Error('O Supabase não confirmou a atualização do caixa e do estoque.');
+      setInventory(sale.inventory_items);
+      setCashRegister(prev => ({ isOpen: false, openingBalance: 0, openedAt: null, openedBy: '', entries: [], closedSessions: [], ...prev, ...sale.cash_state }));
+      try { sessionStorage.removeItem(`rt_product_sale_attempt_${activeOrganizationId || session.user.id}`); } catch {}
+      addAuditLog(`Vendeu ${qty}x ${sale.product_name || found.name} no caixa: R$ ${Number(sale.total_amount || 0).toFixed(2)}`);
+      setShowProductSaleModal(false);
+      notify(`Venda confirmada: ${qty}x ${sale.product_name || found.name}. Total R$ ${Number(sale.total_amount || 0).toFixed(2).replace('.', ',')} e estoque atualizado!`);
+    } catch (error) {
+      console.error('Erro ao registrar venda de produto:', error);
+      notify(`Venda não concluída: ${error?.message || 'não foi possível sincronizar o caixa e o estoque.'}`);
+    }
   };
 
-  const handleSellProductByBarcode = (scannedCode, paymentMethod = 'Dinheiro') => {
+  const handleSellProductByBarcode = async (scannedCode, paymentMethod = 'Dinheiro', saleAttemptId) => {
     const code = String(scannedCode).trim();
-    if (!code) {
-      notify('Código inválido.');
-      return;
-    }
-
+    if (!code) { notify('Código inválido.'); return; }
     const found = inventory.find(p => p.barcode && p.barcode.trim() === code);
-    if (!found) {
-      notify(`Nenhum produto cadastrado com o código ${code}.`);
-      return;
-    }
-
-    if (found.qty <= 0) {
-      notify(`Atenção: ${found.name} está esgotado no estoque!`);
-      return;
-    }
-
+    if (!found) { notify(`Nenhum produto cadastrado com o código ${code}.`); return; }
+    if (Number(found.qty) <= 0) { notify(`Atenção: ${found.name} está esgotado no estoque!`); return; }
     if (!cashRegister.isOpen) { notify('Abra o caixa antes de registrar vendas.'); return; }
-    updateProductQty(found.id, -1);
-
-    const val = parseMoneyValue(found.price);
-    const newEntry = {
-      id: String(Date.now()),
-      type: 'in',
-      description: `Venda Balcão: ${found.name} (Bipado)`,
-      category: 'Acessórios',
-      seller: '', paymentMethod: paymentMethod || 'Dinheiro', sourceType: 'sale', productId: found.id,
-      commissionAmount: 0,
-      quantity: 1, unitPrice: val,
-      amount: val,
-      createdAt: new Date().toISOString(), time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-      user: userAccessLevel === 'owner' ? 'Dono' : 'Técnico'
-    };
-
-    setCashRegister(prev => ({ ...prev, entries: [newEntry, ...prev.entries] }));
-    addAuditLog(`Vendeu 1x ${found.name} no caixa via código de barras: R$ ${val.toFixed(2)}`);
-    setShowBarcodeSaleModal(false);
-    notify(`Venda confirmada: ${found.name} (+ R$ ${val.toFixed(2)}) e estoque atualizado!`);
+    if (!supabaseConfigured || !session?.user?.id || !activeOrganizationId) {
+      notify('Não foi possível registrar a venda: entre na conta da loja e aguarde a sincronização com o Supabase.'); return;
+    }
+    const operationId = saleAttemptId || createRtOperationId('sale');
+    try {
+      const { data, error } = await supabase.rpc('rt_register_inventory_sale', {
+        p_organization_id: activeOrganizationId,
+        p_sale_id: operationId,
+        p_product_id: String(found.id),
+        p_quantity: 1,
+        p_payment_method: paymentMethod || 'Dinheiro',
+        p_user_label: userAccessLevel === 'owner' ? 'Dono' : 'Técnico'
+      });
+      if (error) throw error;
+      const sale = Array.isArray(data) ? data[0] : data;
+      if (!sale?.inventory_items || !sale?.cash_state) throw new Error('O Supabase não confirmou a atualização do caixa e do estoque.');
+      setInventory(sale.inventory_items);
+      setCashRegister(prev => ({ isOpen: false, openingBalance: 0, openedAt: null, openedBy: '', entries: [], closedSessions: [], ...prev, ...sale.cash_state }));
+      try { sessionStorage.removeItem(`rt_product_sale_attempt_${activeOrganizationId || session.user.id}`); } catch {}
+      addAuditLog(`Vendeu 1x ${sale.product_name || found.name} no caixa via código de barras: R$ ${Number(sale.total_amount || 0).toFixed(2)}`);
+      setShowBarcodeSaleModal(false);
+      notify(`Venda confirmada: ${sale.product_name || found.name} (+ R$ ${Number(sale.total_amount || 0).toFixed(2).replace('.', ',')}) e estoque atualizado!`);
+    } catch (error) {
+      console.error('Erro ao registrar venda por código de barras:', error);
+      notify(`Venda não concluída: ${error?.message || 'não foi possível sincronizar o caixa e o estoque.'}`);
+    }
   };
 
   const addToCart = (product) => {
@@ -1547,7 +1572,7 @@ await fetchData();
         p_repair_order_id: order.rawId,
         p_amount: amount,
         p_method: orderPayment.method,
-        p_reference: `OS-${order.id}-${Date.now()}`
+        p_reference: orderPayment.reference || `OS-${order.rawId}-${createRtOperationId('payment')}`
       });
       if (paymentError) throw paymentError;
 
@@ -1558,12 +1583,19 @@ await fetchData();
       const nextPaidAmount = Number(payment.amount_paid);
       const paymentId = payment.payment_id;
       const entry = { id: paymentId, type: 'in', description: `Pagamento OS ${order.id} — ${order.customer || 'Cliente'}`, category: 'Assistência técnica', seller: '', amount, paymentMethod: orderPayment.method, sourceType: 'os_payment', orderId: order.id, rawOrderId: order.rawId, createdAt: paidAt, time: new Date(paidAt).toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'}), user: userAccessLevel === 'owner' ? 'Dono' : 'Técnico' };
-      setCashRegister(prev => ({ ...prev, entries: [entry, ...prev.entries] }));
-      const nextPayments = [...(order.payments || []), { id: paymentId, amount, method: orderPayment.method, paidAt }];
+      // O RPC já grava a mesma entrada no caixa, na mesma transação do pagamento.
+      // Usa o estado retornado pelo banco e deduplica pelo ID para não lançar duas vezes.
+      if (payment.cash_state && typeof payment.cash_state === 'object') {
+        setCashRegister(prev => ({ isOpen: false, openingBalance: 0, openedAt: null, openedBy: '', entries: [], closedSessions: [], ...prev, ...payment.cash_state }));
+      } else {
+        setCashRegister(prev => ({ ...prev, entries: [entry, ...(prev.entries || []).filter(existing => String(existing.id) !== String(paymentId))] }));
+      }
+      const nextPayments = [...(order.payments || []).filter(existing => String(existing.id) !== String(paymentId)), { id: paymentId, amount, method: orderPayment.method, paidAt, reference: orderPayment.reference || '' }];
       setOrders(prev => prev.map(o => o.id === order.id ? { ...o, paidAmount: nextPaidAmount, payments: nextPayments } : o));
       addAuditLog(`Recebeu R$ ${amount.toFixed(2)} da OS ${order.id} via ${orderPayment.method}`);
+      try { localStorage.removeItem(`rt_order_payment_attempt_${order.rawId}`); } catch {}
       setShowOrderPaymentModal(null);
-      setOrderPayment({ amount: '', method: 'Pix' });
+      setOrderPayment({ amount: '', method: 'Pix', reference: '' });
       notify(`Pagamento de R$ ${amount.toFixed(2).replace('.', ',')} registrado no Supabase.`);
     } catch (error) {
       console.error('Erro ao registrar pagamento da OS:', error);
@@ -2059,7 +2091,7 @@ await fetchData();
             </header>
             
             {active==='overview' && userRole === 'tech' && <Overview orders={orders} storeName={storeName} onNew={()=>setShowNewOrder(true)} onNavigate={setActive} modules={modules} inventory={inventory} onOpenTv={() => setShowTvMode(true)} />}
-            {active==='orders' && userRole === 'tech' && <OrdersPage orders={filteredOrders} search={search} setSearch={setSearch} onNew={()=>setShowNewOrder(true)} onEdit={editOrder} onDelete={deleteOrder} onPay={o=>{ const due=Math.max(0,parseMoneyValue(o.amount)-Number(o.paidAmount||0)); if(due<=0){notify('Esta OS já está quitada.');return;} setShowOrderPaymentModal(o); setOrderPayment({amount:due.toFixed(2),method:'Pix'}); }} onStatus={handleUpdateStatus} onShare={shareOsStatusWhatsapp} onSendWarranty={sendWarrantyTermWhatsapp} onOpenChecklist={(o) => setShowChecklistModal(o)} onPrint={(o) => setShowPrintModal(o)} onPellicleReminder={sendPellicleReminder} />}
+            {active==='orders' && userRole === 'tech' && <OrdersPage orders={filteredOrders} search={search} setSearch={setSearch} onNew={()=>setShowNewOrder(true)} onEdit={editOrder} onDelete={deleteOrder} onPay={o=>{ const due=Math.max(0,parseMoneyValue(o.amount)-Number(o.paidAmount||0)); if(due<=0){notify('Esta OS já está quitada.');return;} const attemptKey=`rt_order_payment_attempt_${o.rawId}`; let reference=''; try { reference=localStorage.getItem(attemptKey)||''; if(reference && (o.payments||[]).some(p=>String(p.reference||'')===reference)){ localStorage.removeItem(attemptKey); reference=''; } } catch {} if(!reference){ reference=`OS-${o.rawId}-${createRtOperationId('payment')}`; try { localStorage.setItem(attemptKey,reference); } catch {} } setShowOrderPaymentModal(o); setOrderPayment({amount:due.toFixed(2),method:'Pix',reference}); }} onStatus={handleUpdateStatus} onShare={shareOsStatusWhatsapp} onSendWarranty={sendWarrantyTermWhatsapp} onOpenChecklist={(o) => setShowChecklistModal(o)} onPrint={(o) => setShowPrintModal(o)} onPellicleReminder={sendPellicleReminder} />}
             {active==='customers' && userRole === 'tech' && <CustomersPage customers={customers} onNew={()=>setShowNewCustomer(true)} onEdit={editCustomer} onDelete={deleteCustomer} />}
             {active==='crm' && userRole === 'tech' && <><CrmPage customers={customers} storeName={storeName} whatsapp={whatsappNumber} /><div style={{marginTop:24}}><PostSalePage storeName={storeName} whatsapp={whatsappNumber} /></div></>}
             {active==='cash' && userRole === 'tech' && <><CashPage cashRegister={cashRegister} onNewTransaction={() => cashRegister.isOpen ? setShowCashTransactionModal(true) : notify('Abra o caixa antes de lançar movimentações.')} onOpenBarcodeSale={() => cashRegister.isOpen ? setShowBarcodeSaleModal(true) : notify('Abra o caixa antes de registrar vendas.')} onOpenProductSale={() => cashRegister.isOpen ? setShowProductSaleModal(true) : notify('Abra o caixa antes de registrar vendas.')} onOpenCash={handleOpenCash} onCloseCash={handleCloseCash} /><CashCalculator /></>}
@@ -2137,12 +2169,13 @@ await fetchData();
       )}
 
       {showProductSaleModal && (
-        <ProductSaleModal inventory={inventory} onSell={handleSellProductFromList} onClose={() => setShowProductSaleModal(false)} />
+        <ProductSaleModal inventory={inventory} saleAttemptKey={`rt_product_sale_attempt_${activeOrganizationId || session?.user?.id || 'local'}`} onSell={handleSellProductFromList} onClose={() => setShowProductSaleModal(false)} />
       )}
 
       {showBarcodeSaleModal && (
         <BarcodeSaleModal
           inventory={inventory}
+          saleAttemptKey={`rt_product_sale_attempt_${activeOrganizationId || session?.user?.id || 'local'}`}
           onDetectedBarcode={handleSellProductByBarcode}
           onClose={() => setShowBarcodeSaleModal(false)}
         />
@@ -2875,7 +2908,8 @@ function CashPage({cashRegister, onNewTransaction, onOpenBarcodeSale, onOpenProd
 }
 
 /* VENDA MANUAL DE PRODUTO: registra entrada no caixa e baixa o estoque */
-function ProductSaleModal({ inventory, onSell, onClose }) {
+function ProductSaleModal({ inventory, saleAttemptKey, onSell, onClose }) {
+  const [saleAttemptId] = useState(() => getOrCreateRtAttemptId(saleAttemptKey || 'rt_product_sale_attempt_local', 'sale'));
   const available = inventory.filter(p => Number(p.qty) > 0);
   const [productId, setProductId] = useState(available[0]?.id || '');
   const [quantity, setQuantity] = useState('1');
@@ -2887,7 +2921,7 @@ function ProductSaleModal({ inventory, onSell, onClose }) {
   return <div className="modal-backdrop" onClick={onClose}><div className="modal" onClick={e => e.stopPropagation()} style={{background:'#0f0f12',border:'1px solid #222',maxWidth:480}}>
     <div className="modal-head"><div><div className="eyebrow">CAIXA RÁPIDO</div><h2>Vender produto</h2></div><button type="button" className="icon-btn" onClick={onClose}><X size={19}/></button></div>
     <p className="muted">Selecione o produto cadastrado, informe a quantidade e confirme. O sistema registra a entrada no caixa e desconta as unidades do estoque.</p>
-    {!available.length ? <div className="empty-state"><Package size={28}/><strong>Nenhum produto disponível</strong><span>Cadastre um produto ou reponha o estoque antes de vender.</span></div> : <form onSubmit={e => { e.preventDefault(); onSell(productId, quantity, paymentMethod); }}>
+    {!available.length ? <div className="empty-state"><Package size={28}/><strong>Nenhum produto disponível</strong><span>Cadastre um produto ou reponha o estoque antes de vender.</span></div> : <form onSubmit={e => { e.preventDefault(); onSell(productId, quantity, paymentMethod, saleAttemptId); }}>
       <label>Produto<select required value={productId} onChange={e => setProductId(e.target.value)} style={{marginTop:6}}>{available.map(p => <option key={p.id} value={p.id}>{p.name} — estoque: {p.qty} — {money(p.price)}</option>)}</select></label>
       {selected && <div className="panel" style={{padding:12,margin:'12px 0',background:'#09090b'}}><div style={{display:'flex',justifyContent:'space-between',gap:12}}><span>Preço unitário</span><strong>{money(selected.price)}</strong></div><div style={{display:'flex',justifyContent:'space-between',gap:12,marginTop:6}}><span>Disponível</span><strong>{selected.qty} unidade(s)</strong></div></div>}
       <label>Quantidade<input type="number" min="1" max={selected?.qty || 1} step="1" required value={quantity} onChange={e => setQuantity(e.target.value)} style={{marginTop:6}}/></label>
@@ -2899,7 +2933,8 @@ function ProductSaleModal({ inventory, onSell, onClose }) {
 }
 
 /* MODAL DE VENDA NO CAIXA POR CÓDIGO DE BARRAS */
-function BarcodeSaleModal({ inventory, onDetectedBarcode, onClose }) {
+function BarcodeSaleModal({ inventory, saleAttemptKey, onDetectedBarcode, onClose }) {
+  const [saleAttemptId] = useState(() => getOrCreateRtAttemptId(saleAttemptKey || 'rt_product_sale_attempt_local', 'sale'));
   const [manualCode, setManualCode] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('');
   const [useCamera, setUseCamera] = useState(false);
@@ -2938,7 +2973,7 @@ function BarcodeSaleModal({ inventory, onDetectedBarcode, onClose }) {
       setMessage('Selecione a forma de pagamento antes de confirmar a venda.');
       return;
     }
-    onDetectedBarcode(normalizedCode, paymentMethod);
+    onDetectedBarcode(normalizedCode, paymentMethod, saleAttemptId);
   };
 
   return (
