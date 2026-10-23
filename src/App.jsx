@@ -2784,9 +2784,14 @@ function ProductSaleModal({ inventory, onSell, onClose }) {
 /* MODAL DE VENDA NO CAIXA POR CÓDIGO DE BARRAS */
 function BarcodeSaleModal({ inventory, onDetectedBarcode, onClose }) {
   const [manualCode, setManualCode] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('Dinheiro');
+  const [paymentMethod, setPaymentMethod] = useState('');
   const [useCamera, setUseCamera] = useState(false);
+  const [message, setMessage] = useState('');
   const inputRef = useRef(null);
+  const normalizedCode = String(manualCode || '').trim();
+  const selectedProduct = normalizedCode
+    ? inventory.find(p => String(p.barcode || '').trim() === normalizedCode)
+    : null;
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -2794,9 +2799,29 @@ function BarcodeSaleModal({ inventory, onDetectedBarcode, onClose }) {
 
   const handleManualSubmit = (e) => {
     e.preventDefault();
-    if (manualCode.trim()) {
-      onDetectedBarcode(manualCode.trim(), paymentMethod);
+    if (!normalizedCode) return;
+    if (!selectedProduct) {
+      setMessage(`Nenhum produto cadastrado com o código ${normalizedCode}. Confira o código ou cadastre o produto.`);
+      return;
     }
+    if (Number(selectedProduct.qty) <= 0) {
+      setMessage(`Atenção: ${selectedProduct.name} está esgotado no estoque!`);
+      return;
+    }
+    setMessage('Produto identificado. Confira os dados, escolha a forma de pagamento e confirme a venda.');
+    inputRef.current?.blur();
+  };
+
+  const confirmSale = () => {
+    if (!selectedProduct) {
+      setMessage('Bipe ou informe um código de barras válido antes de continuar.');
+      return;
+    }
+    if (!paymentMethod) {
+      setMessage('Selecione a forma de pagamento antes de confirmar a venda.');
+      return;
+    }
+    onDetectedBarcode(normalizedCode, paymentMethod);
   };
 
   return (
@@ -2810,47 +2835,84 @@ function BarcodeSaleModal({ inventory, onDetectedBarcode, onClose }) {
           <button type="button" className="icon-btn" onClick={onClose}><X size={19}/></button>
         </div>
 
-        <p className="muted" style={{fontSize: '13px'}}>
-          Bipe com o leitor óptico USB/Bluetooth ou use a câmera do seu celular para registrar no caixa e abater o estoque.
-        </p>
+        <div className="panel" style={{padding:12, marginBottom:14, border:'1px solid #303039', background:'#14141a'}}>
+          <strong style={{display:'block', marginBottom:5}}>Como realizar a venda</strong>
+          <p className="muted" style={{fontSize: '13px', margin:0}}>
+            1. Bipe o produto. 2. Confira o produto e escolha a forma de pagamento. 3. Aperte “Confirmar venda”. Bipar sozinho não registra a venda nem baixa o estoque.
+          </p>
+        </div>
 
-        <label>Forma de pagamento<select value={paymentMethod} onChange={e=>setPaymentMethod(e.target.value)} style={{marginTop:6}}><option>Dinheiro</option><option>Pix</option><option>Cartão de débito</option><option>Cartão de crédito</option><option>Transferência</option></select></label>
         <form onSubmit={handleManualSubmit} style={{margin: '15px 0'}}>
-          <label>Código de Barras (Leitor ou Digitação)
+          <label>Código de Barras (Leitor, câmera ou digitação)
             <div style={{display: 'flex', gap: '8px', marginTop: '6px'}}>
               <input
                 ref={inputRef}
                 value={manualCode}
                 onChange={e=>setManualCode(e.target.value)}
-                placeholder="Bipe com o leitor óptico..."
+                placeholder="Bipe ou digite o código..."
                 autoFocus
                 style={{flex: 1}}
               />
-              <button className="primary-btn" type="submit" style={{padding: '0 14px'}}>
-                Confirmar
-              </button>
+              <button className="secondary-btn" type="submit" style={{padding: '0 14px'}}>Localizar</button>
             </div>
           </label>
         </form>
 
-        <div style={{textAlign: 'center', margin: '15px 0'}}>
-          <span style={{fontSize: '11px', color: '#666', textTransform: 'uppercase'}}>ou prefere usar a câmera?</span>
-        </div>
+        {normalizedCode && (
+          <div className="panel" style={{padding:12, marginBottom:14, border:`1px solid ${selectedProduct && Number(selectedProduct.qty)>0 ? '#25D366' : '#f59e0b'}`, background:'#111116'}}>
+            {selectedProduct ? <>
+              <div className="eyebrow" style={{color:'#25D366'}}>PRODUTO IDENTIFICADO</div>
+              <strong style={{display:'block', marginTop:5}}>{selectedProduct.name}</strong>
+              <div className="muted" style={{fontSize:13, marginTop:5}}>Código: {normalizedCode}</div>
+              <div style={{display:'flex', justifyContent:'space-between', gap:10, marginTop:10}}>
+                <span>Preço unitário</span><strong>R$ {parseMoneyValue(selectedProduct.price).toFixed(2).replace('.', ',')}</strong>
+              </div>
+              <div style={{display:'flex', justifyContent:'space-between', gap:10, marginTop:5}}>
+                <span>Estoque disponível</span><strong>{Number(selectedProduct.qty)||0} un.</strong>
+              </div>
+              {Number(selectedProduct.qty) <= 0 && <p style={{color:'#f59e0b',fontSize:12,margin:'8px 0 0'}}>Produto sem estoque. Não é possível vender.</p>}
+            </> : <>
+              <strong style={{color:'#f59e0b'}}>Produto não encontrado</strong>
+              <p className="muted" style={{fontSize:12,margin:'5px 0 0'}}>Confira o código ou cadastre o produto antes de vender.</p>
+            </>}
+          </div>
+        )}
+
+        {message && <p role="status" style={{fontSize:12,color:'#25D366',margin:'0 0 10px'}}>{message}</p>}
+
+        <label>Forma de pagamento
+          <select value={paymentMethod} onChange={e=>setPaymentMethod(e.target.value)} style={{marginTop:6}}>
+            <option value="">Selecione antes de confirmar...</option>
+            <option>Dinheiro</option><option>Pix</option><option>Cartão de débito</option><option>Cartão de crédito</option><option>Transferência</option>
+          </select>
+        </label>
 
         <button
           type="button"
           className="secondary-btn full-btn"
           onClick={() => setUseCamera(true)}
-          style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', border: '1px solid #25D366', color: '#25D366', padding: '10px'}}
+          style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', border: '1px solid #25D366', color: '#25D366', padding: '10px', marginTop:12}}
         >
-          <Camera size={18}/> Abrir Câmera para Escanear
+          <Camera size={18}/> Abrir câmera para bipar
         </button>
+
+        <div className="modal-foot" style={{marginTop:16, display:'flex', gap:8}}>
+          <button type="button" className="secondary-btn" onClick={onClose}>Cancelar</button>
+          <button
+            type="button"
+            className="primary-btn"
+            onClick={confirmSale}
+            disabled={!selectedProduct || Number(selectedProduct.qty)<=0 || !paymentMethod}
+            style={{flex:1, opacity:(!selectedProduct || Number(selectedProduct.qty)<=0 || !paymentMethod)?0.5:1}}
+          >Confirmar venda</button>
+        </div>
 
         {useCamera && (
           <BarcodeCameraScanner
             onDetected={(code) => {
+              setManualCode(code);
               setUseCamera(false);
-              onDetectedBarcode(code, paymentMethod);
+              setMessage('Código lido. Confira o produto, escolha a forma de pagamento e confirme a venda.');
             }}
             onClose={() => setUseCamera(false)}
           />
