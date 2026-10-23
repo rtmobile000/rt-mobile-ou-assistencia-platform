@@ -652,7 +652,9 @@ function App() {
 
   const [orders, setOrders] = useState([]);
   const [customers, setCustomers] = useState([]);
-  const [inventory, setInventory] = useState([]);
+  const [inventory, setInventory] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('rt_inventory_v1') || '[]'); } catch { return []; }
+  });
   // Estoque de seminovos compartilhado entre o painel da loja e a vitrine do cliente.
   const [usedDevices, setUsedDevices] = useLocalRecords('rt_used_devices_v1');
   const [usedDevicesEnabled, setUsedDevicesEnabled] = useState(() => localStorage.getItem('rt_used_devices_enabled') !== 'false');
@@ -679,6 +681,7 @@ function App() {
   // Modais de Leitura de Código de Barras
   const [showBarcodeScannerForProduct, setShowBarcodeScannerForProduct] = useState(false);
   const [showBarcodeSaleModal, setShowBarcodeSaleModal] = useState(false);
+  const [showProductSaleModal, setShowProductSaleModal] = useState(false);
   
   const [toast, setToast] = useState('');
   const [mobileNav, setMobileNav] = useState(false);
@@ -890,6 +893,10 @@ function App() {
     try { localStorage.setItem('rt_cash_register_v1', JSON.stringify(cashRegister)); } catch (err) { console.warn('Não foi possível salvar o caixa neste navegador.', err); }
   }, [cashRegister]);
 
+  useEffect(() => {
+    try { localStorage.setItem('rt_inventory_v1', JSON.stringify(inventory)); } catch (err) { console.warn('Não foi possível salvar o estoque neste navegador.', err); }
+  }, [inventory]);
+
   useEffect(() => { fetchData(); }, [session]);
 
   // Tutorial inicial: aparece uma vez por conta e perfil, com opção de abrir novamente nas configurações.
@@ -1100,6 +1107,29 @@ await fetchData();
   const deleteProduct = (id) => {
     setInventory(prev => prev.filter(p => p.id !== id));
     notify('Produto removido.');
+  };
+
+  const handleSellProductFromList = (productId, quantity, paymentMethod = 'Dinheiro') => {
+    const found = inventory.find(p => String(p.id) === String(productId));
+    const qty = Math.floor(Number(quantity));
+    if (!found) { notify('Selecione um produto válido.'); return; }
+    if (!Number.isFinite(qty) || qty < 1) { notify('Informe uma quantidade válida.'); return; }
+    if (!cashRegister.isOpen) { notify('Abra o caixa antes de registrar vendas.'); return; }
+    if (Number(found.qty) < qty) { notify(`Estoque insuficiente. Há apenas ${found.qty} unidade(s) de ${found.name}.`); return; }
+    const unitPrice = parseMoneyValue(found.price);
+    const total = unitPrice * qty;
+    setInventory(prev => prev.map(p => String(p.id) === String(found.id) ? { ...p, qty: Math.max(0, Number(p.qty) - qty) } : p));
+    const newEntry = {
+      id: String(Date.now()), type: 'in', description: `Venda Balcão: ${qty}x ${found.name}`,
+      category: 'Acessórios', seller: '', paymentMethod: paymentMethod || 'Dinheiro', sourceType: 'sale',
+      productId: found.id, quantity: qty, unitPrice, commissionAmount: 0, amount: total,
+      createdAt: new Date().toISOString(), time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      user: userAccessLevel === 'owner' ? 'Dono' : 'Técnico'
+    };
+    setCashRegister(prev => ({ ...prev, entries: [newEntry, ...prev.entries] }));
+    addAuditLog(`Vendeu ${qty}x ${found.name} no caixa: R$ ${total.toFixed(2)}`);
+    setShowProductSaleModal(false);
+    notify(`Venda confirmada: ${qty}x ${found.name}. Total R$ ${total.toFixed(2).replace('.', ',')} e estoque atualizado!`);
   };
 
   const handleSellProductByBarcode = (scannedCode, paymentMethod = 'Dinheiro') => {
@@ -1730,7 +1760,7 @@ await fetchData();
             {active==='orders' && userRole === 'tech' && <OrdersPage orders={filteredOrders} search={search} setSearch={setSearch} onNew={()=>setShowNewOrder(true)} onPay={o=>{ const due=Math.max(0,parseMoneyValue(o.amount)-Number(o.paidAmount||0)); if(due<=0){notify('Esta OS já está quitada.');return;} setShowOrderPaymentModal(o); setOrderPayment({amount:due.toFixed(2),method:'Pix'}); }} onStatus={handleUpdateStatus} onShare={shareOsStatusWhatsapp} onSendWarranty={sendWarrantyTermWhatsapp} onOpenChecklist={(o) => setShowChecklistModal(o)} onPrint={(o) => setShowPrintModal(o)} onPellicleReminder={sendPellicleReminder} />}
             {active==='customers' && userRole === 'tech' && <CustomersPage customers={customers} onNew={()=>setShowNewCustomer(true)} />}
             {active==='crm' && userRole === 'tech' && <><CrmPage customers={customers} storeName={storeName} whatsapp={whatsappNumber} /><div style={{marginTop:24}}><PostSalePage storeName={storeName} whatsapp={whatsappNumber} /></div></>}
-            {active==='cash' && userRole === 'tech' && <><CashPage cashRegister={cashRegister} onNewTransaction={() => cashRegister.isOpen ? setShowCashTransactionModal(true) : notify('Abra o caixa antes de lançar movimentações.')} onOpenBarcodeSale={() => cashRegister.isOpen ? setShowBarcodeSaleModal(true) : notify('Abra o caixa antes de registrar vendas.')} onOpenCash={handleOpenCash} onCloseCash={handleCloseCash} /><CashCalculator /></>}
+            {active==='cash' && userRole === 'tech' && <><CashPage cashRegister={cashRegister} onNewTransaction={() => cashRegister.isOpen ? setShowCashTransactionModal(true) : notify('Abra o caixa antes de lançar movimentações.')} onOpenBarcodeSale={() => cashRegister.isOpen ? setShowBarcodeSaleModal(true) : notify('Abra o caixa antes de registrar vendas.')} onOpenProductSale={() => cashRegister.isOpen ? setShowProductSaleModal(true) : notify('Abra o caixa antes de registrar vendas.')} onOpenCash={handleOpenCash} onCloseCash={handleCloseCash} /><CashCalculator /></>}
             {active==='inventory' && userRole === 'tech' && <InventoryPage inventory={inventory} onNew={()=>setShowNewProduct(true)} onUpdateQty={updateProductQty} onDelete={deleteProduct} />}
             {active==='used_devices' && userRole === 'tech' && <UsedDevicesPage storeName={storeName} devices={usedDevices.filter(d => d.storeName === storeName || (!d.storeName && storeName === 'RT MOBILE'))} setDevices={setUsedDevices} enabled={usedDevicesEnabled} setEnabled={setUsedDevicesEnabled} />}
             {active==='reports' && userRole === 'tech' && userAccessLevel === 'owner' && <ReportsPage orders={orders} cashRegister={cashRegister} inventory={inventory} />}
@@ -1802,6 +1832,10 @@ await fetchData();
           }}
           onClose={() => setShowBarcodeScannerForProduct(false)}
         />
+      )}
+
+      {showProductSaleModal && (
+        <ProductSaleModal inventory={inventory} onSell={handleSellProductFromList} onClose={() => setShowProductSaleModal(false)} />
       )}
 
       {showBarcodeSaleModal && (
@@ -2514,7 +2548,7 @@ function CrmPage({customers, storeName, whatsapp}) {
   </div>
 }
 
-function CashPage({cashRegister, onNewTransaction, onOpenBarcodeSale, onOpenCash, onCloseCash}) {
+function CashPage({cashRegister, onNewTransaction, onOpenBarcodeSale, onOpenProductSale, onOpenCash, onCloseCash}) {
   const entries = cashRegister.entries || [];
   const totalEntries = entries.filter(e => e.type === 'in').reduce((a, b) => a + Number(b.amount || 0), 0);
   const totalExits = entries.filter(e => e.type === 'out').reduce((a, b) => a + Number(b.amount || 0), 0);
@@ -2524,7 +2558,7 @@ function CashPage({cashRegister, onNewTransaction, onOpenBarcodeSale, onOpenCash
   const money = value => `R$ ${Number(value||0).toFixed(2).replace('.', ',')}`;
   return <div className="page-content">
     <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line"/> FLUXO DE CAIXA DO ESTABELECIMENTO</div><h1>Caixa da <span>Loja.</span></h1><p>Controle abertura, recebimentos por OS e vendas, sangrias e fechamento diário.</p><div style={{marginTop:10}}><span className={`status-pill ${cashRegister.isOpen?'green':'amber'}`}><i/>{cashRegister.isOpen?'CAIXA ABERTO':'CAIXA FECHADO'}</span>{cashRegister.openedAt&&<small className="muted" style={{marginLeft:10}}>Abertura: {new Date(cashRegister.openedAt).toLocaleString('pt-BR')}</small>}</div></div>
-      <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{cashRegister.isOpen ? <><button className="secondary-btn" onClick={onOpenBarcodeSale} style={{background:'#1f2937',color:'#25D366',border:'1px solid #25D366',fontWeight:'bold',display:'flex',alignItems:'center',gap:6}}><BarcodeIcon size={17}/> Bipar / Vender Produto</button><button className="primary-btn" onClick={onNewTransaction}><Plus size={17}/> Lançar Manual</button><button className="secondary-btn" onClick={onCloseCash} style={{border:'1px solid #f59e0b',color:'#f59e0b'}}><Lock size={16}/> Fechar caixa</button></> : <button className="primary-btn" onClick={onOpenCash}><CheckCircle2 size={17}/> Abrir caixa do dia</button>}</div>
+      <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{cashRegister.isOpen ? <><button className="secondary-btn" onClick={onOpenProductSale} style={{background:'#142018',color:'#25D366',border:'1px solid #25D366',fontWeight:'bold',display:'flex',alignItems:'center',gap:6}}><Package size={17}/> Vender Produto</button><button className="secondary-btn" onClick={onOpenBarcodeSale} style={{background:'#1f2937',color:'#25D366',border:'1px solid #25D366',fontWeight:'bold',display:'flex',alignItems:'center',gap:6}}><BarcodeIcon size={17}/> Bipar / Vender Produto</button><button className="primary-btn" onClick={onNewTransaction}><Plus size={17}/> Lançar Manual</button><button className="secondary-btn" onClick={onCloseCash} style={{border:'1px solid #f59e0b',color:'#f59e0b'}}><Lock size={16}/> Fechar caixa</button></> : <button className="primary-btn" onClick={onOpenCash}><CheckCircle2 size={17}/> Abrir caixa do dia</button>}</div>
     </div>
     <div className="metrics-grid" style={{gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))'}}>
       <div className="metric-card" style={{background:'#0a0a0d',border:'1px solid #18181b'}}><div className="metric-top"><span className="metric-period">FUNDO INICIAL</span></div><div className="metric-value" style={{color:'#aaa'}}>{money(cashRegister.openingBalance)}</div><div className="metric-label">Dinheiro na abertura</div></div>
@@ -2536,6 +2570,30 @@ function CashPage({cashRegister, onNewTransaction, onOpenBarcodeSale, onOpenCash
     {!cashRegister.isOpen && cashRegister.closedAt && <div className="panel" style={{background:'#0a0a0d',border:'1px solid #f59e0b',padding:16,marginTop:18}}><h3>Resumo do último fechamento</h3><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:12}}><div>Saldo esperado<br/><strong>{money(cashRegister.expectedCash)}</strong></div><div>Dinheiro contado<br/><strong>{money(cashRegister.countedCash)}</strong></div><div>Diferença<br/><strong style={{color:Number(cashRegister.difference)===0?'#25D366':'#f59e0b'}}>{money(cashRegister.difference)}</strong></div></div><p className="muted">Fechado em {new Date(cashRegister.closedAt).toLocaleString('pt-BR')} por {cashRegister.closedBy||'—'}.</p></div>}
     <div className="panel orders-full" style={{background:'#0a0a0d',border:'1px solid #18181b',marginTop:20}}><div className="panel-heading"><div><h3>Movimentações do caixa</h3><p>Pagamentos de OS, vendas e lançamentos manuais desta sessão</p></div></div><div className="table-wrap"><table><thead><tr><th>HORÁRIO</th><th>DESCRIÇÃO</th><th>CATEGORIA</th><th>FORMA</th><th>OPERADOR</th><th>TIPO</th><th>VALOR</th></tr></thead><tbody>{entries.map(item=><tr key={item.id}><td>{item.time|| (item.createdAt?new Date(item.createdAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'—')}</td><td><strong>{item.description}</strong>{item.seller&&<div className="muted" style={{fontSize:11}}>Vendedor: {item.seller}</div>}</td><td>{item.category||'—'}</td><td>{item.paymentMethod||'Dinheiro'}</td><td>{item.user||'—'}</td><td><span className={`status-pill ${item.type==='in'?'green':'amber'}`}><i/>{item.type==='in'?'Entrada':'Saída'}</span></td><td><strong style={{color:item.type==='in'?'#25D366':'#ff4d4d'}}>{item.type==='in'?'+':'−'} {money(item.amount)}</strong></td></tr>)}</tbody></table>{!entries.length&&<div className="empty-state"><Wallet size={28}/><strong>Nenhuma movimentação nesta sessão</strong><span>Recebimentos de OS e vendas aparecerão aqui quando registrados.</span></div>}</div></div>
   </div>
+}
+
+/* VENDA MANUAL DE PRODUTO: registra entrada no caixa e baixa o estoque */
+function ProductSaleModal({ inventory, onSell, onClose }) {
+  const available = inventory.filter(p => Number(p.qty) > 0);
+  const [productId, setProductId] = useState(available[0]?.id || '');
+  const [quantity, setQuantity] = useState('1');
+  const [paymentMethod, setPaymentMethod] = useState('Dinheiro');
+  const selected = inventory.find(p => String(p.id) === String(productId));
+  const qty = Math.max(0, Math.floor(Number(quantity) || 0));
+  const total = selected ? parseMoneyValue(selected.price) * qty : 0;
+  const money = value => `R$ ${Number(value || 0).toFixed(2).replace('.', ',')}`;
+  return <div className="modal-backdrop" onClick={onClose}><div className="modal" onClick={e => e.stopPropagation()} style={{background:'#0f0f12',border:'1px solid #222',maxWidth:480}}>
+    <div className="modal-head"><div><div className="eyebrow">CAIXA RÁPIDO</div><h2>Vender produto</h2></div><button type="button" className="icon-btn" onClick={onClose}><X size={19}/></button></div>
+    <p className="muted">Selecione o produto cadastrado, informe a quantidade e confirme. O sistema registra a entrada no caixa e desconta as unidades do estoque.</p>
+    {!available.length ? <div className="empty-state"><Package size={28}/><strong>Nenhum produto disponível</strong><span>Cadastre um produto ou reponha o estoque antes de vender.</span></div> : <form onSubmit={e => { e.preventDefault(); onSell(productId, quantity, paymentMethod); }}>
+      <label>Produto<select required value={productId} onChange={e => setProductId(e.target.value)} style={{marginTop:6}}>{available.map(p => <option key={p.id} value={p.id}>{p.name} — estoque: {p.qty} — {money(p.price)}</option>)}</select></label>
+      {selected && <div className="panel" style={{padding:12,margin:'12px 0',background:'#09090b'}}><div style={{display:'flex',justifyContent:'space-between',gap:12}}><span>Preço unitário</span><strong>{money(selected.price)}</strong></div><div style={{display:'flex',justifyContent:'space-between',gap:12,marginTop:6}}><span>Disponível</span><strong>{selected.qty} unidade(s)</strong></div></div>}
+      <label>Quantidade<input type="number" min="1" max={selected?.qty || 1} step="1" required value={quantity} onChange={e => setQuantity(e.target.value)} style={{marginTop:6}}/></label>
+      <label style={{display:'block',marginTop:12}}>Forma de pagamento<select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)} style={{marginTop:6}}><option>Dinheiro</option><option>Pix</option><option>Cartão de débito</option><option>Cartão de crédito</option><option>Transferência</option></select></label>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',margin:'18px 0',padding:'14px',background:'#07130b',border:'1px solid #174b2a',borderRadius:8}}><span>Total da venda</span><strong style={{fontSize:22,color:'#25D366'}}>{money(total)}</strong></div>
+      <button className="primary-btn full-btn" type="submit" disabled={!selected || qty < 1 || qty > Number(selected?.qty)}><CheckCircle2 size={17}/> Confirmar venda e baixar estoque</button>
+    </form>}
+  </div></div>;
 }
 
 /* MODAL DE VENDA NO CAIXA POR CÓDIGO DE BARRAS */
