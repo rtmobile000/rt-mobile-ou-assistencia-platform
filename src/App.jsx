@@ -1453,39 +1453,28 @@ await fetchData();
     if (!cashRegister.isOpen) { notify('Abra o caixa antes de receber pagamentos.'); return; }
     if (!supabaseConfigured || !session?.user?.id) { notify('Entre na sua conta para registrar o pagamento no banco de dados.'); return; }
     if (!order.rawId || !order.organizationId) { notify('Esta OS não possui os identificadores necessários do Supabase. Atualize a página e tente novamente.'); return; }
+
     const amount = parseMoneyValue(orderPayment.amount);
-    const total = parseMoneyValue(order.amount);
-    const paid = Number(order.paidAmount || 0);
-    const due = Math.max(0, total - paid);
-    if (!(amount > 0) || amount > due + 0.009) { notify(`Informe um valor válido. Saldo da OS: R$ ${due.toFixed(2).replace('.', ',')}`); return; }
+    if (!(amount > 0)) { notify('Informe um valor recebido maior que zero.'); return; }
 
     setSaving(true);
     try {
-      const paidAt = new Date().toISOString();
-      const nextPaidAmount = paid + amount;
-      const { data: paymentRow, error: paymentError } = await supabase.from('payments').insert({
-        organization_id: order.organizationId,
-        repair_order_id: order.rawId,
-        amount,
-        method: orderPayment.method,
-        state: 'paid',
-        reference: `OS-${order.id}-${Date.now()}`,
-        paid_at: paidAt,
-        created_by: session.user.id,
-      }).select('id, amount, method, paid_at').single();
+      // Registra o pagamento e atualiza o saldo dentro de uma única transação no banco.
+      const { data: paymentRow, error: paymentError } = await supabase.rpc('rt_receive_order_payment', {
+        p_organization_id: order.organizationId,
+        p_repair_order_id: order.rawId,
+        p_amount: amount,
+        p_method: orderPayment.method,
+        p_reference: `OS-${order.id}-${Date.now()}`
+      });
       if (paymentError) throw paymentError;
 
-      const { error: orderUpdateError } = await supabase.from('repair_orders')
-        .update({ amount_paid: nextPaidAmount })
-        .eq('id', order.rawId)
-        .eq('organization_id', order.organizationId);
-      if (orderUpdateError) {
-        notify('Pagamento salvo, mas o saldo da OS não foi atualizado. Verifique as permissões de UPDATE no Supabase antes de receber outro pagamento.');
-        console.error('Pagamento salvo, falha ao atualizar saldo da OS:', orderUpdateError);
-        return;
-      }
+      const payment = Array.isArray(paymentRow) ? paymentRow[0] : paymentRow;
+      if (!payment?.payment_id) throw new Error('O banco não retornou a confirmação do pagamento. Atualize a tela antes de tentar novamente.');
 
-      const paymentId = paymentRow?.id || `os-payment-${order.rawId}-${Date.now()}`;
+      const paidAt = payment.paid_at || new Date().toISOString();
+      const nextPaidAmount = Number(payment.amount_paid);
+      const paymentId = payment.payment_id;
       const entry = { id: paymentId, type: 'in', description: `Pagamento OS ${order.id} — ${order.customer || 'Cliente'}`, category: 'Assistência técnica', seller: '', amount, paymentMethod: orderPayment.method, sourceType: 'os_payment', orderId: order.id, rawOrderId: order.rawId, createdAt: paidAt, time: new Date(paidAt).toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'}), user: userAccessLevel === 'owner' ? 'Dono' : 'Técnico' };
       setCashRegister(prev => ({ ...prev, entries: [entry, ...prev.entries] }));
       const nextPayments = [...(order.payments || []), { id: paymentId, amount, method: orderPayment.method, paidAt }];
@@ -1496,7 +1485,7 @@ await fetchData();
       notify(`Pagamento de R$ ${amount.toFixed(2).replace('.', ',')} registrado no Supabase.`);
     } catch (error) {
       console.error('Erro ao registrar pagamento da OS:', error);
-      notify(`Não foi possível registrar o pagamento no Supabase: ${error?.message || 'verifique as permissões da tabela payments'}`);
+      notify(`Não foi possível registrar o pagamento: ${error?.message || 'verifique a função rt_receive_order_payment no Supabase'}`);
     } finally {
       setSaving(false);
     }
