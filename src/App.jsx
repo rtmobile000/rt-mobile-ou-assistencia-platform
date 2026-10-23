@@ -861,11 +861,24 @@ function App() {
     return () => listener.subscription.unsubscribe();
   }, []);
 
+  // Garante que o dono tenha organização e vínculo no Supabase. Funcionários precisam ser convidados à loja existente.
+  const ensureMyOrganization = async (createIfMissing = false) => {
+    if (!supabaseConfigured || !session?.user?.id) throw new Error('Entre novamente na sua conta para continuar.');
+    const { data, error } = await supabase.rpc('rt_ensure_my_organization', { p_create_if_missing: Boolean(createIfMissing) });
+    if (error) throw error;
+    const organizationId = typeof data === 'string' ? data : data?.organization_id;
+    if (!organizationId) throw new Error('Sua conta ainda não está vinculada a uma loja. O proprietário precisa concluir o vínculo ou convidar você.');
+    return organizationId;
+  };
+
   const fetchData = async () => {
     if (!supabaseConfigured || !session) return;
     setRemotePersistenceReady(false);
     const userEmail = session.user?.email?.toLowerCase();
     const isOwnerByEmail = userEmail === ADMIN_EMAIL.toLowerCase();
+    // Cria/recupera automaticamente a organização de quem entra como dono (perfil técnico).
+    try { await ensureMyOrganization(userRole === 'tech' && !isOwnerByEmail); }
+    catch (bootstrapError) { console.warn('Vínculo da organização:', bootstrapError.message); }
 
     const userCreatedAt = session.user?.created_at ? new Date(session.user.created_at) : new Date();
     const now = new Date();
@@ -1113,6 +1126,11 @@ function App() {
       if (result.error) throw result.error;
 
       localStorage.setItem('rt_user_role', userRole);
+      // No login, provisiona a loja/vínculo; no cadastro com confirmação de e-mail, isso ocorrerá no primeiro login.
+      if (result.data?.session && userRole === 'tech') {
+        const { error: bootstrapError } = await supabase.rpc('rt_ensure_my_organization', { p_create_if_missing: true });
+        if (bootstrapError) console.warn('A configuração automática será repetida ao entrar:', bootstrapError.message);
+      }
 
       if (userRole === 'tech') {
         setActive('overview');
@@ -1132,10 +1150,9 @@ function App() {
     try {
       const generatedId = `OS-${Math.floor(1000 + Math.random() * 9000)}`;
       if (supabaseConfigured && session) {
-        const { data: memberships } = await supabase.from('organization_members').select('organization_id').eq('user_id', session.user.id).limit(1);
-        const orgId = memberships?.[0]?.organization_id;
+        const orgId = await ensureMyOrganization(userRole === 'tech');
         const { error } = await supabase.from('repair_orders').insert({
-          organization_id: orgId || null,
+          organization_id: orgId,
           created_by: session.user.id,
           customer_name: newOrder.customer.trim(),
           customer_phone: newOrder.phone.trim() || null,
@@ -1203,21 +1220,7 @@ function App() {
     setSaving(true);
     try {
       if (supabaseConfigured && session) {
-        const { data: memberships, error: membershipError } = await supabase
-  .from('organization_members')
-  .select('organization_id')
-  .eq('user_id', session.user.id)
-  .limit(1);
-
-if (membershipError) throw membershipError;
-
-const orgId = memberships?.[0]?.organization_id;
-
-if (!orgId) {
-  throw new Error(
-    'Sua conta não está vinculada a uma loja. Verifique o vínculo do usuário.'
-  );
-}
+        const orgId = await ensureMyOrganization(userRole === 'tech');
 
 const { error } = await supabase.from('customers').insert({
   organization_id: orgId,
