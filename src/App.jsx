@@ -1199,21 +1199,46 @@ await fetchData();
   };
 
   const editOrder = async (order) => {
+    // Edição guiada dos dados da OS; mantém a identificação original e o histórico de pagamentos.
     const customer = window.prompt('Nome do cliente:', order.customer || ''); if (customer === null) return;
     const phone = window.prompt('Telefone / WhatsApp:', order.phone || ''); if (phone === null) return;
-    const device = window.prompt('Aparelho / modelo:', order.device || ''); if (device === null) return;
+    const device = window.prompt('Marca e modelo do aparelho:', order.device || ''); if (device === null) return;
+    const devicePassword = window.prompt('Senha / PIN do aparelho:', order.devicePassword || 'Sem senha'); if (devicePassword === null) return;
     const issue = window.prompt('Defeito relatado:', order.issue || ''); if (issue === null) return;
+    const statusOptions = ['Recebido', 'Em diagnóstico', 'Aguardando aprovação', 'Aguardando peça', 'Em manutenção', 'Pronto para retirada', 'Entregue'];
+    const status = window.prompt(`Status da OS (${statusOptions.join(' / ')}):`, order.status || 'Recebido'); if (status === null) return;
     const amountText = window.prompt('Valor total da OS (ex.: 150,00):', String(parseMoneyValue(order.amount))); if (amountText === null) return;
     const amount = Number(String(amountText).replace(',', '.'));
-    if (!customer.trim() || !device.trim() || !issue.trim() || !Number.isFinite(amount) || amount < 0) { notify('Confira os dados informados.'); return; }
+    const partCostText = window.prompt('Custo das peças (ex.: 35,00):', String(order.partCost ?? '0.00')); if (partCostText === null) return;
+    const partCost = Number(String(partCostText).replace(',', '.'));
+    const warrantyText = window.prompt('Garantia em dias:', String(order.warrantyDays ?? 90)); if (warrantyText === null) return;
+    const warrantyDays = Number(warrantyText);
+    if (!customer.trim() || !device.trim() || !issue.trim() || !Number.isFinite(amount) || amount < 0 || !Number.isFinite(partCost) || partCost < 0 || !Number.isInteger(warrantyDays) || warrantyDays < 0) {
+      notify('Confira os dados: nome, aparelho, defeito, valores e garantia precisam ser válidos.'); return;
+    }
+    if (!statusOptions.includes(status)) { notify('Status inválido. Escolha um dos status listados.'); return; }
+    if (Number(order.paidAmount || 0) > amount && !window.confirm(`A OS já tem R$ ${Number(order.paidAmount).toFixed(2)} registrado como pago, acima do novo total de R$ ${amount.toFixed(2)}. Deseja salvar mesmo assim?`)) return;
     try {
       if (supabaseConfigured && session && order.rawId) {
         const deviceParts = device.trim().split(/\s+/);
-        const { error } = await supabase.from('repair_orders').update({ customer_name: customer.trim(), customer_phone: phone.trim() || null, device_brand: deviceParts[0] || 'Outro', device_model: deviceParts.slice(1).join(' ') || device.trim(), issue_description: issue.trim(), total_amount: amount }).eq('id', order.rawId);
+        const { error } = await supabase.from('repair_orders').update({
+          customer_name: customer.trim(), customer_phone: phone.trim() || null,
+          device_brand: deviceParts[0] || 'Outro', device_model: deviceParts.slice(1).join(' ') || device.trim(),
+          issue_description: issue.trim(), status, total_amount: amount
+        }).eq('id', order.rawId);
         if (error) throw error;
         await fetchData();
-      } else setOrders(prev => prev.map(o => String(o.rawId || o.id) === String(order.rawId || order.id) ? { ...o, customer: customer.trim(), phone: phone.trim(), device: device.trim(), issue: issue.trim(), amount: `R$ ${amount.toFixed(2)}` } : o));
-      addAuditLog(`Editou a ordem ${order.id}`); notify('Ordem de serviço atualizada.');
+        // Campos sem coluna confirmada no esquema atual ficam atualizados nesta sessão sem arriscar erro no banco.
+        setOrders(prev => prev.map(o => String(o.rawId || o.id) === String(order.rawId || order.id) ? { ...o, devicePassword: devicePassword.trim() || 'Sem senha', partCost: partCost.toFixed(2), warrantyDays } : o));
+      } else {
+        setOrders(prev => prev.map(o => String(o.rawId || o.id) === String(order.rawId || order.id) ? {
+          ...o, customer: customer.trim(), phone: phone.trim(), device: device.trim(),
+          devicePassword: devicePassword.trim() || 'Sem senha', issue: issue.trim(), status,
+          amount: `R$ ${amount.toFixed(2)}`, partCost: partCost.toFixed(2), warrantyDays
+        } : o));
+      }
+      addAuditLog(`Editou os dados da ordem ${order.id}`);
+      notify('Dados da ordem atualizados. Confira o total e os pagamentos registrados.');
     } catch (err) { notify(err.message || 'Não foi possível atualizar a OS.'); }
   };
 
