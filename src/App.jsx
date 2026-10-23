@@ -756,6 +756,35 @@ function App() {
 
   const activeStores = useMemo(() => allStores.filter(s => s.status === 'active'), [allStores]);
 
+  // A vitrine pública carrega apenas lojas pagas ativas ou ainda dentro das 48h de teste.
+  // A função RPC faz o filtro no banco, sem expor dados privados dos estabelecimentos.
+  useEffect(() => {
+    let cancelled = false;
+    const loadPublicStores = async () => {
+      if (!supabaseConfigured) return;
+      const { data, error } = await supabase.rpc('rt_public_active_stores');
+      if (cancelled) return;
+      if (error) {
+        console.warn('Não foi possível carregar a vitrine de lojas:', error.message);
+        return; // preserva a vitrine atual se o RPC ainda não foi instalado
+      }
+      const stores = (data || []).map((row) => ({
+        id: String(row.id),
+        name: row.name || 'Estabelecimento',
+        phone: row.phone || '',
+        status: 'active',
+        desc: row.desc || 'Estabelecimento RT Mobile',
+        address: row.address || 'Endereço não informado',
+        rating: 5.0,
+        reviewsCount: 0,
+      }));
+      if (stores.length) setAllStores(stores);
+      else setAllStores([]);
+    };
+    loadPublicStores();
+    return () => { cancelled = true; };
+  }, []);
+
   const [search, setSearch] = useState('');
   const [showNewOrder, setShowNewOrder] = useState(false);
   const [showNewCustomer, setShowNewCustomer] = useState(false);
