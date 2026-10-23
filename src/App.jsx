@@ -859,8 +859,8 @@ function App() {
       const defaultName = `Loja ${session.user.email.split('@')[0].toUpperCase()}`;
       const { data: createdOrg } = await supabase.from('organizations').insert({
         owner_user_id: session.user.id,
-        Nome: defaultName,
-        WhatsApp: '5591989117332',
+        name: defaultName,
+        whatsapp: '5591989117332',
         pix_key: '91989117332',
         access_state: 'Teste',
         plan_status: 'Teste',
@@ -872,12 +872,12 @@ function App() {
     const org = orgData?.[0];
 
     if (org || isOwnerByEmail) {
-      if (org?.Nome) setStoreName(org.Nome);
-      if (org?.WhatsApp) setWhatsappNumber(org.WhatsApp);
+      if (org?.name) setStoreName(org.name);
+      if (org?.whatsapp) setWhatsappNumber(org.whatsapp);
       if (org?.pix_key) setPixKey(org.pix_key);
 
       const isVitalicio = isOwnerByEmail || org?.plan_name === 'Vitalício';
-      const isPaidActive = org?.access_state === 'Ativo' || org?.plan_status === 'Ativo';
+      const isPaidActive = ['ativo', 'active'].includes(String(org?.access_state || '').toLowerCase()) || ['ativo', 'active'].includes(String(org?.plan_status || '').toLowerCase());
 
       if (isVitalicio) {
         setIsLifetimeAdmin(true);
@@ -913,7 +913,7 @@ function App() {
       }
 
       setTeamMembers([
-        { id: session.user.id, name: isOwnerByEmail ? 'Robert Haelley (Proprietário)' : (org?.Nome || 'Responsável'), email: session.user.email, role: 'owner', status: 'Ativo' }
+        { id: session.user.id, name: isOwnerByEmail ? 'Robert Haelley (Proprietário)' : (org?.name || 'Responsável'), email: session.user.email, role: 'owner', status: 'Ativo' }
       ]);
     } else {
       if (hoursRemaining > 0) {
@@ -925,9 +925,23 @@ function App() {
       }
     }
 
-    const { data: oData } = await supabase.from('repair_orders')
-      .select('id, order_number, customer_name, customer_phone, device_brand, device_model, issue_description, status, total_amount, created_at')
-      .order('created_at', { ascending: false }).limit(50);
+    // Busca todas as OS em páginas para não limitar o histórico às 50 mais recentes.
+    // O RLS do Supabase deve continuar garantindo o isolamento por organização.
+    let oData = [];
+    const pageSize = 500;
+    for (let from = 0; ; from += pageSize) {
+      const { data: page, error: ordersError } = await supabase.from('repair_orders')
+        .select('id, organization_id, order_number, customer_name, customer_phone, device_brand, device_model, issue_description, status, total_amount, amount_paid, created_at')
+        .order('created_at', { ascending: false })
+        .range(from, from + pageSize - 1);
+      if (ordersError) {
+        console.error('Erro ao carregar histórico de OS:', ordersError);
+        notify?.('Não foi possível carregar o histórico completo de OS. Confira as permissões do Supabase.');
+        break;
+      }
+      oData = oData.concat(page || []);
+      if (!page || page.length < pageSize) break;
+    }
     if (oData) {
       let savedOrderPayments = {}; try { savedOrderPayments = JSON.parse(localStorage.getItem(`rt_order_payments_${session?.user?.id || 'local'}_${storeName}`) || '{}'); } catch {}
       setOrders(oData.map((o) => {
@@ -936,7 +950,7 @@ function App() {
         return ({
         rawId: o.id,
         id: displayOrderId,
-        paidAmount: Number(paymentData.paidAmount || 0), payments: paymentData.payments || [],
+        paidAmount: Number(paymentData.paidAmount ?? o.amount_paid ?? 0), payments: paymentData.payments || [],
         customer: o.customer_name,
         phone: o.customer_phone || '',
         device: [o.device_brand, o.device_model].filter(Boolean).join(' '),
