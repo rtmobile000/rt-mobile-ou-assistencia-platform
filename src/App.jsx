@@ -943,15 +943,40 @@ function App() {
       if (!page || page.length < pageSize) break;
     }
     if (oData) {
-      let savedOrderPayments = {}; try { savedOrderPayments = JSON.parse(localStorage.getItem(`rt_order_payments_${session?.user?.id || 'local'}_${storeName}`) || '{}'); } catch {}
+      // Carrega o histórico real de pagamentos do Supabase, não apenas do navegador.
+      const paymentsByOrder = {};
+      const orgIds = [...new Set(oData.map(o => o.organization_id).filter(Boolean))];
+      for (const orgId of orgIds) {
+        const { data: paymentRows, error: paymentRowsError } = await supabase
+          .from('payments')
+          .select('id, organization_id, repair_order_id, amount, method, state, reference, paid_at, created_at')
+          .eq('organization_id', orgId)
+          .order('paid_at', { ascending: true });
+        if (paymentRowsError) {
+          console.warn('Não foi possível carregar o histórico de pagamentos do Supabase:', paymentRowsError);
+          continue;
+        }
+        (paymentRows || []).forEach(payment => {
+          if (!paymentsByOrder[payment.repair_order_id]) paymentsByOrder[payment.repair_order_id] = [];
+          paymentsByOrder[payment.repair_order_id].push({
+            id: payment.id,
+            amount: Number(payment.amount || 0),
+            method: payment.method || 'Não informado',
+            paidAt: payment.paid_at || payment.created_at,
+            state: payment.state,
+            reference: payment.reference
+          });
+        });
+      }
       setOrders(oData.map((o) => {
         const displayOrderId = o.order_number || `OS-${String(o.id).slice(0, 6)}`;
-        const paymentData = savedOrderPayments[displayOrderId] || {};
+        const payments = paymentsByOrder[o.id] || [];
+        const paidFromPayments = payments.filter(p => !p.state || ['paid', 'received', 'approved', 'completed'].includes(String(p.state).toLowerCase())).reduce((sum, p) => sum + Number(p.amount || 0), 0);
         return ({
         rawId: o.id,
         organizationId: o.organization_id,
         id: displayOrderId,
-        paidAmount: Number(paymentData.paidAmount ?? o.amount_paid ?? 0), payments: paymentData.payments || [],
+        paidAmount: payments.length ? paidFromPayments : Number(o.amount_paid ?? 0), payments,
         customer: o.customer_name,
         phone: o.customer_phone || '',
         device: [o.device_brand, o.device_model].filter(Boolean).join(' '),
