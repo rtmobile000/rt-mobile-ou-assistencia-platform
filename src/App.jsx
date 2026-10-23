@@ -949,6 +949,7 @@ function App() {
         const paymentData = savedOrderPayments[displayOrderId] || {};
         return ({
         rawId: o.id,
+        organizationId: o.organization_id,
         id: displayOrderId,
         paidAmount: Number(paymentData.paidAmount ?? o.amount_paid ?? 0), payments: paymentData.payments || [],
         customer: o.customer_name,
@@ -1445,29 +1446,60 @@ await fetchData();
     notify('Lançamento registrado no caixa da loja!');
   };
 
-  const handleReceiveOrderPayment = (e) => {
+  const handleReceiveOrderPayment = async (e) => {
     e.preventDefault();
     const order = showOrderPaymentModal;
     if (!order) return;
     if (!cashRegister.isOpen) { notify('Abra o caixa antes de receber pagamentos.'); return; }
+    if (!supabaseConfigured || !session?.user?.id) { notify('Entre na sua conta para registrar o pagamento no banco de dados.'); return; }
+    if (!order.rawId || !order.organizationId) { notify('Esta OS não possui os identificadores necessários do Supabase. Atualize a página e tente novamente.'); return; }
     const amount = parseMoneyValue(orderPayment.amount);
     const total = parseMoneyValue(order.amount);
     const paid = Number(order.paidAmount || 0);
     const due = Math.max(0, total - paid);
     if (!(amount > 0) || amount > due + 0.009) { notify(`Informe um valor válido. Saldo da OS: R$ ${due.toFixed(2).replace('.', ',')}`); return; }
-    const paymentId = `os-payment-${order.rawId || order.id}-${Date.now()}`;
-    const entry = { id: paymentId, type: 'in', description: `Pagamento OS ${order.id} — ${order.customer || 'Cliente'}`, category: 'Assistência técnica', seller: '', amount, paymentMethod: orderPayment.method, sourceType: 'os_payment', orderId: order.id, rawOrderId: order.rawId || null, createdAt: new Date().toISOString(), time: new Date().toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'}), user: userAccessLevel === 'owner' ? 'Dono' : 'Técnico' };
-    setCashRegister(prev => ({ ...prev, entries: [entry, ...prev.entries] }));
-    const paymentStorageKey = `rt_order_payments_${session?.user?.id || 'local'}_${storeName}`;
-    let storedPayments = {}; try { storedPayments = JSON.parse(localStorage.getItem(paymentStorageKey) || '{}'); } catch {}
-    const nextPaidAmount = Number(order.paidAmount || 0) + amount;
-    const nextPayments = [...(order.payments || []), { id: paymentId, amount, method: orderPayment.method, paidAt: new Date().toISOString() }];
-    storedPayments[order.id] = { paidAmount: nextPaidAmount, payments: nextPayments };
-    localStorage.setItem(paymentStorageKey, JSON.stringify(storedPayments));
-    setOrders(prev => prev.map(o => o.id === order.id ? { ...o, paidAmount: nextPaidAmount, payments: nextPayments } : o));
-    addAuditLog(`Recebeu R$ ${amount.toFixed(2)} da OS ${order.id} via ${orderPayment.method}`);
-    setShowOrderPaymentModal(null); setOrderPayment({ amount: '', method: 'Pix' });
-    notify(`Pagamento de R$ ${amount.toFixed(2).replace('.', ',')} registrado no caixa.`);
+
+    setSaving(true);
+    try {
+      const paidAt = new Date().toISOString();
+      const nextPaidAmount = paid + amount;
+      const { data: paymentRow, error: paymentError } = await supabase.from('payments').insert({
+        organization_id: order.organizationId,
+        repair_order_id: order.rawId,
+        amount,
+        method: orderPayment.method,
+        state: 'paid',
+        reference: `OS-${order.id}-${Date.now()}`,
+        paid_at: paidAt,
+        created_by: session.user.id,
+      }).select('id, amount, method, paid_at').single();
+      if (paymentError) throw paymentError;
+
+      const { error: orderUpdateError } = await supabase.from('repair_orders')
+        .update({ amount_paid: nextPaidAmount })
+        .eq('id', order.rawId)
+        .eq('organization_id', order.organizationId);
+      if (orderUpdateError) {
+        notify('Pagamento salvo, mas o saldo da OS não foi atualizado. Verifique as permissões de UPDATE no Supabase antes de receber outro pagamento.');
+        console.error('Pagamento salvo, falha ao atualizar saldo da OS:', orderUpdateError);
+        return;
+      }
+
+      const paymentId = paymentRow?.id || `os-payment-${order.rawId}-${Date.now()}`;
+      const entry = { id: paymentId, type: 'in', description: `Pagamento OS ${order.id} — ${order.customer || 'Cliente'}`, category: 'Assistência técnica', seller: '', amount, paymentMethod: orderPayment.method, sourceType: 'os_payment', orderId: order.id, rawOrderId: order.rawId, createdAt: paidAt, time: new Date(paidAt).toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'}), user: userAccessLevel === 'owner' ? 'Dono' : 'Técnico' };
+      setCashRegister(prev => ({ ...prev, entries: [entry, ...prev.entries] }));
+      const nextPayments = [...(order.payments || []), { id: paymentId, amount, method: orderPayment.method, paidAt }];
+      setOrders(prev => prev.map(o => o.id === order.id ? { ...o, paidAmount: nextPaidAmount, payments: nextPayments } : o));
+      addAuditLog(`Recebeu R$ ${amount.toFixed(2)} da OS ${order.id} via ${orderPayment.method}`);
+      setShowOrderPaymentModal(null);
+      setOrderPayment({ amount: '', method: 'Pix' });
+      notify(`Pagamento de R$ ${amount.toFixed(2).replace('.', ',')} registrado no Supabase.`);
+    } catch (error) {
+      console.error('Erro ao registrar pagamento da OS:', error);
+      notify(`Não foi possível registrar o pagamento no Supabase: ${error?.message || 'verifique as permissões da tabela payments'}`);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleOpenCash = () => {
@@ -2059,7 +2091,7 @@ await fetchData();
         />
       )}
 
-      {showOrderPaymentModal && <div className="modal-backdrop" onClick={()=>setShowOrderPaymentModal(null)}><form className="modal" onClick={e=>e.stopPropagation()} onSubmit={handleReceiveOrderPayment} style={{background:'#0f0f12',border:'1px solid #222',maxWidth:440}}><div className="modal-head"><div><div className="eyebrow">RECEBIMENTO DE OS</div><h2>Receber pagamento</h2><p className="muted">{showOrderPaymentModal.id} · {showOrderPaymentModal.customer}</p></div><button type="button" className="icon-btn" onClick={()=>setShowOrderPaymentModal(null)}><X size={19}/></button></div><div className="panel" style={{padding:12,marginBottom:12}}><div>Valor da OS: <strong>R$ {parseMoneyValue(showOrderPaymentModal.amount).toFixed(2).replace('.',',')}</strong></div><div>Já recebido: <strong>R$ {Number(showOrderPaymentModal.paidAmount||0).toFixed(2).replace('.',',')}</strong></div><div>Saldo restante: <strong style={{color:'#25D366'}}>R$ {Math.max(0,parseMoneyValue(showOrderPaymentModal.amount)-Number(showOrderPaymentModal.paidAmount||0)).toFixed(2).replace('.',',')}</strong></div></div><label>Valor recebido (R$)<input type="number" min="0.01" step="0.01" max={Math.max(0,parseMoneyValue(showOrderPaymentModal.amount)-Number(showOrderPaymentModal.paidAmount||0))} value={orderPayment.amount} onChange={e=>setOrderPayment({...orderPayment,amount:e.target.value})} required /></label><label style={{marginTop:10}}>Forma de pagamento<select value={orderPayment.method} onChange={e=>setOrderPayment({...orderPayment,method:e.target.value})}><option>Pix</option><option>Dinheiro</option><option>Cartão de débito</option><option>Cartão de crédito</option><option>Transferência</option></select></label><div className="modal-foot" style={{marginTop:18}}><button type="button" className="secondary-btn" onClick={()=>setShowOrderPaymentModal(null)}>Cancelar</button><button className="primary-btn">Confirmar recebimento</button></div></form></div>}
+      {showOrderPaymentModal && <div className="modal-backdrop" onClick={()=>setShowOrderPaymentModal(null)}><form className="modal" onClick={e=>e.stopPropagation()} onSubmit={handleReceiveOrderPayment} style={{background:'#0f0f12',border:'1px solid #222',maxWidth:440}}><div className="modal-head"><div><div className="eyebrow">RECEBIMENTO DE OS</div><h2>Receber pagamento</h2><p className="muted">{showOrderPaymentModal.id} · {showOrderPaymentModal.customer}</p></div><button type="button" className="icon-btn" onClick={()=>setShowOrderPaymentModal(null)}><X size={19}/></button></div><div className="panel" style={{padding:12,marginBottom:12}}><div>Valor da OS: <strong>R$ {parseMoneyValue(showOrderPaymentModal.amount).toFixed(2).replace('.',',')}</strong></div><div>Já recebido: <strong>R$ {Number(showOrderPaymentModal.paidAmount||0).toFixed(2).replace('.',',')}</strong></div><div>Saldo restante: <strong style={{color:'#25D366'}}>R$ {Math.max(0,parseMoneyValue(showOrderPaymentModal.amount)-Number(showOrderPaymentModal.paidAmount||0)).toFixed(2).replace('.',',')}</strong></div></div><label>Valor recebido (R$)<input type="number" min="0.01" step="0.01" max={Math.max(0,parseMoneyValue(showOrderPaymentModal.amount)-Number(showOrderPaymentModal.paidAmount||0))} value={orderPayment.amount} onChange={e=>setOrderPayment({...orderPayment,amount:e.target.value})} required /></label><label style={{marginTop:10}}>Forma de pagamento<select value={orderPayment.method} onChange={e=>setOrderPayment({...orderPayment,method:e.target.value})}><option>Pix</option><option>Dinheiro</option><option>Cartão de débito</option><option>Cartão de crédito</option><option>Transferência</option></select></label><div className="modal-foot" style={{marginTop:18}}><button type="button" className="secondary-btn" onClick={()=>setShowOrderPaymentModal(null)}>Cancelar</button><button className="primary-btn" disabled={saving}>{saving ? 'Registrando...' : 'Confirmar recebimento'}</button></div></form></div>}
 
       {showCashTransactionModal && (
         <div className="modal-backdrop" onClick={()=>setShowCashTransactionModal(false)}>
