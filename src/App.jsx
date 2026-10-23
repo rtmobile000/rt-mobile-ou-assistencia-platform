@@ -89,63 +89,125 @@ const orderSteps = [
 function BarcodeCameraScanner({ onDetected, onClose }) {
   const videoRef = useRef(null);
   const [errorMsg, setErrorMsg] = useState('');
+  const [scannerStatus, setScannerStatus] = useState('Preparando câmera e leitor...');
   const streamRef = useRef(null);
+  const readerControlsRef = useRef(null);
+  const detectedRef = useRef(false);
   const onDetectedRef = useRef(onDetected);
   useEffect(() => { onDetectedRef.current = onDetected; }, [onDetected]);
 
   useEffect(() => {
     let active = true;
     let detector = null;
+    let rafId = null;
 
-    if ('BarcodeDetector' in window) {
-      try {
-        detector = new window.BarcodeDetector({
-          formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'qr_code', 'upc_a', 'upc_e']
-        });
-      } catch (err) {
-        detector = null;
-      }
-    }
-
-    if (!detector) setErrorMsg('Este navegador abriu a câmera, mas não oferece leitura de código de barras integrada. Use um leitor USB/Bluetooth ou digite o código.');
-
-    navigator.mediaDevices?.getUserMedia({ video: { facingMode: 'environment' } })
-      .then(stream => {
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.play();
-        }
-
-        const scanLoop = async () => {
-          if (!active) return;
-          if (videoRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
-            if (detector) {
-              try {
-                const barcodes = await detector.detect(videoRef.current);
-                if (barcodes.length > 0) {
-                  onDetectedRef.current?.(barcodes[0].rawValue);
-                  return;
-                }
-              } catch (e) {
-                // skip frame
-              }
-            }
-          }
-          requestAnimationFrame(scanLoop);
-        };
-
-        requestAnimationFrame(scanLoop);
-      })
-      .catch(err => {
-        setErrorMsg('Não foi possível abrir a câmera. Conecte o leitor físico USB ou digite o código.');
-      });
-
-    return () => {
-      active = false;
+    const stopCamera = () => {
+      try { readerControlsRef.current?.stop?.(); } catch (e) {}
+      readerControlsRef.current = null;
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
       }
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    };
+
+    const reportDetected = (value) => {
+      if (!active || detectedRef.current || !value) return;
+      detectedRef.current = true;
+      setScannerStatus('Código reconhecido!');
+      stopCamera();
+      onDetectedRef.current?.(String(value).trim());
+    };
+
+    const loadZXingFallback = () => new Promise((resolve, reject) => {
+      if (window.ZXing?.BrowserMultiFormatReader) return resolve(window.ZXing);
+      const existing = document.querySelector('script[data-rt-zxing="true"]');
+      if (existing) {
+        existing.addEventListener('load', () => resolve(window.ZXing), { once: true });
+        existing.addEventListener('error', reject, { once: true });
+        if (window.ZXing?.BrowserMultiFormatReader) resolve(window.ZXing);
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js';
+      script.async = true;
+      script.dataset.rtZxing = 'true';
+      script.onload = () => window.ZXing?.BrowserMultiFormatReader ? resolve(window.ZXing) : reject(new Error('Biblioteca de leitura não carregou.'));
+      script.onerror = () => reject(new Error('Não foi possível carregar o leitor automático. Verifique a conexão com a internet.'));
+      document.head.appendChild(script);
+    });
+
+    const start = async () => {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setErrorMsg('Este navegador não permite acessar a câmera. Abra o RT Mobile em um navegador atualizado e usando HTTPS.');
+        return;
+      }
+
+      // Preferência: leitor nativo do navegador quando disponível.
+      if ('BarcodeDetector' in window) {
+        try {
+          detector = new window.BarcodeDetector({
+            formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e', 'itf', 'codabar']
+          });
+        } catch (e) { detector = null; }
+      }
+
+      try {
+        if (detector) {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
+          });
+          if (!active) { stream.getTracks().forEach(track => track.stop()); return; }
+          streamRef.current = stream;
+          if (!videoRef.current) throw new Error('A tela da câmera não ficou disponível.');
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+          setScannerStatus('Aponte para o código de barras e mantenha-o dentro da faixa.');
+          const scanLoop = async () => {
+            if (!active || detectedRef.current) return;
+            const video = videoRef.current;
+            if (video && video.readyState >= 2) {
+              try {
+                const codes = await detector.detect(video);
+                if (codes?.length && codes[0]?.rawValue) {
+                  reportDetected(codes[0].rawValue);
+                  return;
+                }
+              } catch (e) { /* ignora quadro sem leitura */ }
+            }
+            if (active && !detectedRef.current) rafId = requestAnimationFrame(scanLoop);
+          };
+          rafId = requestAnimationFrame(scanLoop);
+          return;
+        }
+
+        // Fallback: ZXing para navegadores (incluindo celulares) sem BarcodeDetector.
+        setScannerStatus('Ativando leitor compatível com este navegador...');
+        const ZXing = await loadZXingFallback();
+        if (!active) return;
+        if (!videoRef.current) throw new Error('A tela da câmera não ficou disponível.');
+        const reader = new ZXing.BrowserMultiFormatReader();
+        setScannerStatus('Aponte para o código de barras e mantenha-o dentro da faixa.');
+        const controls = await reader.decodeFromVideoDevice(
+          undefined,
+          videoRef.current,
+          (result, err) => {
+            if (result) reportDetected(result.getText());
+          }
+        );
+        if (active) readerControlsRef.current = controls;
+        else controls?.stop?.();
+      } catch (err) {
+        if (!active) return;
+        setErrorMsg(err?.message || 'Não foi possível iniciar a leitura automática. Confira a permissão da câmera e tente novamente.');
+      }
+    };
+
+    start();
+    return () => {
+      active = false;
+      stopCamera();
     };
   }, []);
 
@@ -163,20 +225,23 @@ function BarcodeCameraScanner({ onDetected, onClose }) {
         {errorMsg ? (
           <div style={{padding: '20px', color: '#ef4444', fontSize: '13px'}}>{errorMsg}</div>
         ) : (
-          <div style={{position: 'relative', width: '100%', height: '260px', overflow: 'hidden', borderRadius: '10px', background: '#000', margin: '15px 0'}}>
-            <video ref={videoRef} playsInline muted style={{width: '100%', height: '100%', objectFit: 'cover'}} />
-            <div style={{
-              position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-              width: '80%', height: '100px', border: '2px solid #25D366', borderRadius: '8px',
-              boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.45)', pointerEvents: 'none'
-            }}>
-              <div style={{position: 'absolute', top: '50%', width: '100%', height: '2px', background: '#ef4444', opacity: 0.8, boxShadow: '0 0 8px #ef4444'}} />
+          <>
+            <div style={{position: 'relative', width: '100%', height: '260px', overflow: 'hidden', borderRadius: '10px', background: '#000', margin: '15px 0'}}>
+              <video ref={videoRef} playsInline muted autoPlay style={{width: '100%', height: '100%', objectFit: 'cover'}} />
+              <div style={{
+                position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+                width: '84%', height: '100px', border: '2px solid #25D366', borderRadius: '8px',
+                boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.35)', pointerEvents: 'none'
+              }}>
+                <div style={{position: 'absolute', top: '50%', width: '100%', height: '2px', background: '#ef4444', opacity: 0.8, boxShadow: '0 0 8px #ef4444'}} />
+              </div>
             </div>
-          </div>
+            <p className="muted" style={{fontSize: '12px', margin: '8px 0'}}>{scannerStatus}</p>
+          </>
         )}
 
         <p className="muted" style={{fontSize: '12px', margin: '8px 0'}}>
-          Aponte a câmera para o código de barras ou bipa diretamente com o leitor USB na bancada.
+          A leitura é automática. Mantenha o código inteiro visível, bem iluminado e próximo o suficiente para ficar nítido.
         </p>
 
         <button type="button" className="secondary-btn full-btn" onClick={onClose} style={{marginTop: '10px'}}>
