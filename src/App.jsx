@@ -33,9 +33,12 @@ function pixCrc16(payload) {
   }
   return crc.toString(16).toUpperCase().padStart(4, '0');
 }
-function buildPixPayload(key, merchantName = 'RT MOBILE', merchantCity = 'CASTANHAL', amount = 50) {
-  const pixKey = String(key || '').trim();
-  if (!pixKey) return '';
+function buildPixPayload(key, merchantName = 'RT MOBILE', merchantCity = 'CASTANHAL', amount = 50, normalizePhoneKey = false) {
+  const rawPixKey = String(key || '').trim();
+  if (!rawPixKey) return '';
+  // A chave continua salva como cadastrada; para o BR Code, telefone brasileiro usa +55 + DDD + número.
+  const digitsOnly = rawPixKey.replace(/\D/g, '');
+  const pixKey = normalizePhoneKey && !rawPixKey.startsWith('+') && digitsOnly.length === 11 ? `+55${digitsOnly}` : rawPixKey;
   const name = String(merchantName || 'RT MOBILE').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9 ]/g, '').trim().slice(0, 25) || 'RT MOBILE';
   const city = String(merchantCity || 'CASTANHAL').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9 ]/g, '').trim().slice(0, 15) || 'CASTANHAL';
   const merchantAccount = pixTlv('00', 'BR.GOV.BCB.PIX') + pixTlv('01', pixKey);
@@ -46,8 +49,8 @@ function buildPixPayload(key, merchantName = 'RT MOBILE', merchantCity = 'CASTAN
   payload += pixTlv('58', 'BR') + pixTlv('59', name) + pixTlv('60', city) + pixTlv('62', pixTlv('05', txid)) + '6304';
   return payload + pixCrc16(payload);
 }
-function PixQrCode({ pixKey, name = 'RT MOBILE', city = 'CASTANHAL', amount, size = 140 }) {
-  const payload = buildPixPayload(pixKey, name, city, amount);
+function PixQrCode({ pixKey, name = 'RT MOBILE', city = 'CASTANHAL', amount, size = 140, normalizePhoneKey = false }) {
+  const payload = buildPixPayload(pixKey, name, city, amount, normalizePhoneKey);
   if (!payload) return <div style={{width:size,height:size,display:'grid',placeItems:'center',color:'#aaa',fontSize:12,textAlign:'center'}}>Cadastre uma chave Pix para gerar o QR Code.</div>;
   const src = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(payload)}`;
   return <img src={src} alt="QR Code Pix" width={size} height={size} style={{display:'block',width:size,height:size,objectFit:'contain',background:'#fff',padding:6,borderRadius:8,margin:'0 auto',boxSizing:'border-box'}} />;
@@ -929,6 +932,8 @@ function App() {
   // Garante que o dono tenha organização e vínculo no Supabase. Funcionários precisam ser convidados à loja existente.
   const ensureMyOrganization = async (createIfMissing = false) => {
     if (!supabaseConfigured || !session?.user?.id) throw new Error('Entre novamente na sua conta para continuar.');
+    // Atualiza estados vencidos sempre que a sessão consulta a organização.
+    try { await supabase.rpc('rt_expire_trial_stores'); } catch (expiryError) { console.warn('Expiração de testes:', expiryError.message); }
     const { data, error } = await supabase.rpc('rt_ensure_my_organization', { p_create_if_missing: Boolean(createIfMissing) });
     if (error) throw error;
     const organizationId = typeof data === 'string' ? data : data?.organization_id;
@@ -948,7 +953,7 @@ function App() {
     const userCreatedAt = session.user?.created_at ? new Date(session.user.created_at) : new Date();
     const now = new Date();
     const hoursElapsed = Math.floor((now - userCreatedAt) / (1000 * 60 * 60));
-    const hoursRemaining = Math.max(0, 48 - hoursElapsed);
+    let hoursRemaining = Math.max(0, 48 - hoursElapsed);
     setTrialTimeLeft(hoursRemaining);
 
     let { data: orgData } = await supabase.from('organizations')
@@ -968,21 +973,17 @@ function App() {
       }
     }
 
-    if ((!orgData || orgData.length === 0) && userRole === 'tech' && !isOwnerByEmail) {
-      const defaultName = `Loja ${session.user.email.split('@')[0].toUpperCase()}`;
-      const { data: createdOrg } = await supabase.from('organizations').insert({
-        owner_user_id: session.user.id,
-        name: defaultName,
-        whatsapp: '5591989117332',
-        pix_key: '91989117332',
-        access_state: 'pending',
-        plan_status: 'Teste',
-        plan_name: 'Teste 48h'
-      }).select();
-      if (createdOrg) orgData = createdOrg;
-    }
+    // Não criar organização por INSERT direto aqui: o RPC é a única porta de provisionamento,
+    // evitando que uma falha de leitura gere uma segunda loja para o mesmo usuário.
 
     const org = orgData?.[0];
+    // A contagem do teste pertence à loja, não à data de criação da conta do usuário.
+    if (org?.trial_expires_at) {
+      const trialExpiry = new Date(org.trial_expires_at);
+      const remainingMs = trialExpiry.getTime() - Date.now();
+      hoursRemaining = Math.max(0, Math.ceil(remainingMs / (1000 * 60 * 60)));
+      setTrialTimeLeft(hoursRemaining);
+    }
     const organizationId = org?.id || null;
     setActiveOrganizationId(organizationId);
 
@@ -1013,7 +1014,8 @@ function App() {
       if (org?.pix_key) setPixKey(org.pix_key);
 
       const isVitalicio = isOwnerByEmail || org?.plan_name === 'Vitalício';
-      const isPaidActive = ['ativo', 'active'].includes(String(org?.access_state || '').toLowerCase()) || ['ativo', 'active'].includes(String(org?.plan_status || '').toLowerCase());
+      const isTrialSuspended = ['suspended', 'suspenso', 'cancelado', 'cancelled'].includes(String(org?.access_state || '').toLowerCase());
+    const isPaidActive = ['ativo', 'active'].includes(String(org?.access_state || '').toLowerCase()) || ['ativo', 'active'].includes(String(org?.plan_status || '').toLowerCase());
 
       if (isVitalicio) {
         setIsLifetimeAdmin(true);
@@ -1037,6 +1039,10 @@ function App() {
           setIsAccountExpired(false);
           setIsTrialActive(false);
         }
+      } else if (isTrialSuspended) {
+        setIsTrialActive(false);
+        setIsAccountExpired(true);
+        setExpiredReason('trial');
       } else {
         if (hoursRemaining > 0) {
           setIsTrialActive(true);
@@ -1915,7 +1921,7 @@ await fetchData();
             <p className="muted" style={{fontSize: '13px'}}>Pague o Pix para manter seu estabelecimento ativo e liberar o painel sem limites para você e sua equipe.</p>
             
             <div style={{margin: '20px 0', background: '#000', padding: '15px', borderRadius: '12px', border: '1px solid #333', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px'}}>
-              <PixQrCode pixKey={adminPixKey} name="RT MOBILE" city="CASTANHAL" amount={50} size={150} />
+              <PixQrCode pixKey={adminPixKey} name="RT MOBILE" city="CASTANHAL" amount={50} size={150} normalizePhoneKey />
               <span style={{fontSize: '12px', color: '#aaa'}}>Chave Pix (PicPay / Telefone):</span>
               <strong style={{fontSize: '16px', color: '#fff', background: '#18181f', padding: '8px 14px', borderRadius: '6px', border: '1px solid #444'}}>{adminPixKey}</strong>
               <button 
@@ -2075,7 +2081,7 @@ await fetchData();
               </p>
 
               <div style={{background: '#000', border: '1px solid #333', borderRadius: '12px', padding: '20px', margin: '0 0 24px'}}>
-                <PixQrCode pixKey={adminPixKey} name="RT MOBILE" city="CASTANHAL" amount={50} size={150} />
+                <PixQrCode pixKey={adminPixKey} name="RT MOBILE" city="CASTANHAL" amount={50} size={150} normalizePhoneKey />
                 <span style={{fontSize: '12px', color: '#888'}}>Chave Pix (Telefone / PicPay):</span>
                 <div style={{fontSize: '16px', fontWeight: 'bold', color: '#fff', background: '#18181f', padding: '8px', borderRadius: '6px', margin: '6px 0', border: '1px solid #444'}}>
                   {adminPixKey}
