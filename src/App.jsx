@@ -804,7 +804,7 @@ function App() {
         console.warn('Não foi possível carregar a vitrine de lojas:', error.message);
         return; // preserva a vitrine atual se o RPC ainda não foi instalado
       }
-      const stores = (data || []).map((row) => ({
+      const mappedStores = (data || []).map((row) => ({
         id: String(row.id),
         name: row.name || 'Estabelecimento',
         phone: row.phone || '',
@@ -814,8 +814,29 @@ function App() {
         rating: 5.0,
         reviewsCount: 0,
       }));
-      if (stores.length) setAllStores(stores);
-      else setAllStores([]);
+      // Evita repetir a mesma loja caso existam organizações duplicadas com nomes iguais.
+      const seenStoreNames = new Set();
+      const stores = mappedStores.filter((store) => {
+        const normalizedName = String(store.name || '').trim().toLocaleLowerCase('pt-BR');
+        if (!normalizedName || seenStoreNames.has(normalizedName)) return false;
+        seenStoreNames.add(normalizedName);
+        return true;
+      });
+      // A loja principal RT MOBILE deve continuar visível junto das lojas elegíveis.
+      const hasRtMobile = stores.some((store) => String(store.name).trim().toLocaleLowerCase('pt-BR') === 'rt mobile');
+      if (!hasRtMobile) {
+        stores.unshift({
+          id: 'rt-mobile-main',
+          name: 'RT MOBILE',
+          phone: '5591989117332',
+          status: 'active',
+          desc: 'Especialista Apple, Xiaomi & Multimarcas',
+          address: 'Santa Izabel do Pará - PA',
+          rating: 5.0,
+          reviewsCount: 1,
+        });
+      }
+      setAllStores(stores);
     };
     loadPublicStores();
     return () => { cancelled = true; };
