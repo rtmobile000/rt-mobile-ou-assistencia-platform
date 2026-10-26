@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity, ArrowUpRight, Bell, Camera, Check, ChevronDown, CircleHelp,
   ClipboardList, Clock3, CreditCard, Gauge, LogOut, Menu, MessageCircle,
-  Plus, RefreshCw, Search, Settings, ShieldCheck, Smartphone, Sparkles, Store, Users, Wrench, X, Upload, PhoneCall, QrCode, Package, Sliders, Trash2, CheckSquare, Printer, Star, DollarSign, Send, Calendar, Clock, Lock, UserPlus, AlertTriangle, History, Wallet, MapPin, Copy, FileText, HeartHandshake, Key, CheckCircle2, XCircle, Eraser, ShoppingCart, Truck, UserCheck, CheckCircle, Tv, Maximize2, Minimize2, Pencil
+  Plus, RefreshCw, Search, Settings, ShieldCheck, Smartphone, Sparkles, Store, Users, Wrench, X, Upload, PhoneCall, QrCode, Package, Sliders, Trash2, CheckSquare, Printer, Star, DollarSign, Send, Calendar, Clock, Lock, UserPlus, AlertTriangle, History, Wallet, MapPin, Copy, FileText, HeartHandshake, Key, CheckCircle2, XCircle, Eraser, ShoppingCart, Truck, UserCheck, CheckCircle, Tv, Maximize2, Minimize2
 } from 'lucide-react';
 import { supabase, supabaseConfigured } from './lib/supabase';
 
@@ -15,65 +15,7 @@ function BarcodeIcon({ size = 16, color = "currentColor", style = {} }) {
   );
 }
 
-
 const ADMIN_EMAIL = 'roberthaelley75@gmail.com';
-
-// Gera o payload Pix estático no padrão EMV/BR Code e o renderiza como QR.
-// O QR contém a chave cadastrada; não confirma o recebimento do pagamento.
-function pixTlv(id, value) {
-  const v = String(value ?? '');
-  return `${id}${String(v.length).padStart(2, '0')}${v}`;
-}
-function pixCrc16(payload) {
-  let crc = 0xFFFF;
-  for (let i = 0; i < payload.length; i++) {
-    crc ^= payload.charCodeAt(i) << 8;
-    for (let j = 0; j < 8; j++) crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) : (crc << 1);
-    crc &= 0xFFFF;
-  }
-  return crc.toString(16).toUpperCase().padStart(4, '0');
-}
-function buildPixPayload(key, merchantName = 'RT MOBILE', merchantCity = 'CASTANHAL', amount = 50, normalizePhoneKey = false) {
-  const rawPixKey = String(key || '').trim();
-  if (!rawPixKey) return '';
-  // A chave continua salva como cadastrada; para o BR Code, telefone brasileiro usa +55 + DDD + número.
-  const digitsOnly = rawPixKey.replace(/\D/g, '');
-  const pixKey = normalizePhoneKey && !rawPixKey.startsWith('+') && digitsOnly.length === 11 ? `+55${digitsOnly}` : rawPixKey;
-  const name = String(merchantName || 'RT MOBILE').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9 ]/g, '').trim().slice(0, 25) || 'RT MOBILE';
-  const city = String(merchantCity || 'CASTANHAL').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9 ]/g, '').trim().slice(0, 15) || 'CASTANHAL';
-  const merchantAccount = pixTlv('00', 'BR.GOV.BCB.PIX') + pixTlv('01', pixKey);
-  const txid = '***';
-  let payload = pixTlv('00', '01') + pixTlv('01', '11') + pixTlv('26', merchantAccount) +
-    pixTlv('52', '0000') + pixTlv('53', '986');
-  if (Number.isFinite(Number(amount)) && Number(amount) > 0) payload += pixTlv('54', Number(amount).toFixed(2));
-  payload += pixTlv('58', 'BR') + pixTlv('59', name) + pixTlv('60', city) + pixTlv('62', pixTlv('05', txid)) + '6304';
-  return payload + pixCrc16(payload);
-}
-function PixQrCode({ pixKey, name = 'RT MOBILE', city = 'CASTANHAL', amount, size = 140, normalizePhoneKey = false }) {
-  const payload = buildPixPayload(pixKey, name, city, amount, normalizePhoneKey);
-  if (!payload) return <div style={{width:size,height:size,display:'grid',placeItems:'center',color:'#aaa',fontSize:12,textAlign:'center'}}>Cadastre uma chave Pix para gerar o QR Code.</div>;
-  const src = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(payload)}`;
-  return <img src={src} alt="QR Code Pix" width={size} height={size} style={{display:'block',width:size,height:size,objectFit:'contain',background:'#fff',padding:6,borderRadius:8,margin:'0 auto',boxSizing:'border-box'}} />;
-}
-
-function createRtOperationId(prefix = 'op') {
-  const randomPart = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  return `${prefix}-${randomPart}`;
-}
-
-function getOrCreateRtAttemptId(storageKey, prefix = 'op') {
-  try {
-    const existing = sessionStorage.getItem(storageKey);
-    if (existing) return existing;
-    const created = createRtOperationId(prefix);
-    sessionStorage.setItem(storageKey, created);
-    return created;
-  } catch {
-    return createRtOperationId(prefix);
-  }
-}
 
 const seminovosList = [
   'iPhone 11', 'iPhone 11 Pro', 'iPhone 11 Pro Max',
@@ -147,127 +89,61 @@ const orderSteps = [
 function BarcodeCameraScanner({ onDetected, onClose }) {
   const videoRef = useRef(null);
   const [errorMsg, setErrorMsg] = useState('');
-  const [scannerStatus, setScannerStatus] = useState('Preparando câmera e leitor...');
   const streamRef = useRef(null);
-  const readerControlsRef = useRef(null);
-  const detectedRef = useRef(false);
-  const onDetectedRef = useRef(onDetected);
-  useEffect(() => { onDetectedRef.current = onDetected; }, [onDetected]);
 
   useEffect(() => {
     let active = true;
     let detector = null;
-    let rafId = null;
 
-    const stopCamera = () => {
-      try { readerControlsRef.current?.stop?.(); } catch (e) {}
-      readerControlsRef.current = null;
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-        streamRef.current = null;
-      }
-      if (rafId !== null) cancelAnimationFrame(rafId);
-    };
-
-    const reportDetected = (value) => {
-      if (!active || detectedRef.current || !value) return;
-      detectedRef.current = true;
-      setScannerStatus('Código reconhecido!');
-      stopCamera();
-      onDetectedRef.current?.(String(value).trim());
-    };
-
-    const loadZXingFallback = () => new Promise((resolve, reject) => {
-      if (window.ZXing?.BrowserMultiFormatReader) return resolve(window.ZXing);
-      const existing = document.querySelector('script[data-rt-zxing="true"]');
-      if (existing) {
-        existing.addEventListener('load', () => resolve(window.ZXing), { once: true });
-        existing.addEventListener('error', reject, { once: true });
-        if (window.ZXing?.BrowserMultiFormatReader) resolve(window.ZXing);
-        return;
-      }
-      const script = document.createElement('script');
-      script.src = 'https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js';
-      script.async = true;
-      script.dataset.rtZxing = 'true';
-      script.onload = () => window.ZXing?.BrowserMultiFormatReader ? resolve(window.ZXing) : reject(new Error('Biblioteca de leitura não carregou.'));
-      script.onerror = () => reject(new Error('Não foi possível carregar o leitor automático. Verifique a conexão com a internet.'));
-      document.head.appendChild(script);
-    });
-
-    const start = async () => {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        setErrorMsg('Este navegador não permite acessar a câmera. Abra o RT Mobile em um navegador atualizado e usando HTTPS.');
-        return;
-      }
-
-      // Preferência: leitor nativo do navegador quando disponível.
-      if ('BarcodeDetector' in window) {
-        try {
-          detector = new window.BarcodeDetector({
-            formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e', 'itf', 'codabar']
-          });
-        } catch (e) { detector = null; }
-      }
-
+    if ('BarcodeDetector' in window) {
       try {
-        if (detector) {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            audio: false,
-            video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
-          });
-          if (!active) { stream.getTracks().forEach(track => track.stop()); return; }
-          streamRef.current = stream;
-          if (!videoRef.current) throw new Error('A tela da câmera não ficou disponível.');
+        detector = new window.BarcodeDetector({
+          formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'qr_code', 'upc_a', 'upc_e']
+        });
+      } catch (err) {
+        detector = null;
+      }
+    }
+
+    navigator.mediaDevices?.getUserMedia({ video: { facingMode: 'environment' } })
+      .then(stream => {
+        streamRef.current = stream;
+        if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-          setScannerStatus('Aponte para o código de barras e mantenha-o dentro da faixa.');
-          const scanLoop = async () => {
-            if (!active || detectedRef.current) return;
-            const video = videoRef.current;
-            if (video && video.readyState >= 2) {
-              try {
-                const codes = await detector.detect(video);
-                if (codes?.length && codes[0]?.rawValue) {
-                  reportDetected(codes[0].rawValue);
-                  return;
-                }
-              } catch (e) { /* ignora quadro sem leitura */ }
-            }
-            if (active && !detectedRef.current) rafId = requestAnimationFrame(scanLoop);
-          };
-          rafId = requestAnimationFrame(scanLoop);
-          return;
+          videoRef.current.play();
         }
 
-        // Fallback: ZXing para navegadores (incluindo celulares) sem BarcodeDetector.
-        setScannerStatus('Ativando leitor compatível com este navegador...');
-        const ZXing = await loadZXingFallback();
-        if (!active) return;
-        if (!videoRef.current) throw new Error('A tela da câmera não ficou disponível.');
-        const reader = new ZXing.BrowserMultiFormatReader();
-        setScannerStatus('Aponte para o código de barras e mantenha-o dentro da faixa.');
-        const controls = await reader.decodeFromVideoDevice(
-          undefined,
-          videoRef.current,
-          (result, err) => {
-            if (result) reportDetected(result.getText());
+        const scanLoop = async () => {
+          if (!active) return;
+          if (videoRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
+            if (detector) {
+              try {
+                const barcodes = await detector.detect(videoRef.current);
+                if (barcodes.length > 0) {
+                  onDetected(barcodes[0].rawValue);
+                  return;
+                }
+              } catch (e) {
+                // skip frame
+              }
+            }
           }
-        );
-        if (active) readerControlsRef.current = controls;
-        else controls?.stop?.();
-      } catch (err) {
-        if (!active) return;
-        setErrorMsg(err?.message || 'Não foi possível iniciar a leitura automática. Confira a permissão da câmera e tente novamente.');
-      }
-    };
+          requestAnimationFrame(scanLoop);
+        };
 
-    start();
+        requestAnimationFrame(scanLoop);
+      })
+      .catch(err => {
+        setErrorMsg('Não foi possível abrir a câmera. Conecte o leitor físico USB ou digite o código.');
+      });
+
     return () => {
       active = false;
-      stopCamera();
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
     };
-  }, []);
+  }, [onDetected]);
 
   return (
     <div className="modal-backdrop" onClick={onClose} style={{zIndex: 99999}}>
@@ -283,23 +159,20 @@ function BarcodeCameraScanner({ onDetected, onClose }) {
         {errorMsg ? (
           <div style={{padding: '20px', color: '#ef4444', fontSize: '13px'}}>{errorMsg}</div>
         ) : (
-          <>
-            <div style={{position: 'relative', width: '100%', height: '260px', overflow: 'hidden', borderRadius: '10px', background: '#000', margin: '15px 0'}}>
-              <video ref={videoRef} playsInline muted autoPlay style={{width: '100%', height: '100%', objectFit: 'cover'}} />
-              <div style={{
-                position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-                width: '84%', height: '100px', border: '2px solid #25D366', borderRadius: '8px',
-                boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.35)', pointerEvents: 'none'
-              }}>
-                <div style={{position: 'absolute', top: '50%', width: '100%', height: '2px', background: '#ef4444', opacity: 0.8, boxShadow: '0 0 8px #ef4444'}} />
-              </div>
+          <div style={{position: 'relative', width: '100%', height: '260px', overflow: 'hidden', borderRadius: '10px', background: '#000', margin: '15px 0'}}>
+            <video ref={videoRef} playsInline muted style={{width: '100%', height: '100%', objectFit: 'cover'}} />
+            <div style={{
+              position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+              width: '80%', height: '100px', border: '2px solid #25D366', borderRadius: '8px',
+              boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.45)', pointerEvents: 'none'
+            }}>
+              <div style={{position: 'absolute', top: '50%', width: '100%', height: '2px', background: '#ef4444', opacity: 0.8, boxShadow: '0 0 8px #ef4444'}} />
             </div>
-            <p className="muted" style={{fontSize: '12px', margin: '8px 0'}}>{scannerStatus}</p>
-          </>
+          </div>
         )}
 
         <p className="muted" style={{fontSize: '12px', margin: '8px 0'}}>
-          A leitura é automática. Mantenha o código inteiro visível, bem iluminado e próximo o suficiente para ficar nítido.
+          Aponte a câmera para o código de barras ou bipa diretamente com o leitor USB na bancada.
         </p>
 
         <button type="button" className="secondary-btn full-btn" onClick={onClose} style={{marginTop: '10px'}}>
@@ -688,15 +561,6 @@ function BrandSplash({ onFinish }) {
   );
 }
 
-function parseMoneyValue(value) {
-  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
-  const raw = String(value ?? '').replace(/R\$\s?/g, '').trim();
-  const normalized = raw.includes(',') ? raw.replace(/\./g, '').replace(',', '.') : raw;
-  const cleaned = normalized.replace(/[^0-9.-]/g, '');
-  const parsed = Number(cleaned);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
 function App() {
   const [showSplash, setShowSplash] = useState(() => !sessionStorage.getItem('rt_splash_shown'));
   const [userRole, setUserRole] = useState(() => localStorage.getItem('rt_user_role') || 'client');
@@ -754,14 +618,11 @@ function App() {
   // Caixa da Loja
   const [cashRegister, setCashRegister] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('rt_cash_register_v1') || 'null') || { isOpen: false, openingBalance: 0.00, openedAt: null, openedBy: '', entries: [], closedSessions: [] };
+      return JSON.parse(localStorage.getItem('rt_cash_register_v1') || 'null') || { isOpen: true, openingBalance: 0.00, entries: [] };
     } catch {
-      return { isOpen: false, openingBalance: 0.00, openedAt: null, openedBy: '', entries: [], closedSessions: [] };
+      return { isOpen: true, openingBalance: 0.00, entries: [] };
     }
   });
-  // O caixa e o estoque são sincronizados por organização no Supabase após a leitura inicial.
-  const [activeOrganizationId, setActiveOrganizationId] = useState(null);
-  const [remotePersistenceReady, setRemotePersistenceReady] = useState(false);
 
   // Equipe
   const [teamMembers, setTeamMembers] = useState([]);
@@ -782,9 +643,7 @@ function App() {
 
   const [orders, setOrders] = useState([]);
   const [customers, setCustomers] = useState([]);
-  const [inventory, setInventory] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('rt_inventory_v1') || '[]'); } catch { return []; }
-  });
+  const [inventory, setInventory] = useState([]);
   // Estoque de seminovos compartilhado entre o painel da loja e a vitrine do cliente.
   const [usedDevices, setUsedDevices] = useLocalRecords('rt_used_devices_v1');
   const [usedDevicesEnabled, setUsedDevicesEnabled] = useState(() => localStorage.getItem('rt_used_devices_enabled') !== 'false');
@@ -795,74 +654,20 @@ function App() {
 
   const activeStores = useMemo(() => allStores.filter(s => s.status === 'active'), [allStores]);
 
-  // A vitrine é revalidada periodicamente no banco para remover testes vencidos
-  // sem exigir que o visitante feche e reabra a página. O RPC filtra no servidor.
-  useEffect(() => {
-    let cancelled = false;
-    let loading = false;
-    const loadPublicStores = async () => {
-      if (!supabaseConfigured || loading) return;
-      loading = true;
-      try {
-        const { data, error } = await supabase.rpc('rt_public_active_stores');
-        if (cancelled) return;
-        if (error) {
-          console.warn('Não foi possível atualizar a vitrine de lojas:', error.message);
-          // Falha fechada: não mantém lojas potencialmente vencidas com dados antigos.
-          setAllStores([]);
-          return;
-        }
-        const stores = (data || []).map((row) => ({
-          id: String(row.id),
-          name: row.name || 'Estabelecimento',
-          phone: row.phone || '',
-          status: 'active',
-          desc: row.desc || 'Estabelecimento RT Mobile',
-          address: row.address || 'Endereço não informado',
-          rating: 5.0,
-          reviewsCount: 0,
-        }));
-        setAllStores(stores);
-      } catch (loadError) {
-        if (!cancelled) {
-          console.warn('Falha ao atualizar a vitrine de lojas:', loadError?.message || loadError);
-          setAllStores([]);
-        }
-      } finally {
-        loading = false;
-      }
-    };
-    loadPublicStores();
-    const refreshId = setInterval(loadPublicStores, 60 * 1000);
-    const handleVisibility = () => { if (document.visibilityState === 'visible') loadPublicStores(); };
-    document.addEventListener('visibilitychange', handleVisibility);
-    window.addEventListener('focus', loadPublicStores);
-    return () => {
-      cancelled = true;
-      clearInterval(refreshId);
-      document.removeEventListener('visibilitychange', handleVisibility);
-      window.removeEventListener('focus', loadPublicStores);
-    };
-  }, []);
-
   const [search, setSearch] = useState('');
   const [showNewOrder, setShowNewOrder] = useState(false);
   const [showNewCustomer, setShowNewCustomer] = useState(false);
   const [showNewProduct, setShowNewProduct] = useState(false);
-  const [editingProduct, setEditingProduct] = useState(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showChecklistModal, setShowChecklistModal] = useState(null);
   const [showPrintModal, setShowPrintModal] = useState(null);
   const [showQuoteModal, setShowQuoteModal] = useState(null);
   const [showCashTransactionModal, setShowCashTransactionModal] = useState(false);
-  const [showOrderPaymentModal, setShowOrderPaymentModal] = useState(null);
-  const [orderPayment, setOrderPayment] = useState({ amount: '', method: 'Pix' });
   const [showInviteMemberModal, setShowInviteMemberModal] = useState(false);
 
   // Modais de Leitura de Código de Barras
   const [showBarcodeScannerForProduct, setShowBarcodeScannerForProduct] = useState(false);
   const [showBarcodeSaleModal, setShowBarcodeSaleModal] = useState(false);
-  const [showProductSaleModal, setShowProductSaleModal] = useState(false);
   
   const [toast, setToast] = useState('');
   const [mobileNav, setMobileNav] = useState(false);
@@ -895,7 +700,7 @@ function App() {
     housingScratched: false,
   });
 
-  const [cashTx, setCashTx] = useState({ type: 'in', category: 'Acessórios', seller: '', description: '', amount: '', paymentMethod: 'Dinheiro' });
+  const [cashTx, setCashTx] = useState({ type: 'in', category: 'Acessórios', seller: '', description: '', amount: '' });
   const [newMember, setNewMember] = useState({ name: '', email: '', role: 'technician' });
 
   const [passwordType, setPasswordType] = useState('text');
@@ -950,31 +755,15 @@ function App() {
     return () => listener.subscription.unsubscribe();
   }, []);
 
-  // Garante que o dono tenha organização e vínculo no Supabase. Funcionários precisam ser convidados à loja existente.
-  const ensureMyOrganization = async (createIfMissing = false) => {
-    if (!supabaseConfigured || !session?.user?.id) throw new Error('Entre novamente na sua conta para continuar.');
-    // Atualiza estados vencidos sempre que a sessão consulta a organização.
-    try { await supabase.rpc('rt_expire_trial_stores'); } catch (expiryError) { console.warn('Expiração de testes:', expiryError.message); }
-    const { data, error } = await supabase.rpc('rt_ensure_my_organization', { p_create_if_missing: Boolean(createIfMissing) });
-    if (error) throw error;
-    const organizationId = typeof data === 'string' ? data : data?.organization_id;
-    if (!organizationId) throw new Error('Sua conta ainda não está vinculada a uma loja. O proprietário precisa concluir o vínculo ou convidar você.');
-    return organizationId;
-  };
-
   const fetchData = async () => {
     if (!supabaseConfigured || !session) return;
-    setRemotePersistenceReady(false);
     const userEmail = session.user?.email?.toLowerCase();
     const isOwnerByEmail = userEmail === ADMIN_EMAIL.toLowerCase();
-    // Cria/recupera automaticamente a organização de quem entra como dono (perfil técnico).
-    try { await ensureMyOrganization(userRole === 'tech' && !isOwnerByEmail); }
-    catch (bootstrapError) { console.warn('Vínculo da organização:', bootstrapError.message); }
 
     const userCreatedAt = session.user?.created_at ? new Date(session.user.created_at) : new Date();
     const now = new Date();
     const hoursElapsed = Math.floor((now - userCreatedAt) / (1000 * 60 * 60));
-    let hoursRemaining = Math.max(0, 48 - hoursElapsed);
+    const hoursRemaining = Math.max(0, 48 - hoursElapsed);
     setTrialTimeLeft(hoursRemaining);
 
     let { data: orgData } = await supabase.from('organizations')
@@ -982,61 +771,29 @@ function App() {
       .eq('owner_user_id', session.user.id)
       .limit(1);
 
-    // Se o usuário é membro/funcionário e não dono direto da loja, recupera sua organização vinculada.
-    if (!orgData || orgData.length === 0) {
-      const { data: memberships } = await supabase.from('organization_members')
-        .select('organization_id').eq('user_id', session.user.id).limit(1);
-      const memberOrgId = memberships?.[0]?.organization_id;
-      if (memberOrgId) {
-        const { data: memberOrg, error: memberOrgError } = await supabase.from('organizations')
-          .select('*').eq('id', memberOrgId).maybeSingle();
-        if (!memberOrgError && memberOrg) orgData = [memberOrg];
-      }
+    if ((!orgData || orgData.length === 0) && userRole === 'tech' && !isOwnerByEmail) {
+      const defaultName = `Loja ${session.user.email.split('@')[0].toUpperCase()}`;
+      const { data: createdOrg } = await supabase.from('organizations').insert({
+        owner_user_id: session.user.id,
+        Nome: defaultName,
+        WhatsApp: '5591989117332',
+        pix_key: '91989117332',
+        access_state: 'Teste',
+        plan_status: 'Teste',
+        plan_name: 'Teste 48h'
+      }).select();
+      if (createdOrg) orgData = createdOrg;
     }
-
-    // Não criar organização por INSERT direto aqui: o RPC é a única porta de provisionamento,
-    // evitando que uma falha de leitura gere uma segunda loja para o mesmo usuário.
 
     const org = orgData?.[0];
-    // A contagem do teste pertence à loja, não à data de criação da conta do usuário.
-    if (org?.trial_expires_at) {
-      const trialExpiry = new Date(org.trial_expires_at);
-      const remainingMs = trialExpiry.getTime() - Date.now();
-      hoursRemaining = Math.max(0, Math.ceil(remainingMs / (1000 * 60 * 60)));
-      setTrialTimeLeft(hoursRemaining);
-    }
-    const organizationId = org?.id || null;
-    setActiveOrganizationId(organizationId);
-
-    if (organizationId) {
-      const [cashStateResult, inventoryStateResult] = await Promise.all([
-        supabase.from('rt_cash_register_state').select('state').eq('organization_id', organizationId).maybeSingle(),
-        supabase.from('rt_inventory_state').select('items').eq('organization_id', organizationId).maybeSingle()
-      ]);
-      if (cashStateResult.error || inventoryStateResult.error) {
-        console.warn('Persistência remota do caixa/estoque ainda não está disponível. Execute o SQL de integração e recarregue o app.', cashStateResult.error || inventoryStateResult.error);
-        setRemotePersistenceReady(false);
-      } else {
-        // Se a organização ainda não possui registro remoto, mantém os dados locais existentes
-        // e o efeito abaixo os envia ao banco na primeira sincronização.
-        if (cashStateResult.data?.state && typeof cashStateResult.data.state === 'object') {
-          setCashRegister({ isOpen: false, openingBalance: 0, openedAt: null, openedBy: '', entries: [], closedSessions: [], ...cashStateResult.data.state });
-        }
-        if (Array.isArray(inventoryStateResult.data?.items)) setInventory(inventoryStateResult.data.items);
-        setRemotePersistenceReady(true);
-      }
-    } else {
-      setRemotePersistenceReady(false);
-    }
 
     if (org || isOwnerByEmail) {
-      if (org?.name) setStoreName(org.name);
-      if (org?.whatsapp) setWhatsappNumber(org.whatsapp);
+      if (org?.Nome) setStoreName(org.Nome);
+      if (org?.WhatsApp) setWhatsappNumber(org.WhatsApp);
       if (org?.pix_key) setPixKey(org.pix_key);
 
       const isVitalicio = isOwnerByEmail || org?.plan_name === 'Vitalício';
-      const isTrialSuspended = ['suspended', 'suspenso', 'cancelado', 'cancelled'].includes(String(org?.access_state || '').toLowerCase());
-    const isPaidActive = ['ativo', 'active'].includes(String(org?.access_state || '').toLowerCase()) || ['ativo', 'active'].includes(String(org?.plan_status || '').toLowerCase());
+      const isPaidActive = org?.access_state === 'Ativo' || org?.plan_status === 'Ativo';
 
       if (isVitalicio) {
         setIsLifetimeAdmin(true);
@@ -1060,10 +817,6 @@ function App() {
           setIsAccountExpired(false);
           setIsTrialActive(false);
         }
-      } else if (isTrialSuspended) {
-        setIsTrialActive(false);
-        setIsAccountExpired(true);
-        setExpiredReason('trial');
       } else {
         if (hoursRemaining > 0) {
           setIsTrialActive(true);
@@ -1076,7 +829,7 @@ function App() {
       }
 
       setTeamMembers([
-        { id: session.user.id, name: isOwnerByEmail ? 'Robert Haelley (Proprietário)' : (org?.name || 'Responsável'), email: session.user.email, role: 'owner', status: 'Ativo' }
+        { id: session.user.id, name: isOwnerByEmail ? 'Robert Haelley (Proprietário)' : (org?.Nome || 'Responsável'), email: session.user.email, role: 'owner', status: 'Ativo' }
       ]);
     } else {
       if (hoursRemaining > 0) {
@@ -1088,58 +841,13 @@ function App() {
       }
     }
 
-    // Busca todas as OS em páginas para não limitar o histórico às 50 mais recentes.
-    // O RLS do Supabase deve continuar garantindo o isolamento por organização.
-    let oData = [];
-    const pageSize = 500;
-    for (let from = 0; ; from += pageSize) {
-      const { data: page, error: ordersError } = await supabase.from('repair_orders')
-        .select('id, organization_id, order_number, customer_name, customer_phone, device_brand, device_model, issue_description, status, total_amount, amount_paid, created_at')
-        .order('created_at', { ascending: false })
-        .range(from, from + pageSize - 1);
-      if (ordersError) {
-        console.error('Erro ao carregar histórico de OS:', ordersError);
-        notify?.('Não foi possível carregar o histórico completo de OS. Confira as permissões do Supabase.');
-        break;
-      }
-      oData = oData.concat(page || []);
-      if (!page || page.length < pageSize) break;
-    }
+    const { data: oData } = await supabase.from('repair_orders')
+      .select('id, order_number, customer_name, customer_phone, device_brand, device_model, issue_description, status, total_amount, created_at')
+      .order('created_at', { ascending: false }).limit(50);
     if (oData) {
-      // Carrega o histórico real de pagamentos do Supabase, não apenas do navegador.
-      const paymentsByOrder = {};
-      const orgIds = [...new Set(oData.map(o => o.organization_id).filter(Boolean))];
-      for (const orgId of orgIds) {
-        const { data: paymentRows, error: paymentRowsError } = await supabase
-          .from('payments')
-          .select('id, organization_id, repair_order_id, amount, method, state, reference, paid_at, created_at')
-          .eq('organization_id', orgId)
-          .order('paid_at', { ascending: true });
-        if (paymentRowsError) {
-          console.warn('Não foi possível carregar o histórico de pagamentos do Supabase:', paymentRowsError);
-          continue;
-        }
-        (paymentRows || []).forEach(payment => {
-          if (!paymentsByOrder[payment.repair_order_id]) paymentsByOrder[payment.repair_order_id] = [];
-          paymentsByOrder[payment.repair_order_id].push({
-            id: payment.id,
-            amount: Number(payment.amount || 0),
-            method: payment.method || 'Não informado',
-            paidAt: payment.paid_at || payment.created_at,
-            state: payment.state,
-            reference: payment.reference
-          });
-        });
-      }
-      setOrders(oData.map((o) => {
-        const displayOrderId = o.order_number || `OS-${String(o.id).slice(0, 6)}`;
-        const payments = paymentsByOrder[o.id] || [];
-        const paidFromPayments = payments.filter(p => !p.state || ['paid', 'received', 'approved', 'completed'].includes(String(p.state).toLowerCase())).reduce((sum, p) => sum + Number(p.amount || 0), 0);
-        return ({
+      setOrders(oData.map((o) => ({
         rawId: o.id,
-        organizationId: o.organization_id,
-        id: displayOrderId,
-        paidAmount: payments.length ? paidFromPayments : Number(o.amount_paid ?? 0), payments,
+        id: o.order_number || `OS-${String(o.id).slice(0, 6)}`,
         customer: o.customer_name,
         phone: o.customer_phone || '',
         device: [o.device_brand, o.device_model].filter(Boolean).join(' '),
@@ -1154,8 +862,7 @@ function App() {
         createdAt: o.created_at,
         color: statusClass(o.status),
         checklist: { ...defaultChecklist }
-      });
-      }));
+      })));
     }
 
     const { data: cData } = await supabase.from('customers').select('id, name, phone, email, created_at').order('name', { ascending: true });
@@ -1164,29 +871,7 @@ function App() {
 
   useEffect(() => {
     try { localStorage.setItem('rt_cash_register_v1', JSON.stringify(cashRegister)); } catch (err) { console.warn('Não foi possível salvar o caixa neste navegador.', err); }
-    if (!remotePersistenceReady || !activeOrganizationId || !session?.user?.id) return;
-    supabase.from('rt_cash_register_state').upsert({
-      organization_id: activeOrganizationId,
-      state: cashRegister,
-      updated_by: session.user.id,
-      updated_at: new Date().toISOString()
-    }, { onConflict: 'organization_id' }).then(({ error }) => {
-      if (error) console.warn('Não foi possível sincronizar o caixa com o Supabase:', error.message);
-    });
-  }, [cashRegister, activeOrganizationId, remotePersistenceReady, session?.user?.id]);
-
-  useEffect(() => {
-    try { localStorage.setItem('rt_inventory_v1', JSON.stringify(inventory)); } catch (err) { console.warn('Não foi possível salvar o estoque neste navegador.', err); }
-    if (!remotePersistenceReady || !activeOrganizationId || !session?.user?.id) return;
-    supabase.from('rt_inventory_state').upsert({
-      organization_id: activeOrganizationId,
-      items: inventory,
-      updated_by: session.user.id,
-      updated_at: new Date().toISOString()
-    }, { onConflict: 'organization_id' }).then(({ error }) => {
-      if (error) console.warn('Não foi possível sincronizar o estoque com o Supabase:', error.message);
-    });
-  }, [inventory, activeOrganizationId, remotePersistenceReady, session?.user?.id]);
+  }, [cashRegister]);
 
   useEffect(() => { fetchData(); }, [session]);
 
@@ -1218,11 +903,6 @@ function App() {
       if (result.error) throw result.error;
 
       localStorage.setItem('rt_user_role', userRole);
-      // No login, provisiona a loja/vínculo; no cadastro com confirmação de e-mail, isso ocorrerá no primeiro login.
-      if (result.data?.session && userRole === 'tech') {
-        const { error: bootstrapError } = await supabase.rpc('rt_ensure_my_organization', { p_create_if_missing: true });
-        if (bootstrapError) console.warn('A configuração automática será repetida ao entrar:', bootstrapError.message);
-      }
 
       if (userRole === 'tech') {
         setActive('overview');
@@ -1242,9 +922,10 @@ function App() {
     try {
       const generatedId = `OS-${Math.floor(1000 + Math.random() * 9000)}`;
       if (supabaseConfigured && session) {
-        const orgId = await ensureMyOrganization(userRole === 'tech');
+        const { data: memberships } = await supabase.from('organization_members').select('organization_id').eq('user_id', session.user.id).limit(1);
+        const orgId = memberships?.[0]?.organization_id;
         const { error } = await supabase.from('repair_orders').insert({
-          organization_id: orgId,
+          organization_id: orgId || null,
           created_by: session.user.id,
           customer_name: newOrder.customer.trim(),
           customer_phone: newOrder.phone.trim() || null,
@@ -1312,18 +993,16 @@ function App() {
     setSaving(true);
     try {
       if (supabaseConfigured && session) {
-        const orgId = await ensureMyOrganization(userRole === 'tech');
-
-const { error } = await supabase.from('customers').insert({
-  organization_id: orgId,
-  name: newCustomer.name.trim(),
-  phone: newCustomer.phone.trim() || null,
-  email: newCustomer.email.trim() || null,
-});
-
-if (error) throw error;
-
-await fetchData();
+        const { data: memberships } = await supabase.from('organization_members').select('organization_id').eq('user_id', session.user.id).limit(1);
+        const orgId = memberships?.[0]?.organization_id;
+        const { error } = await supabase.from('customers').insert({
+          organization_id: orgId || null,
+          name: newCustomer.name.trim(),
+          phone: newCustomer.phone.trim() || null,
+          email: newCustomer.email.trim() || null,
+        });
+        if (error) throw error;
+        await fetchData();
       }
       addAuditLog(`Cadastrou o cliente ${newCustomer.name.trim()}`);
       setShowNewCustomer(false);
@@ -1352,117 +1031,6 @@ await fetchData();
     setShowNewProduct(false);
     setNewProduct({ name: '', category: 'Capas', price: '', qty: '1', barcode: '', photo: null });
     notify('Produto adicionado ao estoque!');
-  };
-
-  const editProduct = (id) => {
-    const product = inventory.find(p => String(p.id) === String(id));
-    if (!product) return;
-    const name = window.prompt('Nome do produto:', product.name);
-    if (name === null) return;
-    const category = window.prompt('Categoria:', product.category || 'Acessórios');
-    if (category === null) return;
-    const priceText = window.prompt('Preço de venda (ex.: 29,90):', String(product.price ?? ''));
-    if (priceText === null) return;
-    const price = Number(String(priceText).replace(',', '.'));
-    if (!name.trim() || !Number.isFinite(price) || price < 0) { notify('Nome ou preço inválido.'); return; }
-    const qtyText = window.prompt('Quantidade em estoque:', String(product.qty ?? 0));
-    if (qtyText === null) return;
-    const qty = Number(qtyText);
-    if (!Number.isInteger(qty) || qty < 0) { notify('Quantidade inválida.'); return; }
-    const barcode = window.prompt('Código de barras (deixe vazio para remover):', product.barcode || '');
-    if (barcode === null) return;
-    const duplicate = inventory.some(p => String(p.id) !== String(id) && barcode.trim() && String(p.barcode || '').trim() === barcode.trim());
-    if (duplicate) { notify('Esse código de barras já está cadastrado em outro produto.'); return; }
-    setInventory(prev => prev.map(p => String(p.id) === String(id) ? { ...p, name: name.trim(), category: category.trim(), price: price.toFixed(2), qty, barcode: barcode.trim() } : p));
-    addAuditLog(`Editou o produto ${name.trim()}`);
-    notify('Produto atualizado.');
-  };
-
-  const editCustomer = async (customer) => {
-    const name = window.prompt('Nome do cliente:', customer.name || ''); if (name === null) return;
-    const phone = window.prompt('Telefone / WhatsApp:', customer.phone || ''); if (phone === null) return;
-    const email = window.prompt('E-mail:', customer.email || ''); if (email === null) return;
-    if (!name.trim()) { notify('O nome do cliente é obrigatório.'); return; }
-    try {
-      if (supabaseConfigured && session && customer.id) {
-        const { error } = await supabase.from('customers').update({ name: name.trim(), phone: phone.trim() || null, email: email.trim() || null }).eq('id', customer.id);
-        if (error) throw error;
-        await fetchData();
-      } else {
-        setCustomers(prev => prev.map(c => String(c.id) === String(customer.id) ? { ...c, name: name.trim(), phone: phone.trim(), email: email.trim() } : c));
-      }
-      addAuditLog(`Editou o cadastro do cliente ${name.trim()}`); notify('Cliente atualizado.');
-    } catch (err) { notify(err.message || 'Não foi possível atualizar o cliente.'); }
-  };
-
-  const deleteCustomer = async (customer) => {
-    const linked = orders.some(o => String(o.customer || '').trim().toLowerCase() === String(customer.name || '').trim().toLowerCase());
-    if (linked) { notify('Este cliente tem OS no histórico. Para preservar o histórico, não é possível excluir o cadastro agora.'); return; }
-    if (!window.confirm(`Excluir o cliente ${customer.name}? Esta ação não pode ser desfeita.`)) return;
-    try {
-      if (supabaseConfigured && session && customer.id) {
-        const { error } = await supabase.from('customers').delete().eq('id', customer.id);
-        if (error) throw error;
-        await fetchData();
-      } else setCustomers(prev => prev.filter(c => String(c.id) !== String(customer.id)));
-      addAuditLog(`Excluiu o cliente ${customer.name}`); notify('Cliente excluído.');
-    } catch (err) { notify(err.message || 'Não foi possível excluir o cliente.'); }
-  };
-
-  const editOrder = async (order) => {
-    // Edição guiada dos dados da OS; mantém a identificação original e o histórico de pagamentos.
-    const customer = window.prompt('Nome do cliente:', order.customer || ''); if (customer === null) return;
-    const phone = window.prompt('Telefone / WhatsApp:', order.phone || ''); if (phone === null) return;
-    const device = window.prompt('Marca e modelo do aparelho:', order.device || ''); if (device === null) return;
-    const devicePassword = window.prompt('Senha / PIN do aparelho:', order.devicePassword || 'Sem senha'); if (devicePassword === null) return;
-    const issue = window.prompt('Defeito relatado:', order.issue || ''); if (issue === null) return;
-    const statusOptions = ['Recebido', 'Em diagnóstico', 'Aguardando aprovação', 'Aguardando peça', 'Em manutenção', 'Pronto para retirada', 'Entregue'];
-    const status = window.prompt(`Status da OS (${statusOptions.join(' / ')}):`, order.status || 'Recebido'); if (status === null) return;
-    const amountText = window.prompt('Valor total da OS (ex.: 150,00):', String(parseMoneyValue(order.amount))); if (amountText === null) return;
-    const amount = Number(String(amountText).replace(',', '.'));
-    const partCostText = window.prompt('Custo das peças (ex.: 35,00):', String(order.partCost ?? '0.00')); if (partCostText === null) return;
-    const partCost = Number(String(partCostText).replace(',', '.'));
-    const warrantyText = window.prompt('Garantia em dias:', String(order.warrantyDays ?? 90)); if (warrantyText === null) return;
-    const warrantyDays = Number(warrantyText);
-    if (!customer.trim() || !device.trim() || !issue.trim() || !Number.isFinite(amount) || amount < 0 || !Number.isFinite(partCost) || partCost < 0 || !Number.isInteger(warrantyDays) || warrantyDays < 0) {
-      notify('Confira os dados: nome, aparelho, defeito, valores e garantia precisam ser válidos.'); return;
-    }
-    if (!statusOptions.includes(status)) { notify('Status inválido. Escolha um dos status listados.'); return; }
-    if (Number(order.paidAmount || 0) > amount && !window.confirm(`A OS já tem R$ ${Number(order.paidAmount).toFixed(2)} registrado como pago, acima do novo total de R$ ${amount.toFixed(2)}. Deseja salvar mesmo assim?`)) return;
-    try {
-      if (supabaseConfigured && session && order.rawId) {
-        const deviceParts = device.trim().split(/\s+/);
-        const { error } = await supabase.from('repair_orders').update({
-          customer_name: customer.trim(), customer_phone: phone.trim() || null,
-          device_brand: deviceParts[0] || 'Outro', device_model: deviceParts.slice(1).join(' ') || device.trim(),
-          issue_description: issue.trim(), status, total_amount: amount
-        }).eq('id', order.rawId);
-        if (error) throw error;
-        await fetchData();
-        // Campos sem coluna confirmada no esquema atual ficam atualizados nesta sessão sem arriscar erro no banco.
-        setOrders(prev => prev.map(o => String(o.rawId || o.id) === String(order.rawId || order.id) ? { ...o, devicePassword: devicePassword.trim() || 'Sem senha', partCost: partCost.toFixed(2), warrantyDays } : o));
-      } else {
-        setOrders(prev => prev.map(o => String(o.rawId || o.id) === String(order.rawId || order.id) ? {
-          ...o, customer: customer.trim(), phone: phone.trim(), device: device.trim(),
-          devicePassword: devicePassword.trim() || 'Sem senha', issue: issue.trim(), status,
-          amount: `R$ ${amount.toFixed(2)}`, partCost: partCost.toFixed(2), warrantyDays
-        } : o));
-      }
-      addAuditLog(`Editou os dados da ordem ${order.id}`);
-      notify('Dados da ordem atualizados. Confira o total e os pagamentos registrados.');
-    } catch (err) { notify(err.message || 'Não foi possível atualizar a OS.'); }
-  };
-
-  const deleteOrder = async (order) => {
-    if (!window.confirm(`Excluir a ordem ${order.id} de ${order.customer}? Confira antes se existem pagamentos ou garantias vinculados.`)) return;
-    try {
-      if (supabaseConfigured && session && order.rawId) {
-        const { error } = await supabase.from('repair_orders').delete().eq('id', order.rawId);
-        if (error) throw error;
-        await fetchData();
-      } else setOrders(prev => prev.filter(o => String(o.rawId || o.id) !== String(order.rawId || order.id)));
-      addAuditLog(`Excluiu a ordem ${order.id}`); notify('Ordem excluída.');
-    } catch (err) { notify(err.message || 'Não foi possível excluir a OS. O banco pode bloquear a exclusão por haver registros vinculados.'); }
   };
 
   const handleProductPhotoUpload = (e) => {
@@ -1497,81 +1065,47 @@ await fetchData();
   };
 
   const deleteProduct = (id) => {
-    const product = inventory.find(p => String(p.id) === String(id));
-    if (!product) return;
-    if (!window.confirm(`Excluir o produto ${product.name}? O histórico de vendas já registradas não será apagado.`)) return;
-    setInventory(prev => prev.filter(p => String(p.id) !== String(id)));
+    setInventory(prev => prev.filter(p => p.id !== id));
     notify('Produto removido.');
   };
 
-  const handleSellProductFromList = async (productId, quantity, paymentMethod = 'Dinheiro', saleAttemptId) => {
-    const found = inventory.find(p => String(p.id) === String(productId));
-    const qty = Math.floor(Number(quantity));
-    if (!found) { notify('Selecione um produto válido.'); return; }
-    if (!Number.isFinite(qty) || qty < 1) { notify('Informe uma quantidade válida.'); return; }
-    if (!cashRegister.isOpen) { notify('Abra o caixa antes de registrar vendas.'); return; }
-    if (Number(found.qty) < qty) { notify(`Estoque insuficiente. Há apenas ${found.qty} unidade(s) de ${found.name}.`); return; }
-    if (!supabaseConfigured || !session?.user?.id || !activeOrganizationId) {
-      notify('Não foi possível registrar a venda: entre na conta da loja e aguarde a sincronização com o Supabase.'); return;
-    }
-    const operationId = saleAttemptId || createRtOperationId('sale');
-    try {
-      const { data, error } = await supabase.rpc('rt_register_inventory_sale', {
-        p_organization_id: activeOrganizationId,
-        p_sale_id: operationId,
-        p_product_id: String(found.id),
-        p_quantity: qty,
-        p_payment_method: paymentMethod || 'Dinheiro',
-        p_user_label: userAccessLevel === 'owner' ? 'Dono' : 'Técnico'
-      });
-      if (error) throw error;
-      const sale = Array.isArray(data) ? data[0] : data;
-      if (!sale?.inventory_items || !sale?.cash_state) throw new Error('O Supabase não confirmou a atualização do caixa e do estoque.');
-      setInventory(sale.inventory_items);
-      setCashRegister(prev => ({ isOpen: false, openingBalance: 0, openedAt: null, openedBy: '', entries: [], closedSessions: [], ...prev, ...sale.cash_state }));
-      try { sessionStorage.removeItem(`rt_product_sale_attempt_${activeOrganizationId || session.user.id}`); } catch {}
-      addAuditLog(`Vendeu ${qty}x ${sale.product_name || found.name} no caixa: R$ ${Number(sale.total_amount || 0).toFixed(2)}`);
-      setShowProductSaleModal(false);
-      notify(`Venda confirmada: ${qty}x ${sale.product_name || found.name}. Total R$ ${Number(sale.total_amount || 0).toFixed(2).replace('.', ',')} e estoque atualizado!`);
-    } catch (error) {
-      console.error('Erro ao registrar venda de produto:', error);
-      notify(`Venda não concluída: ${error?.message || 'não foi possível sincronizar o caixa e o estoque.'}`);
-    }
-  };
-
-  const handleSellProductByBarcode = async (scannedCode, paymentMethod = 'Dinheiro', saleAttemptId) => {
+  const handleSellProductByBarcode = (scannedCode) => {
     const code = String(scannedCode).trim();
-    if (!code) { notify('Código inválido.'); return; }
+    if (!code) {
+      notify('Código inválido.');
+      return;
+    }
+
     const found = inventory.find(p => p.barcode && p.barcode.trim() === code);
-    if (!found) { notify(`Nenhum produto cadastrado com o código ${code}.`); return; }
-    if (Number(found.qty) <= 0) { notify(`Atenção: ${found.name} está esgotado no estoque!`); return; }
-    if (!cashRegister.isOpen) { notify('Abra o caixa antes de registrar vendas.'); return; }
-    if (!supabaseConfigured || !session?.user?.id || !activeOrganizationId) {
-      notify('Não foi possível registrar a venda: entre na conta da loja e aguarde a sincronização com o Supabase.'); return;
+    if (!found) {
+      notify(`Nenhum produto cadastrado com o código ${code}.`);
+      return;
     }
-    const operationId = saleAttemptId || createRtOperationId('sale');
-    try {
-      const { data, error } = await supabase.rpc('rt_register_inventory_sale', {
-        p_organization_id: activeOrganizationId,
-        p_sale_id: operationId,
-        p_product_id: String(found.id),
-        p_quantity: 1,
-        p_payment_method: paymentMethod || 'Dinheiro',
-        p_user_label: userAccessLevel === 'owner' ? 'Dono' : 'Técnico'
-      });
-      if (error) throw error;
-      const sale = Array.isArray(data) ? data[0] : data;
-      if (!sale?.inventory_items || !sale?.cash_state) throw new Error('O Supabase não confirmou a atualização do caixa e do estoque.');
-      setInventory(sale.inventory_items);
-      setCashRegister(prev => ({ isOpen: false, openingBalance: 0, openedAt: null, openedBy: '', entries: [], closedSessions: [], ...prev, ...sale.cash_state }));
-      try { sessionStorage.removeItem(`rt_product_sale_attempt_${activeOrganizationId || session.user.id}`); } catch {}
-      addAuditLog(`Vendeu 1x ${sale.product_name || found.name} no caixa via código de barras: R$ ${Number(sale.total_amount || 0).toFixed(2)}`);
-      setShowBarcodeSaleModal(false);
-      notify(`Venda confirmada: ${sale.product_name || found.name} (+ R$ ${Number(sale.total_amount || 0).toFixed(2).replace('.', ',')}) e estoque atualizado!`);
-    } catch (error) {
-      console.error('Erro ao registrar venda por código de barras:', error);
-      notify(`Venda não concluída: ${error?.message || 'não foi possível sincronizar o caixa e o estoque.'}`);
+
+    if (found.qty <= 0) {
+      notify(`Atenção: ${found.name} está esgotado no estoque!`);
+      return;
     }
+
+    updateProductQty(found.id, -1);
+
+    const val = parseFloat(found.price);
+    const newEntry = {
+      id: String(Date.now()),
+      type: 'in',
+      description: `Venda Balcão: ${found.name} (Bipado)`,
+      category: 'Acessórios',
+      seller: '',
+      commissionAmount: 0,
+      amount: val,
+      time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      user: userAccessLevel === 'owner' ? 'Dono' : 'Técnico'
+    };
+
+    setCashRegister(prev => ({ ...prev, entries: [newEntry, ...prev.entries] }));
+    addAuditLog(`Vendeu 1x ${found.name} no caixa via código de barras: R$ ${val.toFixed(2)}`);
+    setShowBarcodeSaleModal(false);
+    notify(`Venda confirmada: ${found.name} (+ R$ ${val.toFixed(2)}) e estoque atualizado!`);
   };
 
   const addToCart = (product) => {
@@ -1630,99 +1164,23 @@ await fetchData();
     if (cashTx.type === 'in' && !cashTx.seller.trim()) {
       notify('Selecione o funcionário responsável pela venda para registrar o desempenho e a comissão.'); return;
     }
-    if (!cashRegister.isOpen) { notify('Abra o caixa antes de registrar movimentações.'); return; }
-    const val = parseMoneyValue(cashTx.amount);
-    if (!(val > 0)) { notify('Informe um valor maior que zero.'); return; }
+    const val = parseFloat(cashTx.amount.replace(',', '.'));
     const newEntry = {
-      id: String(Date.now()), type: cashTx.type, description: cashTx.description,
+      id: String(Date.now()),
+      type: cashTx.type,
+      description: cashTx.description,
       category: cashTx.type === 'in' ? cashTx.category : 'Saídas/Despesas',
-      seller: cashTx.type === 'in' ? cashTx.seller : '', paymentMethod: cashTx.type === 'in' ? (cashTx.paymentMethod || 'Dinheiro') : 'Dinheiro',
-      sourceType: 'manual', commissionAmount: cashTx.type === 'in' && cashTx.seller.trim() ? (localStorage.getItem('rt_commission_mode') === 'percent' ? val * (Number(localStorage.getItem('rt_phone_commission_fixed') || techCommissionRate) || 0) / 100 : Number(localStorage.getItem('rt_phone_commission_fixed') || techCommissionRate) || 0) : 0,
-      amount: val, createdAt: new Date().toISOString(), time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      seller: cashTx.type === 'in' ? cashTx.seller : '',
+      commissionAmount: cashTx.type === 'in' && cashTx.seller.trim() ? (localStorage.getItem('rt_commission_mode') === 'percent' ? val * (Number(localStorage.getItem('rt_phone_commission_fixed') || techCommissionRate) || 0) / 100 : Number(localStorage.getItem('rt_phone_commission_fixed') || techCommissionRate) || 0) : 0,
+      amount: val,
+      time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
       user: userAccessLevel === 'owner' ? 'Dono' : 'Técnico'
     };
     setCashRegister(prev => ({ ...prev, entries: [newEntry, ...prev.entries] }));
     addAuditLog(`Registrou ${cashTx.type === 'in' ? 'Entrada' : 'Sangria/Saída'} no caixa da loja: R$ ${val.toFixed(2)} (${cashTx.description})`);
     setShowCashTransactionModal(false);
-    setCashTx({ type: 'in', category: 'Acessórios', seller: '', description: '', amount: '', paymentMethod: 'Dinheiro' });
+    setCashTx({ type: 'in', category: 'Acessórios', seller: '', description: '', amount: '' });
     notify('Lançamento registrado no caixa da loja!');
-  };
-
-  const handleReceiveOrderPayment = async (e) => {
-    e.preventDefault();
-    const order = showOrderPaymentModal;
-    if (!order) return;
-    if (!cashRegister.isOpen) { notify('Abra o caixa antes de receber pagamentos.'); return; }
-    if (!supabaseConfigured || !session?.user?.id) { notify('Entre na sua conta para registrar o pagamento no banco de dados.'); return; }
-    if (!order.rawId || !order.organizationId) { notify('Esta OS não possui os identificadores necessários do Supabase. Atualize a página e tente novamente.'); return; }
-
-    const amount = parseMoneyValue(orderPayment.amount);
-    if (!(amount > 0)) { notify('Informe um valor recebido maior que zero.'); return; }
-
-    setSaving(true);
-    try {
-      // Registra o pagamento e atualiza o saldo dentro de uma única transação no banco.
-      const { data: paymentRow, error: paymentError } = await supabase.rpc('rt_receive_order_payment', {
-        p_organization_id: order.organizationId,
-        p_repair_order_id: order.rawId,
-        p_amount: amount,
-        p_method: orderPayment.method,
-        p_reference: orderPayment.reference || `OS-${order.rawId}-${createRtOperationId('payment')}`
-      });
-      if (paymentError) throw paymentError;
-
-      const payment = Array.isArray(paymentRow) ? paymentRow[0] : paymentRow;
-      if (!payment?.payment_id) throw new Error('O banco não retornou a confirmação do pagamento. Atualize a tela antes de tentar novamente.');
-
-      const paidAt = payment.paid_at || new Date().toISOString();
-      const nextPaidAmount = Number(payment.amount_paid);
-      const paymentId = payment.payment_id;
-      const entry = { id: paymentId, type: 'in', description: `Pagamento OS ${order.id} — ${order.customer || 'Cliente'}`, category: 'Assistência técnica', seller: '', amount, paymentMethod: orderPayment.method, sourceType: 'os_payment', orderId: order.id, rawOrderId: order.rawId, createdAt: paidAt, time: new Date(paidAt).toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'}), user: userAccessLevel === 'owner' ? 'Dono' : 'Técnico' };
-      // O RPC já grava a mesma entrada no caixa, na mesma transação do pagamento.
-      // Usa o estado retornado pelo banco e deduplica pelo ID para não lançar duas vezes.
-      if (payment.cash_state && typeof payment.cash_state === 'object') {
-        setCashRegister(prev => ({ isOpen: false, openingBalance: 0, openedAt: null, openedBy: '', entries: [], closedSessions: [], ...prev, ...payment.cash_state }));
-      } else {
-        setCashRegister(prev => ({ ...prev, entries: [entry, ...(prev.entries || []).filter(existing => String(existing.id) !== String(paymentId))] }));
-      }
-      const nextPayments = [...(order.payments || []).filter(existing => String(existing.id) !== String(paymentId)), { id: paymentId, amount, method: orderPayment.method, paidAt, reference: orderPayment.reference || '' }];
-      setOrders(prev => prev.map(o => o.id === order.id ? { ...o, paidAmount: nextPaidAmount, payments: nextPayments } : o));
-      addAuditLog(`Recebeu R$ ${amount.toFixed(2)} da OS ${order.id} via ${orderPayment.method}`);
-      try { localStorage.removeItem(`rt_order_payment_attempt_${order.rawId}`); } catch {}
-      setShowOrderPaymentModal(null);
-      setOrderPayment({ amount: '', method: 'Pix', reference: '' });
-      notify(`Pagamento de R$ ${amount.toFixed(2).replace('.', ',')} registrado no Supabase.`);
-    } catch (error) {
-      console.error('Erro ao registrar pagamento da OS:', error);
-      notify(`Não foi possível registrar o pagamento: ${error?.message || 'verifique a função rt_receive_order_payment no Supabase'}`);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleOpenCash = () => {
-    const raw = window.prompt('Valor inicial em dinheiro (fundo de troco), em R$:', '0,00');
-    if (raw === null) return;
-    const openingBalance = parseMoneyValue(raw);
-    if (openingBalance < 0) { notify('O saldo inicial não pode ser negativo.'); return; }
-    setCashRegister(prev => {
-      const history = [...(prev.closedSessions || [])];
-      if (prev.isOpen === false && prev.closedAt && prev.entries?.length) history.unshift({ openingBalance: prev.openingBalance, openedAt: prev.openedAt, openedBy: prev.openedBy, closedAt: prev.closedAt, closedBy: prev.closedBy, countedCash: prev.countedCash, expectedCash: prev.expectedCash, difference: prev.difference, entries: prev.entries });
-      return { ...prev, isOpen: true, openingBalance, openedAt: new Date().toISOString(), openedBy: userAccessLevel === 'owner' ? 'Dono' : 'Técnico', closedAt: null, entries: [], closedSessions: history };
-    });
-    addAuditLog(`Abriu o caixa com fundo inicial de R$ ${openingBalance.toFixed(2)}`); notify('Caixa aberto.');
-  };
-
-  const handleCloseCash = () => {
-    if (!cashRegister.isOpen) return;
-    const moneyIn = cashRegister.entries.filter(e => e.type === 'in' && (e.paymentMethod || 'Dinheiro') === 'Dinheiro').reduce((sum,e)=>sum+Number(e.amount||0),0);
-    const moneyOut = cashRegister.entries.filter(e => e.type === 'out').reduce((sum,e)=>sum+Number(e.amount||0),0);
-    const expectedCash = Number(cashRegister.openingBalance || 0) + moneyIn - moneyOut;
-    const raw = window.prompt(`Dinheiro contado na gaveta (R$). Saldo esperado: ${expectedCash.toFixed(2).replace('.', ',')}`, expectedCash.toFixed(2).replace('.', ','));
-    if (raw === null) return;
-    const countedCash = parseMoneyValue(raw); const difference = countedCash - expectedCash;
-    setCashRegister(prev => ({ ...prev, isOpen: false, closedAt: new Date().toISOString(), closedBy: userAccessLevel === 'owner' ? 'Dono' : 'Técnico', expectedCash, countedCash, difference }));
-    addAuditLog(`Fechou o caixa. Esperado R$ ${expectedCash.toFixed(2)}, contado R$ ${countedCash.toFixed(2)}, diferença R$ ${difference.toFixed(2)}`); notify('Fechamento do caixa registrado.');
   };
 
   const handleInviteMember = (e) => {
@@ -1864,7 +1322,7 @@ await fetchData();
     const checklistRows = Object.entries(checklistLabels).map(([key,label]) => `<tr><td>${label}</td><td>${order.checklist?.[key] === 'ok' ? 'OK' : order.checklist?.[key] === 'issue' ? 'Avaria registrada' : 'Não verificado'}</td></tr>`).join('');
     const report = window.open('', '_blank');
     if (report) {
-      report.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Check-in ${order.id}</title><style>body{font:14px Arial,sans-serif;margin:32px;color:#111}h1{font-size:22px}table{border-collapse:collapse;width:100%;margin-top:16px}td,th{border:1px solid #bbb;padding:8px;text-align:left}.note{margin-top:24px;color:#555;font-size:12px}@media print{button{display:none}}</style></head><body><h1>${storeName} — Comprovante de Check-in</h1><p><b>OS:</b> ${order.id}</p><p><b>Cliente:</b> ${order.customer || ''}</p><p><b>WhatsApp:</b> ${order.phone || ''}</p><p><b>Aparelho:</b> ${order.device || ''}</p><p><b>Defeito informado:</b> ${order.issue || ''}</p><p><b>Data:</b> ${new Date().toLocaleString('pt-BR')}</p><table><thead><tr><th>Item vistoriado</th><th>Condição registrada</th></tr></thead><tbody>${checklistRows}</tbody></table><h2>Fotos do check-in</h2><div>${(order.checkinPhotos||[]).map((src,i)=>`<img src="${src}" alt="Foto ${i+1}" style="width:180px;height:180px;object-fit:contain;margin:6px;border:1px solid #bbb"/>`).join('')}</div><p class="note">Este comprovante registra somente os itens marcados no check-in. Guarde uma cópia junto à ordem de serviço.</p><button onclick="window.print()">Imprimir / Salvar em PDF</button></body></html>`);
+      report.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Check-in ${order.id}</title><style>body{font:14px Arial,sans-serif;margin:32px;color:#111}h1{font-size:22px}table{border-collapse:collapse;width:100%;margin-top:16px}td,th{border:1px solid #bbb;padding:8px;text-align:left}.note{margin-top:24px;color:#555;font-size:12px}@media print{button{display:none}}</style></head><body><h1>${storeName} — Comprovante de Check-in</h1><p><b>OS:</b> ${order.id}</p><p><b>Cliente:</b> ${order.customer || ''}</p><p><b>WhatsApp:</b> ${order.phone || ''}</p><p><b>Aparelho:</b> ${order.device || ''}</p><p><b>Defeito informado:</b> ${order.issue || ''}</p><p><b>Data:</b> ${new Date().toLocaleString('pt-BR')}</p><table><thead><tr><th>Item vistoriado</th><th>Condição registrada</th></tr></thead><tbody>${checklistRows}</tbody></table><h2>Fotos do check-in</h2><div>${(order.checkinPhotos||[]).map((src,i)=>`<img src="${src}" alt="Foto ${i+1}" style="width:180px;height:180px;object-fit:contain;margin:6px;border:1px solid #bbb"/>`).join('')}</div><p class="note">Este comprovante registra somente os itens marcados no check-in. Guarde uma cópia junto à ordem de serviço.</p><div class="actions"><button onclick="window.print()">Imprimir / Salvar em PDF</button><button class="back" onclick="window.close();if(!window.closed){history.back()}">Voltar ao RT Mobile</button></div><style>.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}.actions button{padding:10px 16px;border:0;border-radius:7px;background:#111;color:#fff;cursor:pointer}.actions .back{background:#e5e5e5;color:#111}@media print{.actions{display:none}}</style></body></html>`);
       report.document.close();
     }
     const phone = String(order.phone || '').replace(/\D/g, '');
@@ -1906,11 +1364,11 @@ await fetchData();
       </div>
       
       <form className="auth-card" onSubmit={handleAuth} style={{background: '#0a0a0c', border: '1px solid #1f1f23'}}>
-        <div className="auth-role-switch" style={{display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '20px', background: '#111', padding: '4px', borderRadius: '8px', border: '1px solid #222', minWidth: 0, width: '100%', boxSizing: 'border-box'}}>
-          <button type="button" className={`secondary-btn ${userRole === 'client' ? 'primary-btn' : ''}`} style={{flex: '1 1 140px', minWidth: 0, whiteSpace: 'normal', overflowWrap: 'anywhere', lineHeight: 1.25, fontSize: '13px', padding: '10px 8px'}} onClick={() => setUserRole('client')}>
+        <div style={{display: 'flex', gap: '8px', marginBottom: '20px', background: '#111', padding: '4px', borderRadius: '8px', border: '1px solid #222'}}>
+          <button type="button" className={`secondary-btn ${userRole === 'client' ? 'primary-btn' : ''}`} style={{flex: 1, fontSize: '13px'}} onClick={() => setUserRole('client')}>
             Área do Cliente (Portal)
           </button>
-          <button type="button" className={`secondary-btn ${userRole === 'tech' ? 'primary-btn' : ''}`} style={{flex: '1 1 140px', minWidth: 0, whiteSpace: 'normal', overflowWrap: 'anywhere', lineHeight: 1.25, fontSize: '13px', padding: '10px 8px'}} onClick={() => setUserRole('tech')}>
+          <button type="button" className={`secondary-btn ${userRole === 'tech' ? 'primary-btn' : ''}`} style={{flex: 1, fontSize: '13px'}} onClick={() => setUserRole('tech')}>
             Painel do Estabelecimento
           </button>
         </div>
@@ -1942,7 +1400,7 @@ await fetchData();
             <p className="muted" style={{fontSize: '13px'}}>Pague o Pix para manter seu estabelecimento ativo e liberar o painel sem limites para você e sua equipe.</p>
             
             <div style={{margin: '20px 0', background: '#000', padding: '15px', borderRadius: '12px', border: '1px solid #333', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px'}}>
-              <PixQrCode pixKey={adminPixKey} name="RT MOBILE" city="CASTANHAL" amount={50} size={150} normalizePhoneKey />
+              <QrCode size={120} color="#25D366" />
               <span style={{fontSize: '12px', color: '#aaa'}}>Chave Pix (PicPay / Telefone):</span>
               <strong style={{fontSize: '16px', color: '#fff', background: '#18181f', padding: '8px 14px', borderRadius: '6px', border: '1px solid #444'}}>{adminPixKey}</strong>
               <button 
@@ -2102,7 +1560,7 @@ await fetchData();
               </p>
 
               <div style={{background: '#000', border: '1px solid #333', borderRadius: '12px', padding: '20px', margin: '0 0 24px'}}>
-                <PixQrCode pixKey={adminPixKey} name="RT MOBILE" city="CASTANHAL" amount={50} size={150} normalizePhoneKey />
+                <QrCode size={130} color="#25D366" style={{margin: '0 auto 12px', display: 'block'}} />
                 <span style={{fontSize: '12px', color: '#888'}}>Chave Pix (Telefone / PicPay):</span>
                 <div style={{fontSize: '16px', fontWeight: 'bold', color: '#fff', background: '#18181f', padding: '8px', borderRadius: '6px', margin: '6px 0', border: '1px solid #444'}}>
                   {adminPixKey}
@@ -2186,11 +1644,11 @@ await fetchData();
             </header>
             
             {active==='overview' && userRole === 'tech' && <Overview orders={orders} storeName={storeName} onNew={()=>setShowNewOrder(true)} onNavigate={setActive} modules={modules} inventory={inventory} onOpenTv={() => setShowTvMode(true)} />}
-            {active==='orders' && userRole === 'tech' && <OrdersPage orders={filteredOrders} search={search} setSearch={setSearch} onNew={()=>setShowNewOrder(true)} onEdit={editOrder} onDelete={deleteOrder} onPay={o=>{ const due=Math.max(0,parseMoneyValue(o.amount)-Number(o.paidAmount||0)); if(due<=0){notify('Esta OS já está quitada.');return;} const attemptKey=`rt_order_payment_attempt_${o.rawId}`; let reference=''; try { reference=localStorage.getItem(attemptKey)||''; if(reference && (o.payments||[]).some(p=>String(p.reference||'')===reference)){ localStorage.removeItem(attemptKey); reference=''; } } catch {} if(!reference){ reference=`OS-${o.rawId}-${createRtOperationId('payment')}`; try { localStorage.setItem(attemptKey,reference); } catch {} } setShowOrderPaymentModal(o); setOrderPayment({amount:due.toFixed(2),method:'Pix',reference}); }} onStatus={handleUpdateStatus} onShare={shareOsStatusWhatsapp} onSendWarranty={sendWarrantyTermWhatsapp} onOpenChecklist={(o) => setShowChecklistModal(o)} onPrint={(o) => setShowPrintModal(o)} onPellicleReminder={sendPellicleReminder} />}
-            {active==='customers' && userRole === 'tech' && <CustomersPage customers={customers} onNew={()=>setShowNewCustomer(true)} onEdit={editCustomer} onDelete={deleteCustomer} />}
+            {active==='orders' && userRole === 'tech' && <OrdersPage orders={filteredOrders} search={search} setSearch={setSearch} onNew={()=>setShowNewOrder(true)} onStatus={handleUpdateStatus} onShare={shareOsStatusWhatsapp} onSendWarranty={sendWarrantyTermWhatsapp} onOpenChecklist={(o) => setShowChecklistModal(o)} onPrint={(o) => setShowPrintModal(o)} onPellicleReminder={sendPellicleReminder} />}
+            {active==='customers' && userRole === 'tech' && <CustomersPage customers={customers} onNew={()=>setShowNewCustomer(true)} />}
             {active==='crm' && userRole === 'tech' && <><CrmPage customers={customers} storeName={storeName} whatsapp={whatsappNumber} /><div style={{marginTop:24}}><PostSalePage storeName={storeName} whatsapp={whatsappNumber} /></div></>}
-            {active==='cash' && userRole === 'tech' && <><CashPage cashRegister={cashRegister} onNewTransaction={() => cashRegister.isOpen ? setShowCashTransactionModal(true) : notify('Abra o caixa antes de lançar movimentações.')} onOpenBarcodeSale={() => cashRegister.isOpen ? setShowBarcodeSaleModal(true) : notify('Abra o caixa antes de registrar vendas.')} onOpenProductSale={() => cashRegister.isOpen ? setShowProductSaleModal(true) : notify('Abra o caixa antes de registrar vendas.')} onOpenCash={handleOpenCash} onCloseCash={handleCloseCash} /><CashCalculator /></>}
-            {active==='inventory' && userRole === 'tech' && <InventoryPage inventory={inventory} onNew={()=>setShowNewProduct(true)} onUpdateQty={updateProductQty} onEdit={editProduct} onDelete={deleteProduct} />}
+            {active==='cash' && userRole === 'tech' && <><CashPage cashRegister={cashRegister} onNewTransaction={() => setShowCashTransactionModal(true)} onOpenBarcodeSale={() => setShowBarcodeSaleModal(true)} /><CashCalculator /></>}
+            {active==='inventory' && userRole === 'tech' && <InventoryPage inventory={inventory} onNew={()=>setShowNewProduct(true)} onUpdateQty={updateProductQty} onDelete={deleteProduct} />}
             {active==='used_devices' && userRole === 'tech' && <UsedDevicesPage storeName={storeName} devices={usedDevices.filter(d => d.storeName === storeName || (!d.storeName && storeName === 'RT MOBILE'))} setDevices={setUsedDevices} enabled={usedDevicesEnabled} setEnabled={setUsedDevicesEnabled} />}
             {active==='reports' && userRole === 'tech' && userAccessLevel === 'owner' && <ReportsPage orders={orders} cashRegister={cashRegister} inventory={inventory} />}
             {active==='client_inventory' && <ClientInventoryPage inventory={inventory} storeName={storeName} cart={cart} addToCart={addToCart} onOpenCart={() => setShowCartModal(true)} />}
@@ -2263,14 +1721,9 @@ await fetchData();
         />
       )}
 
-      {showProductSaleModal && (
-        <ProductSaleModal inventory={inventory} saleAttemptKey={`rt_product_sale_attempt_${activeOrganizationId || session?.user?.id || 'local'}`} onSell={handleSellProductFromList} onClose={() => setShowProductSaleModal(false)} />
-      )}
-
       {showBarcodeSaleModal && (
         <BarcodeSaleModal
           inventory={inventory}
-          saleAttemptKey={`rt_product_sale_attempt_${activeOrganizationId || session?.user?.id || 'local'}`}
           onDetectedBarcode={handleSellProductByBarcode}
           onClose={() => setShowBarcodeSaleModal(false)}
         />
@@ -2289,8 +1742,6 @@ await fetchData();
           notify={notify}
         />
       )}
-
-      {showOrderPaymentModal && <div className="modal-backdrop" onClick={()=>setShowOrderPaymentModal(null)}><form className="modal" onClick={e=>e.stopPropagation()} onSubmit={handleReceiveOrderPayment} style={{background:'#0f0f12',border:'1px solid #222',maxWidth:440}}><div className="modal-head"><div><div className="eyebrow">RECEBIMENTO DE OS</div><h2>Receber pagamento</h2><p className="muted">{showOrderPaymentModal.id} · {showOrderPaymentModal.customer}</p></div><button type="button" className="icon-btn" onClick={()=>setShowOrderPaymentModal(null)}><X size={19}/></button></div><div className="panel" style={{padding:12,marginBottom:12}}><div>Valor da OS: <strong>R$ {parseMoneyValue(showOrderPaymentModal.amount).toFixed(2).replace('.',',')}</strong></div><div>Já recebido: <strong>R$ {Number(showOrderPaymentModal.paidAmount||0).toFixed(2).replace('.',',')}</strong></div><div>Saldo restante: <strong style={{color:'#25D366'}}>R$ {Math.max(0,parseMoneyValue(showOrderPaymentModal.amount)-Number(showOrderPaymentModal.paidAmount||0)).toFixed(2).replace('.',',')}</strong></div></div><label>Valor recebido (R$)<input type="number" min="0.01" step="0.01" max={Math.max(0,parseMoneyValue(showOrderPaymentModal.amount)-Number(showOrderPaymentModal.paidAmount||0))} value={orderPayment.amount} onChange={e=>setOrderPayment({...orderPayment,amount:e.target.value})} required /></label><label style={{marginTop:10}}>Forma de pagamento<select value={orderPayment.method} onChange={e=>setOrderPayment({...orderPayment,method:e.target.value})}><option>Pix</option><option>Dinheiro</option><option>Cartão de débito</option><option>Cartão de crédito</option><option>Transferência</option></select></label><div className="modal-foot" style={{marginTop:18}}><button type="button" className="secondary-btn" onClick={()=>setShowOrderPaymentModal(null)}>Cancelar</button><button className="primary-btn" disabled={saving}>{saving ? 'Registrando...' : 'Confirmar recebimento'}</button></div></form></div>}
 
       {showCashTransactionModal && (
         <div className="modal-backdrop" onClick={()=>setShowCashTransactionModal(false)}>
@@ -2322,9 +1773,6 @@ await fetchData();
               </label>
             </>}
 
-            {cashTx.type === 'in' && <label style={{marginTop:'10px'}}>Forma de pagamento
-              <select value={cashTx.paymentMethod || 'Dinheiro'} onChange={e=>setCashTx({...cashTx,paymentMethod:e.target.value})}><option>Dinheiro</option><option>Pix</option><option>Cartão de débito</option><option>Cartão de crédito</option><option>Transferência</option></select>
-            </label>}
             <label style={{marginTop: '10px'}}>Descrição do Lançamento
               <input value={cashTx.description} onChange={e=>setCashTx({...cashTx, description: e.target.value})} placeholder="Ex: Pagamento Fornecedor / Venda Balcão" required />
             </label>
@@ -2852,7 +2300,7 @@ function Metric({icon:Icon,label,value,trend,tone}) {return <div className="metr
 function StatusPill({status}) {return <span className={`status-pill ${statusClass(status)}`}><i/>{status}</span>}
 function QuickAction({icon:Icon,title,desc,onClick}) {return <button className="quick-action" onClick={onClick} style={{background: '#111115'}}><div className="quick-action-icon"><Icon size={17}/></div><span><strong>{title}</strong><small>{desc}</small></span><ArrowUpRight size={15} className="quick-arrow"/></button>}
 
-function OrdersPage({orders,search,setSearch,onNew,onEdit,onDelete,onPay,onStatus,onShare,onSendWarranty,onOpenChecklist,onPrint,onPellicleReminder}) {
+function OrdersPage({orders,search,setSearch,onNew,onStatus,onShare,onSendWarranty,onOpenChecklist,onPrint,onPellicleReminder}) {
   return <div className="page-content"><div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line"/> OPERAÇÃO</div><h1>Ordens de <span>serviço.</span></h1><p>Registre entradas e acompanhe cada atendimento do início à entrega.</p></div><button className="primary-btn" onClick={onNew}><Plus size={17}/> Nova ordem</button></div><div className="list-toolbar"><div className="search-box"><Search size={17}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar por cliente, aparelho ou ordem..."/></div><div className="toolbar-count">{orders.length} registros</div></div><div className="panel orders-full" style={{background: '#0a0a0d', border: '1px solid #18181b'}}><div className="table-wrap"><table><thead><tr><th>ORDEM / CLIENTE</th><th>APARELHO / DEFEITO</th><th>SENHA / PADRÃO</th><th>STATUS DO ATENDIMENTO</th><th>VISTORIA</th><th>AÇÕES / DISPAROS</th></tr></thead><tbody>{orders.map(o=><tr key={o.id}><td><div className="order-id">{o.id}</div><div className="cell-sub">{o.customer}</div></td><td><div className="device-cell"><div className="device-mini"><Smartphone size={15}/></div><span>{o.device}</span></div><div className="cell-sub">{o.issue}</div></td><td>
     <div style={{display: 'flex', alignItems: 'center', gap: '6px'}}>
       {o.patternDrawing ? (
@@ -2866,10 +2314,10 @@ function OrdersPage({orders,search,setSearch,onNew,onEdit,onDelete,onPay,onStatu
         </div>
       )}
     </div>
-  </td><td><select className={`status-select ${statusClass(o.status)}`} value={o.status} onChange={e=>onStatus(o.rawId,e.target.value)}>{['Recebido','Em diagnóstico','Aguardando aprovação','Aguardando peça','Em manutenção','Pronto para retirada','Entregue'].map(s=><option key={s}>{s}</option>)}</select>{o.deliveredAt && (()=>{const remaining=Math.ceil((new Date(o.deliveredAt).getTime()+Number(o.warrantyDays||90)*86400000-Date.now())/86400000);return remaining>=0&&remaining<=7?<div style={{fontSize:10,color:'#f59e0b',marginTop:5}}>Garantia vence em {remaining} dia(s)</div>:null;})()}</td><td><button className="secondary-btn" onClick={()=>onOpenChecklist(o)} style={{display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '12px'}}><CheckSquare size={14} color="#3b82f6"/> Vistoria</button></td><td><div style={{display: 'flex', gap: '6px'}}><button className="secondary-btn" onClick={()=>onShare(o)} title="Disparar Status WhatsApp" style={{padding: '6px 10px'}}><MessageCircle size={14} color="#25D366"/></button><button className="secondary-btn" onClick={()=>onSendWarranty(o)} title="Enviar Termo de Garantia Legal WhatsApp" style={{padding: '6px 10px', color: '#3b82f6'}}><FileText size={14}/></button><button className="secondary-btn" onClick={()=>onPrint(o)} title="Imprimir Cupom Térmico" style={{padding: '6px 10px'}}><Printer size={14}/></button><button className="secondary-btn" onClick={()=>onPellicleReminder(o)} title="Lembrete / Revisão" style={{padding: '6px 10px', color: '#eab308'}}><Calendar size={14}/></button><button className="secondary-btn" onClick={()=>onEdit(o)} title="Editar OS" style={{padding:'6px 10px',color:'#eab308'}}><Pencil size={14}/></button><button className="secondary-btn" onClick={()=>onDelete(o)} title="Excluir OS" style={{padding:'6px 10px',color:'#ff4d4d'}}><Trash2 size={14}/></button><button className="secondary-btn" onClick={()=>onPay(o)} title="Receber pagamento da OS" style={{padding:'6px 10px',color:'#25D366'}}><DollarSign size={14}/></button><div className="cell-sub">Pago: R$ {Number(o.paidAmount||0).toFixed(2).replace('.',',')}</div></div></td></tr>)}</tbody></table>{!orders.length && <div className="empty-state"><ClipboardList size={28}/><strong>Nenhuma ordem encontrada</strong><span>Tente mudar a busca ou registre uma nova ordem.</span></div>}</div></div></div>
+  </td><td><select className={`status-select ${statusClass(o.status)}`} value={o.status} onChange={e=>onStatus(o.rawId,e.target.value)}>{['Recebido','Em diagnóstico','Aguardando aprovação','Aguardando peça','Em manutenção','Pronto para retirada','Entregue'].map(s=><option key={s}>{s}</option>)}</select>{o.deliveredAt && (()=>{const remaining=Math.ceil((new Date(o.deliveredAt).getTime()+Number(o.warrantyDays||90)*86400000-Date.now())/86400000);return remaining>=0&&remaining<=7?<div style={{fontSize:10,color:'#f59e0b',marginTop:5}}>Garantia vence em {remaining} dia(s)</div>:null;})()}</td><td><button className="secondary-btn" onClick={()=>onOpenChecklist(o)} style={{display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '12px'}}><CheckSquare size={14} color="#3b82f6"/> Vistoria</button></td><td><div style={{display: 'flex', gap: '6px'}}><button className="secondary-btn" onClick={()=>onShare(o)} title="Disparar Status WhatsApp" style={{padding: '6px 10px'}}><MessageCircle size={14} color="#25D366"/></button><button className="secondary-btn" onClick={()=>onSendWarranty(o)} title="Enviar Termo de Garantia Legal WhatsApp" style={{padding: '6px 10px', color: '#3b82f6'}}><FileText size={14}/></button><button className="secondary-btn" onClick={()=>onPrint(o)} title="Imprimir Cupom Térmico" style={{padding: '6px 10px'}}><Printer size={14}/></button><button className="secondary-btn" onClick={()=>onPellicleReminder(o)} title="Lembrete / Revisão" style={{padding: '6px 10px', color: '#eab308'}}><Calendar size={14}/></button></div></td></tr>)}</tbody></table>{!orders.length && <div className="empty-state"><ClipboardList size={28}/><strong>Nenhuma ordem encontrada</strong><span>Tente mudar a busca ou registre uma nova ordem.</span></div>}</div></div></div>
 }
 
-function CustomersPage({customers, onNew, onEdit, onDelete}) {
+function CustomersPage({customers, onNew}) {
   return <div className="page-content">
     <div className="page-heading">
       <div>
@@ -2887,7 +2335,7 @@ function CustomersPage({customers, onNew, onEdit, onDelete}) {
               <th>NOME</th>
               <th>TELEFONE / WHATSAPP</th>
               <th>E-MAIL</th>
-              <th>CADASTRADO EM</th><th>AÇÕES</th>
+              <th>CADASTRADO EM</th>
             </tr>
           </thead>
           <tbody>
@@ -2896,7 +2344,7 @@ function CustomersPage({customers, onNew, onEdit, onDelete}) {
                 <td><strong>{c.name}</strong></td>
                 <td>{c.phone || 'Não informado'}</td>
                 <td>{c.email || 'Não informado'}</td>
-                <td className="time-cell">{c.created_at ? new Date(c.created_at).toLocaleDateString('pt-BR') : '—'}</td><td><div style={{display:'flex',gap:6}}><button className="secondary-btn" title="Editar cliente" onClick={()=>onEdit(c)}><Pencil size={14}/></button><button className="icon-btn" title="Excluir cliente" onClick={()=>onDelete(c)} style={{color:'#ff4d4d'}}><Trash2 size={15}/></button></div></td>
+                <td className="time-cell">{new Date(c.created_at).toLocaleDateString('pt-BR')}</td>
               </tr>
             ))}
           </tbody>
@@ -2978,67 +2426,101 @@ function CrmPage({customers, storeName, whatsapp}) {
   </div>
 }
 
-function CashPage({cashRegister, onNewTransaction, onOpenBarcodeSale, onOpenProductSale, onOpenCash, onCloseCash}) {
-  const entries = cashRegister.entries || [];
-  const totalEntries = entries.filter(e => e.type === 'in').reduce((a, b) => a + Number(b.amount || 0), 0);
-  const totalExits = entries.filter(e => e.type === 'out').reduce((a, b) => a + Number(b.amount || 0), 0);
-  const cashIn = entries.filter(e => e.type === 'in' && (e.paymentMethod || 'Dinheiro') === 'Dinheiro').reduce((a,b)=>a+Number(b.amount||0),0);
-  const digitalIn = entries.filter(e => e.type === 'in' && (e.paymentMethod || 'Dinheiro') !== 'Dinheiro').reduce((a,b)=>a+Number(b.amount||0),0);
-  const currentBalance = Number(cashRegister.openingBalance || 0) + cashIn - totalExits;
-  const money = value => `R$ ${Number(value||0).toFixed(2).replace('.', ',')}`;
+function CashPage({cashRegister, onNewTransaction, onOpenBarcodeSale}) {
+  const totalEntries = cashRegister.entries.filter(e => e.type === 'in').reduce((a, b) => a + b.amount, 0);
+  const totalExits = cashRegister.entries.filter(e => e.type === 'out').reduce((a, b) => a + b.amount, 0);
+  const currentBalance = cashRegister.openingBalance + totalEntries - totalExits;
+
   return <div className="page-content">
-    <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line"/> FLUXO DE CAIXA DO ESTABELECIMENTO</div><h1>Caixa da <span>Loja.</span></h1><p>Controle abertura, recebimentos por OS e vendas, sangrias e fechamento diário.</p><div style={{marginTop:10}}><span className={`status-pill ${cashRegister.isOpen?'green':'amber'}`}><i/>{cashRegister.isOpen?'CAIXA ABERTO':'CAIXA FECHADO'}</span>{cashRegister.openedAt&&<small className="muted" style={{marginLeft:10}}>Abertura: {new Date(cashRegister.openedAt).toLocaleString('pt-BR')}</small>}</div></div>
-      <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{cashRegister.isOpen ? <><button className="secondary-btn" onClick={onOpenProductSale} style={{background:'#142018',color:'#25D366',border:'1px solid #25D366',fontWeight:'bold',display:'flex',alignItems:'center',gap:6}}><Package size={17}/> Vender Produto</button><button className="secondary-btn" onClick={onOpenBarcodeSale} style={{background:'#1f2937',color:'#25D366',border:'1px solid #25D366',fontWeight:'bold',display:'flex',alignItems:'center',gap:6}}><BarcodeIcon size={17}/> Bipar / Vender Produto</button><button className="primary-btn" onClick={onNewTransaction}><Plus size={17}/> Lançar Manual</button><button className="secondary-btn" onClick={onCloseCash} style={{border:'1px solid #f59e0b',color:'#f59e0b'}}><Lock size={16}/> Fechar caixa</button></> : <button className="primary-btn" onClick={onOpenCash}><CheckCircle2 size={17}/> Abrir caixa do dia</button>}</div>
+    <div className="page-heading">
+      <div>
+        <div className="eyebrow"><span className="eyebrow-line"/> FLUXO DE CAIXA DO ESTABELECIMENTO</div>
+        <h1>Caixa da <span>Loja.</span></h1>
+        <p>Controle entradas, suprimentos de troco, sangrias e despesas do dia a dia.</p>
+      </div>
+      <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap'}}>
+        <button className="secondary-btn" onClick={onOpenBarcodeSale} style={{background: '#1f2937', color: '#25D366', border: '1px solid #25D366', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px'}}>
+          <BarcodeIcon size={17}/> Bipar / Vender Produto
+        </button>
+        <button className="primary-btn" onClick={onNewTransaction} style={{background: '#25D366', color: '#000', fontWeight: 'bold'}}>
+          <Plus size={17}/> Lançar Manual
+        </button>
+      </div>
     </div>
-    <div className="metrics-grid" style={{gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))'}}>
-      <div className="metric-card" style={{background:'#0a0a0d',border:'1px solid #18181b'}}><div className="metric-top"><span className="metric-period">FUNDO INICIAL</span></div><div className="metric-value" style={{color:'#aaa'}}>{money(cashRegister.openingBalance)}</div><div className="metric-label">Dinheiro na abertura</div></div>
-      <div className="metric-card" style={{background:'#0a0a0d',border:'1px solid #18181b'}}><div className="metric-top"><span className="metric-period">RECEBIMENTOS</span></div><div className="metric-value" style={{color:'#25D366'}}>{money(totalEntries)}</div><div className="metric-label">Total de entradas (todas as formas)</div></div>
-      <div className="metric-card" style={{background:'#0a0a0d',border:'1px solid #18181b'}}><div className="metric-top"><span className="metric-period">DINHEIRO ESPERADO</span></div><div className="metric-value" style={{color:'#3b82f6'}}>{money(currentBalance)}</div><div className="metric-label">Fundo inicial + dinheiro − saídas</div></div>
-      <div className="metric-card" style={{background:'#0a0a0d',border:'1px solid #18181b'}}><div className="metric-top"><span className="metric-period">PIX / CARTÕES</span></div><div className="metric-value" style={{color:'#a78bfa'}}>{money(digitalIn)}</div><div className="metric-label">Entradas não recebidas em espécie</div></div>
-      <div className="metric-card" style={{background:'#0a0a0d',border:'1px solid #18181b'}}><div className="metric-top"><span className="metric-period">SAÍDAS</span></div><div className="metric-value" style={{color:'#ff4d4d'}}>{money(totalExits)}</div><div className="metric-label">Sangrias e despesas registradas</div></div>
+
+    <div className="metrics-grid" style={{gridTemplateColumns: 'repeat(4, 1fr)'}}>
+      <div className="metric-card" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
+        <div className="metric-top"><span className="metric-period">ABERTURA</span></div>
+        <div className="metric-value" style={{color: '#aaa'}}>R$ {cashRegister.openingBalance.toFixed(2)}</div>
+        <div className="metric-label">Fundo de Troco Inicial</div>
+      </div>
+
+      <div className="metric-card" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
+        <div className="metric-top"><span className="metric-period">ENTRADAS</span></div>
+        <div className="metric-value" style={{color: '#25D366'}}>+ R$ {totalEntries.toFixed(2)}</div>
+        <div className="metric-label">Serviços & Vendas</div>
+      </div>
+
+      <div className="metric-card" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
+        <div className="metric-top"><span className="metric-period">SANGRIA / SAÍDAS</span></div>
+        <div className="metric-value" style={{color: '#ff4d4d'}}>- R$ {totalExits.toFixed(2)}</div>
+        <div className="metric-label">Despesas & Insumos</div>
+      </div>
+
+      <div className="metric-card" style={{background: '#0a0a0d', border: '1px solid #18181b'}}>
+        <div className="metric-top"><span className="metric-period">SALDO EM GAVETA</span></div>
+        <div className="metric-value" style={{color: '#3b82f6'}}>R$ {currentBalance.toFixed(2)}</div>
+        <div className="metric-label">Saldo Atual Estimado</div>
+      </div>
     </div>
-    {!cashRegister.isOpen && cashRegister.closedAt && <div className="panel" style={{background:'#0a0a0d',border:'1px solid #f59e0b',padding:16,marginTop:18}}><h3>Resumo do último fechamento</h3><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:12}}><div>Saldo esperado<br/><strong>{money(cashRegister.expectedCash)}</strong></div><div>Dinheiro contado<br/><strong>{money(cashRegister.countedCash)}</strong></div><div>Diferença<br/><strong style={{color:Number(cashRegister.difference)===0?'#25D366':'#f59e0b'}}>{money(cashRegister.difference)}</strong></div></div><p className="muted">Fechado em {new Date(cashRegister.closedAt).toLocaleString('pt-BR')} por {cashRegister.closedBy||'—'}.</p></div>}
-    <div className="panel orders-full" style={{background:'#0a0a0d',border:'1px solid #18181b',marginTop:20}}><div className="panel-heading"><div><h3>Movimentações do caixa</h3><p>Pagamentos de OS, vendas e lançamentos manuais desta sessão</p></div></div><div className="table-wrap"><table><thead><tr><th>HORÁRIO</th><th>DESCRIÇÃO</th><th>CATEGORIA</th><th>FORMA</th><th>OPERADOR</th><th>TIPO</th><th>VALOR</th></tr></thead><tbody>{entries.map(item=><tr key={item.id}><td>{item.time|| (item.createdAt?new Date(item.createdAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'—')}</td><td><strong>{item.description}</strong>{item.seller&&<div className="muted" style={{fontSize:11}}>Vendedor: {item.seller}</div>}</td><td>{item.category||'—'}</td><td>{item.paymentMethod||'Dinheiro'}</td><td>{item.user||'—'}</td><td><span className={`status-pill ${item.type==='in'?'green':'amber'}`}><i/>{item.type==='in'?'Entrada':'Saída'}</span></td><td><strong style={{color:item.type==='in'?'#25D366':'#ff4d4d'}}>{item.type==='in'?'+':'−'} {money(item.amount)}</strong></td></tr>)}</tbody></table>{!entries.length&&<div className="empty-state"><Wallet size={28}/><strong>Nenhuma movimentação nesta sessão</strong><span>Recebimentos de OS e vendas aparecerão aqui quando registrados.</span></div>}</div></div>
+
+    <div className="panel orders-full" style={{background: '#0a0a0d', border: '1px solid #18181b', marginTop: '20px'}}>
+      <div className="panel-heading">
+        <div><h3>Histórico de Lançamentos do Dia</h3><p>Registro das movimentações</p></div>
+      </div>
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>HORÁRIO</th>
+              <th>DESCRIÇÃO DO LANÇAMENTO</th>
+              <th>CATEGORIA</th>
+              <th>OPERADOR</th>
+              <th>TIPO</th>
+              <th>VALOR</th>
+            </tr>
+          </thead>
+          <tbody>
+            {cashRegister.entries.map(item => (
+              <tr key={item.id}>
+                <td>{item.time}</td>
+                <td><strong>{item.description}</strong>{item.seller && <div className="muted" style={{fontSize:11}}>Vendedor: {item.seller}</div>}</td>
+                <td>{item.category || '—'}</td>
+                <td>{item.user}</td>
+                <td>
+                  <span className={`status-pill ${item.type === 'in' ? 'green' : 'amber'}`}>
+                    {item.type === 'in' ? 'Entrada / Suprimento' : 'Sangria / Saída'}
+                  </span>
+                </td>
+                <td>
+                  <strong style={{color: item.type === 'in' ? '#25D366' : '#ff4d4d'}}>
+                    {item.type === 'in' ? '+' : '-'} R$ {item.amount.toFixed(2)}
+                  </strong>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 }
 
-/* VENDA MANUAL DE PRODUTO: registra entrada no caixa e baixa o estoque */
-function ProductSaleModal({ inventory, saleAttemptKey, onSell, onClose }) {
-  const [saleAttemptId] = useState(() => getOrCreateRtAttemptId(saleAttemptKey || 'rt_product_sale_attempt_local', 'sale'));
-  const available = inventory.filter(p => Number(p.qty) > 0);
-  const [productId, setProductId] = useState(available[0]?.id || '');
-  const [quantity, setQuantity] = useState('1');
-  const [paymentMethod, setPaymentMethod] = useState('Dinheiro');
-  const selected = inventory.find(p => String(p.id) === String(productId));
-  const qty = Math.max(0, Math.floor(Number(quantity) || 0));
-  const total = selected ? parseMoneyValue(selected.price) * qty : 0;
-  const money = value => `R$ ${Number(value || 0).toFixed(2).replace('.', ',')}`;
-  return <div className="modal-backdrop" onClick={onClose}><div className="modal" onClick={e => e.stopPropagation()} style={{background:'#0f0f12',border:'1px solid #222',maxWidth:480}}>
-    <div className="modal-head"><div><div className="eyebrow">CAIXA RÁPIDO</div><h2>Vender produto</h2></div><button type="button" className="icon-btn" onClick={onClose}><X size={19}/></button></div>
-    <p className="muted">Selecione o produto cadastrado, informe a quantidade e confirme. O sistema registra a entrada no caixa e desconta as unidades do estoque.</p>
-    {!available.length ? <div className="empty-state"><Package size={28}/><strong>Nenhum produto disponível</strong><span>Cadastre um produto ou reponha o estoque antes de vender.</span></div> : <form onSubmit={e => { e.preventDefault(); onSell(productId, quantity, paymentMethod, saleAttemptId); }}>
-      <label>Produto<select required value={productId} onChange={e => setProductId(e.target.value)} style={{marginTop:6}}>{available.map(p => <option key={p.id} value={p.id}>{p.name} — estoque: {p.qty} — {money(p.price)}</option>)}</select></label>
-      {selected && <div className="panel" style={{padding:12,margin:'12px 0',background:'#09090b'}}><div style={{display:'flex',justifyContent:'space-between',gap:12}}><span>Preço unitário</span><strong>{money(selected.price)}</strong></div><div style={{display:'flex',justifyContent:'space-between',gap:12,marginTop:6}}><span>Disponível</span><strong>{selected.qty} unidade(s)</strong></div></div>}
-      <label>Quantidade<input type="number" min="1" max={selected?.qty || 1} step="1" required value={quantity} onChange={e => setQuantity(e.target.value)} style={{marginTop:6}}/></label>
-      <label style={{display:'block',marginTop:12}}>Forma de pagamento<select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)} style={{marginTop:6}}><option>Dinheiro</option><option>Pix</option><option>Cartão de débito</option><option>Cartão de crédito</option><option>Transferência</option></select></label>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',margin:'18px 0',padding:'14px',background:'#07130b',border:'1px solid #174b2a',borderRadius:8}}><span>Total da venda</span><strong style={{fontSize:22,color:'#25D366'}}>{money(total)}</strong></div>
-      <button className="primary-btn full-btn" type="submit" disabled={!selected || qty < 1 || qty > Number(selected?.qty)}><CheckCircle2 size={17}/> Confirmar venda e baixar estoque</button>
-    </form>}
-  </div></div>;
-}
-
 /* MODAL DE VENDA NO CAIXA POR CÓDIGO DE BARRAS */
-function BarcodeSaleModal({ inventory, saleAttemptKey, onDetectedBarcode, onClose }) {
-  const [saleAttemptId] = useState(() => getOrCreateRtAttemptId(saleAttemptKey || 'rt_product_sale_attempt_local', 'sale'));
+function BarcodeSaleModal({ inventory, onDetectedBarcode, onClose }) {
   const [manualCode, setManualCode] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('');
   const [useCamera, setUseCamera] = useState(false);
-  const [message, setMessage] = useState('');
   const inputRef = useRef(null);
-  const normalizedCode = String(manualCode || '').trim();
-  const selectedProduct = normalizedCode
-    ? inventory.find(p => String(p.barcode || '').trim() === normalizedCode)
-    : null;
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -3046,29 +2528,9 @@ function BarcodeSaleModal({ inventory, saleAttemptKey, onDetectedBarcode, onClos
 
   const handleManualSubmit = (e) => {
     e.preventDefault();
-    if (!normalizedCode) return;
-    if (!selectedProduct) {
-      setMessage(`Nenhum produto cadastrado com o código ${normalizedCode}. Confira o código ou cadastre o produto.`);
-      return;
+    if (manualCode.trim()) {
+      onDetectedBarcode(manualCode.trim());
     }
-    if (Number(selectedProduct.qty) <= 0) {
-      setMessage(`Atenção: ${selectedProduct.name} está esgotado no estoque!`);
-      return;
-    }
-    setMessage('Produto identificado. Confira os dados, escolha a forma de pagamento e confirme a venda.');
-    inputRef.current?.blur();
-  };
-
-  const confirmSale = () => {
-    if (!selectedProduct) {
-      setMessage('Bipe ou informe um código de barras válido antes de continuar.');
-      return;
-    }
-    if (!paymentMethod) {
-      setMessage('Selecione a forma de pagamento antes de confirmar a venda.');
-      return;
-    }
-    onDetectedBarcode(normalizedCode, paymentMethod, saleAttemptId);
   };
 
   return (
@@ -3082,84 +2544,46 @@ function BarcodeSaleModal({ inventory, saleAttemptKey, onDetectedBarcode, onClos
           <button type="button" className="icon-btn" onClick={onClose}><X size={19}/></button>
         </div>
 
-        <div className="panel" style={{padding:12, marginBottom:14, border:'1px solid #303039', background:'#14141a'}}>
-          <strong style={{display:'block', marginBottom:5}}>Como realizar a venda</strong>
-          <p className="muted" style={{fontSize: '13px', margin:0}}>
-            1. Bipe o produto. 2. Confira o produto e escolha a forma de pagamento. 3. Aperte “Confirmar venda”. Bipar sozinho não registra a venda nem baixa o estoque.
-          </p>
-        </div>
+        <p className="muted" style={{fontSize: '13px'}}>
+          Bipe com o leitor óptico USB/Bluetooth ou use a câmera do seu celular para registrar no caixa e abater o estoque.
+        </p>
 
         <form onSubmit={handleManualSubmit} style={{margin: '15px 0'}}>
-          <label>Código de Barras (Leitor, câmera ou digitação)
+          <label>Código de Barras (Leitor ou Digitação)
             <div style={{display: 'flex', gap: '8px', marginTop: '6px'}}>
               <input
                 ref={inputRef}
                 value={manualCode}
                 onChange={e=>setManualCode(e.target.value)}
-                placeholder="Bipe ou digite o código..."
+                placeholder="Bipe com o leitor óptico..."
                 autoFocus
                 style={{flex: 1}}
               />
-              <button className="secondary-btn" type="submit" style={{padding: '0 14px'}}>Localizar</button>
+              <button className="primary-btn" type="submit" style={{padding: '0 14px'}}>
+                Confirmar
+              </button>
             </div>
           </label>
         </form>
 
-        {normalizedCode && (
-          <div className="panel" style={{padding:12, marginBottom:14, border:`1px solid ${selectedProduct && Number(selectedProduct.qty)>0 ? '#25D366' : '#f59e0b'}`, background:'#111116'}}>
-            {selectedProduct ? <>
-              <div className="eyebrow" style={{color:'#25D366'}}>PRODUTO IDENTIFICADO</div>
-              <strong style={{display:'block', marginTop:5}}>{selectedProduct.name}</strong>
-              <div className="muted" style={{fontSize:13, marginTop:5}}>Código: {normalizedCode}</div>
-              <div style={{display:'flex', justifyContent:'space-between', gap:10, marginTop:10}}>
-                <span>Preço unitário</span><strong>R$ {parseMoneyValue(selectedProduct.price).toFixed(2).replace('.', ',')}</strong>
-              </div>
-              <div style={{display:'flex', justifyContent:'space-between', gap:10, marginTop:5}}>
-                <span>Estoque disponível</span><strong>{Number(selectedProduct.qty)||0} un.</strong>
-              </div>
-              {Number(selectedProduct.qty) <= 0 && <p style={{color:'#f59e0b',fontSize:12,margin:'8px 0 0'}}>Produto sem estoque. Não é possível vender.</p>}
-            </> : <>
-              <strong style={{color:'#f59e0b'}}>Produto não encontrado</strong>
-              <p className="muted" style={{fontSize:12,margin:'5px 0 0'}}>Confira o código ou cadastre o produto antes de vender.</p>
-            </>}
-          </div>
-        )}
-
-        {message && <p role="status" style={{fontSize:12,color:'#25D366',margin:'0 0 10px'}}>{message}</p>}
-
-        <label>Forma de pagamento
-          <select value={paymentMethod} onChange={e=>setPaymentMethod(e.target.value)} style={{marginTop:6}}>
-            <option value="">Selecione antes de confirmar...</option>
-            <option>Dinheiro</option><option>Pix</option><option>Cartão de débito</option><option>Cartão de crédito</option><option>Transferência</option>
-          </select>
-        </label>
+        <div style={{textAlign: 'center', margin: '15px 0'}}>
+          <span style={{fontSize: '11px', color: '#666', textTransform: 'uppercase'}}>ou prefere usar a câmera?</span>
+        </div>
 
         <button
           type="button"
           className="secondary-btn full-btn"
           onClick={() => setUseCamera(true)}
-          style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', border: '1px solid #25D366', color: '#25D366', padding: '10px', marginTop:12}}
+          style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', border: '1px solid #25D366', color: '#25D366', padding: '10px'}}
         >
-          <Camera size={18}/> Abrir câmera para bipar
+          <Camera size={18}/> Abrir Câmera para Escanear
         </button>
-
-        <div className="modal-foot" style={{marginTop:16, display:'flex', gap:8}}>
-          <button type="button" className="secondary-btn" onClick={onClose}>Cancelar</button>
-          <button
-            type="button"
-            className="primary-btn"
-            onClick={confirmSale}
-            disabled={!selectedProduct || Number(selectedProduct.qty)<=0 || !paymentMethod}
-            style={{flex:1, opacity:(!selectedProduct || Number(selectedProduct.qty)<=0 || !paymentMethod)?0.5:1}}
-          >Confirmar venda</button>
-        </div>
 
         {useCamera && (
           <BarcodeCameraScanner
             onDetected={(code) => {
-              setManualCode(code);
               setUseCamera(false);
-              setMessage('Código lido. Confira o produto, escolha a forma de pagamento e confirme a venda.');
+              onDetectedBarcode(code);
             }}
             onClose={() => setUseCamera(false)}
           />
@@ -3169,7 +2593,7 @@ function BarcodeSaleModal({ inventory, saleAttemptKey, onDetectedBarcode, onClos
   );
 }
 
-function InventoryPage({inventory, onNew, onUpdateQty, onEdit, onDelete}) {
+function InventoryPage({inventory, onNew, onUpdateQty, onDelete}) {
   return <div className="page-content">
     <div className="page-heading">
       <div>
@@ -3227,7 +2651,7 @@ function InventoryPage({inventory, onNew, onUpdateQty, onEdit, onDelete}) {
                   </div>
                 </td>
                 <td>
-                  <div style={{display:'flex',gap:6}}><button className="secondary-btn" title="Editar produto" onClick={() => onEdit(item.id)}><Pencil size={14}/></button><button className="icon-btn" title="Excluir produto" onClick={() => onDelete(item.id)} style={{color: '#ff4d4d'}}><Trash2 size={16}/></button></div>
+                  <button className="icon-btn" onClick={() => onDelete(item.id)} style={{color: '#ff4d4d'}}><Trash2 size={16}/></button>
                 </td>
               </tr>
             ))}
@@ -3505,7 +2929,7 @@ function CartModal({cart, onClose, onUpdateQty, onClear, pixKey, storeName, stor
 
             {paymentMethod === 'pix' && (
               <div style={{background: '#000', padding: '12px', borderRadius: '10px', border: '1px solid #333', textAlign: 'center', marginBottom: '16px'}}>
-                <PixQrCode pixKey={pixKey} name={storeName || "LOJA"} city="CASTANHAL" size={110} />
+                <QrCode size={90} color="#25D366" style={{margin: '0 auto 6px', display: 'block'}} />
                 <span style={{fontSize: '11px', color: '#aaa'}}>Chave Pix da Loja:</span>
                 <div style={{fontSize: '13px', fontWeight: 'bold', color: '#fff', margin: '4px 0'}}>{pixKey}</div>
                 <button type="button" onClick={copyPix} className="secondary-btn" style={{fontSize: '11px', padding: '4px 8px', margin: '0 auto', display: 'flex', alignItems: 'center', gap: '4px'}}>
@@ -4291,58 +3715,9 @@ function UsedDevicesPage({storeName, devices, setDevices, enabled, setEnabled}) 
 }
 
 function ReportsPage({orders,cashRegister,inventory}) {
- const today = new Date();
- const localDate = (date) => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
- const [startDate,setStartDate] = useState(() => localDate(today));
- const [endDate,setEndDate] = useState(() => localDate(today));
- const [periodDays,setPeriodDays] = useState('');
- const applyDays = (raw) => {
-   const days = Math.max(1, Math.min(36500, Math.floor(Number(raw)||1)));
-   const end = new Date(); const start = new Date(); start.setDate(start.getDate()-(days-1));
-   setStartDate(localDate(start)); setEndDate(localDate(end)); setPeriodDays(String(days));
- };
- const moneyValue = (value) => Number(String(value ?? '').replace(/[^0-9,.-]/g,'').replace(',','.')) || 0;
- // Junta lançamentos da sessão atual e dos fechamentos anteriores sem duplicar IDs.
- const allEntries = [...(cashRegister?.entries || []), ...(cashRegister?.closedSessions || []).flatMap(s => s.entries || [])];
- const uniqueEntries = Array.from(new Map(allEntries.map((entry,index) => [entry.id || `${entry.createdAt || 'sem-data'}-${entry.description || ''}-${entry.amount || 0}-${index}`,entry])).values());
- const from = startDate ? new Date(`${startDate}T00:00:00`) : null;
- const through = endDate ? new Date(`${endDate}T23:59:59.999`) : null;
- const inRange = (dateValue) => { if(!dateValue) return false; const d = new Date(dateValue); return !Number.isNaN(d.getTime()) && (!from || d >= from) && (!through || d <= through); };
- const entries = uniqueEntries.filter(e => inRange(e.createdAt));
- const incomeEntries = entries.filter(e => e.type === 'in');
- const expenseEntries = entries.filter(e => e.type === 'out');
- const received = incomeEntries.reduce((sum,e)=>sum+Number(e.amount||0),0);
- const cashReceived = incomeEntries.filter(e => (e.paymentMethod || 'Dinheiro') === 'Dinheiro').reduce((sum,e)=>sum+Number(e.amount||0),0);
- const digitalReceived = received-cashReceived;
- const expenses = expenseEntries.reduce((sum,e)=>sum+Number(e.amount||0),0);
- const osReceived = incomeEntries.filter(e=>e.sourceType==='os_payment').reduce((sum,e)=>sum+Number(e.amount||0),0);
- const productSales = incomeEntries.filter(e=>e.sourceType==='sale').reduce((sum,e)=>sum+Number(e.amount||0),0);
- const manualIncome = incomeEntries.filter(e=>!['os_payment','sale'].includes(e.sourceType)).reduce((sum,e)=>sum+Number(e.amount||0),0);
- const outstanding = orders.reduce((sum,o)=>sum+Math.max(0,moneyValue(o.amount)-Number(o.paidAmount||0)),0);
- const net = received-expenses;
- const bars=[{label:'Total recebido no período',value:received,color:'#25D366'},{label:'Despesas registradas',value:expenses,color:'#f59e0b'},{label:'Resultado de caixa no período',value:net,color:'#60a5fa'}];
- const setPreset = (preset) => {
-   const end = new Date(); let start = new Date();
-   if(preset==='today') start = new Date();
-   else if(preset==='yesterday'){ start.setDate(start.getDate()-1); end.setDate(end.getDate()-1); }
-   else if(preset==='month') start = new Date(end.getFullYear(),end.getMonth(),1);
-   setStartDate(localDate(start)); setEndDate(localDate(end)); setPeriodDays('');
- };
- return <div className="page-content"><ModuleHeading eyebrow="BUSINESS INTELLIGENCE" title={<>Relatórios & <span>Indicadores.</span></>} description="Consulte recebimentos reais, vendas, pagamentos de OS e despesas por qualquer período."/>
- <section className="panel" style={{padding:18,marginTop:14,background:'#0a0a0d',border:'1px solid #18181b'}}>
-  <h3 style={{marginTop:0}}>Período do relatório</h3>
-  <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:14}}>
-   <button type="button" className="secondary-btn" onClick={()=>setPreset('today')}>Hoje</button>
-   <button type="button" className="secondary-btn" onClick={()=>setPreset('yesterday')}>Ontem</button>
-   <button type="button" className="secondary-btn" onClick={()=>setPreset('month')}>Este mês</button>
-   <div style={{display:'flex',gap:6,alignItems:'center'}}><input aria-label="Quantidade de dias" type="number" min="1" max="36500" value={periodDays} onChange={e=>setPeriodDays(e.target.value)} placeholder="Ex.: 8, 60, 365" style={{...fieldStyle,width:145}}/><button type="button" className="secondary-btn" onClick={()=>applyDays(periodDays)}>Aplicar dias</button></div>
-  </div>
-  <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:12}}><label>Data inicial<input type="date" value={startDate} onChange={e=>{setStartDate(e.target.value);setPeriodDays('');}} style={{...fieldStyle,display:'block',width:'100%',marginTop:6}}/></label><label>Data final<input type="date" value={endDate} min={startDate||undefined} onChange={e=>{setEndDate(e.target.value);setPeriodDays('');}} style={{...fieldStyle,display:'block',width:'100%',marginTop:6}}/></label></div>
-  {startDate && endDate && startDate>endDate && <p style={{color:'#ff7777',marginBottom:0}}>A data inicial precisa ser anterior ou igual à data final.</p>}
- </section>
- <div className="metrics-grid" style={{gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',marginTop:16}}>{[{l:'Total recebido no período',v:moneyBR(received)},{l:'Recebido em dinheiro',v:moneyBR(cashReceived)},{l:'Pix/cartão/outros',v:moneyBR(digitalReceived)},{l:'Pagamentos de OS recebidos',v:moneyBR(osReceived)},{l:'Vendas de produtos',v:moneyBR(productSales)},{l:'Entradas manuais',v:moneyBR(manualIncome)},{l:'Despesas no período',v:moneyBR(expenses)},{l:'Resultado do período',v:moneyBR(net)},{l:'A receber nas OS',v:moneyBR(outstanding)},{l:'Acessórios cadastrados',v:String(inventory.length)}].map(x=><div key={x.l} className="metric-card" style={{background:'#0a0a0d',border:'1px solid #18181b'}}><div className="metric-value" style={{fontSize:22}}>{x.v}</div><div className="metric-label">{x.l}</div></div>)}</div>
- <section className="panel" style={{padding:18,marginTop:16,background:'#0a0a0d',border:'1px solid #18181b'}}><h3>Movimentações incluídas no período</h3><p className="muted">O relatório considera a data do lançamento/recebimento, não a data de criação da OS. OS ainda não pagas não entram como dinheiro recebido; o saldo pendente aparece em “A receber nas OS”.</p><div className="table-wrap"><table><thead><tr><th>DATA</th><th>DESCRIÇÃO</th><th>FORMA</th><th>TIPO</th><th>VALOR</th></tr></thead><tbody>{entries.slice().sort((a,b)=>new Date(b.createdAt||0)-new Date(a.createdAt||0)).map(e=><tr key={e.id}><td>{e.createdAt?new Date(e.createdAt).toLocaleString('pt-BR'):'—'}</td><td>{e.description||'—'}</td><td>{e.paymentMethod||'Dinheiro'}</td><td>{e.type==='in'?'Entrada':'Saída'}</td><td style={{color:e.type==='in'?'#25D366':'#ff7777'}}>{e.type==='in'?'+':'−'} {moneyBR(e.amount)}</td></tr>)}</tbody></table>{!entries.length&&<div className="empty-state"><Wallet size={26}/><strong>Nenhuma movimentação neste período</strong><span>Quando houver pagamentos, vendas ou despesas registradas, eles aparecerão aqui.</span></div>}</div><div style={{marginTop:14}}><button className="secondary-btn" onClick={()=>window.print()}><Printer size={15}/> Imprimir relatório</button></div></section>
- <section className="panel" style={{padding:18,marginTop:16,background:'#0a0a0d',border:'1px solid #18181b'}}><h3>Resumo visual</h3>{bars.map(b=><div key={b.label} style={{margin:'18px 0'}}><div style={{display:'flex',justifyContent:'space-between',gap:10,marginBottom:6}}><span>{b.label}</span><strong>{moneyBR(b.value)}</strong></div><div style={{height:10,background:'#222',borderRadius:8,overflow:'hidden'}}><div style={{height:'100%',width:`${Math.min(100,Math.max(0,received?Math.abs(b.value)/Math.max(received,expenses,1)*100:0))}%`,background:b.color,borderRadius:8}}/></div></div>)}<p className="muted">Atenção: este relatório usa os lançamentos disponíveis no caixa deste navegador/conta. Para sincronização confiável entre dispositivos e isolamento por assistência, os lançamentos precisam estar persistidos no Supabase com organização e permissões verificadas no banco.</p></section></div>;
+ const revenue=orders.reduce((a,o)=>a+(Number(String(o.amount||'').replace(/[^0-9,.-]/g,'').replace(',','.'))||0),0); const costs=orders.reduce((a,o)=>a+(Number(o.partCost)||0),0); const completed=orders.filter(o=>['Entregue','Pronto para retirada'].includes(o.status)); const avg=orders.length?revenue/orders.length:0; const net=revenue-costs;
+ const bars=[{label:'Faturamento estimado',value:revenue,color:'#25D366'},{label:'Custo de peças informado',value:costs,color:'#f59e0b'},{label:'Margem estimada',value:net,color:'#60a5fa'}];
+ return <div className="page-content"><ModuleHeading eyebrow="BUSINESS INTELLIGENCE" title={<>Relatórios & <span>Indicadores.</span></>} description="Resumo gerencial com faturamento de OS, ticket médio, custos informados e status de atendimentos."/><div className="metrics-grid" style={{gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))'}}>{[{l:'Faturamento em OS',v:moneyBR(revenue)},{l:'Ticket médio',v:moneyBR(avg)},{l:'Margem estimada',v:moneyBR(net)},{l:'OS prontas/entregues',v:String(completed.length)},{l:'Acessórios cadastrados',v:String(inventory.length)}].map(x=><div key={x.l} className="metric-card" style={{background:'#0a0a0d',border:'1px solid #18181b'}}><div className="metric-value" style={{fontSize:22}}>{x.v}</div><div className="metric-label">{x.l}</div></div>)}</div><section className="panel" style={{padding:18,marginTop:16,background:'#0a0a0d',border:'1px solid #18181b'}}><h3>Indicadores visuais</h3>{bars.map(b=><div key={b.label} style={{margin:'18px 0'}}><div style={{display:'flex',justifyContent:'space-between',gap:10,marginBottom:6}}><span>{b.label}</span><strong>{moneyBR(b.value)}</strong></div><div style={{height:10,background:'#222',borderRadius:8,overflow:'hidden'}}><div style={{height:'100%',width:`${Math.min(100,Math.max(0,revenue?b.value/revenue*100:0))}%`,background:b.color,borderRadius:8}}/></div></div>)}<p className="muted">Os valores dependem dos custos preenchidos nas OS. A comparação real entre mês atual e mês anterior requer que os lançamentos tenham datas e custos salvos de forma consistente no banco.</p><button className="secondary-btn" onClick={()=>window.print()}><Printer size={15}/> Imprimir relatório</button></section></div>;
 }
 
 function CashCalculator() {
