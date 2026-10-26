@@ -795,33 +795,54 @@ function App() {
 
   const activeStores = useMemo(() => allStores.filter(s => s.status === 'active'), [allStores]);
 
-  // A vitrine pública carrega apenas lojas pagas ativas ou ainda dentro das 48h de teste.
-  // A função RPC faz o filtro no banco, sem expor dados privados dos estabelecimentos.
+  // A vitrine é revalidada periodicamente no banco para remover testes vencidos
+  // sem exigir que o visitante feche e reabra a página. O RPC filtra no servidor.
   useEffect(() => {
     let cancelled = false;
+    let loading = false;
     const loadPublicStores = async () => {
-      if (!supabaseConfigured) return;
-      const { data, error } = await supabase.rpc('rt_public_active_stores');
-      if (cancelled) return;
-      if (error) {
-        console.warn('Não foi possível carregar a vitrine de lojas:', error.message);
-        return; // preserva a vitrine atual se o RPC ainda não foi instalado
+      if (!supabaseConfigured || loading) return;
+      loading = true;
+      try {
+        const { data, error } = await supabase.rpc('rt_public_active_stores');
+        if (cancelled) return;
+        if (error) {
+          console.warn('Não foi possível atualizar a vitrine de lojas:', error.message);
+          // Falha fechada: não mantém lojas potencialmente vencidas com dados antigos.
+          setAllStores([]);
+          return;
+        }
+        const stores = (data || []).map((row) => ({
+          id: String(row.id),
+          name: row.name || 'Estabelecimento',
+          phone: row.phone || '',
+          status: 'active',
+          desc: row.desc || 'Estabelecimento RT Mobile',
+          address: row.address || 'Endereço não informado',
+          rating: 5.0,
+          reviewsCount: 0,
+        }));
+        setAllStores(stores);
+      } catch (loadError) {
+        if (!cancelled) {
+          console.warn('Falha ao atualizar a vitrine de lojas:', loadError?.message || loadError);
+          setAllStores([]);
+        }
+      } finally {
+        loading = false;
       }
-      const stores = (data || []).map((row) => ({
-        id: String(row.id),
-        name: row.name || 'Estabelecimento',
-        phone: row.phone || '',
-        status: 'active',
-        desc: row.desc || 'Estabelecimento RT Mobile',
-        address: row.address || 'Endereço não informado',
-        rating: 5.0,
-        reviewsCount: 0,
-      }));
-      if (stores.length) setAllStores(stores);
-      else setAllStores([]);
     };
     loadPublicStores();
-    return () => { cancelled = true; };
+    const refreshId = setInterval(loadPublicStores, 60 * 1000);
+    const handleVisibility = () => { if (document.visibilityState === 'visible') loadPublicStores(); };
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', loadPublicStores);
+    return () => {
+      cancelled = true;
+      clearInterval(refreshId);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', loadPublicStores);
+    };
   }, []);
 
   const [search, setSearch] = useState('');
