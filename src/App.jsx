@@ -939,7 +939,7 @@ function App() {
         name: defaultName,
         whatsapp: '5591989117332',
         pix_key: '91989117332',
-        access_state: 'Teste',
+        access_state: 'pending',
         plan_status: 'Teste',
         plan_name: 'Teste 48h'
       }).select();
