@@ -15,7 +15,43 @@ function BarcodeIcon({ size = 16, color = "currentColor", style = {} }) {
   );
 }
 
+
 const ADMIN_EMAIL = 'roberthaelley75@gmail.com';
+
+// Gera o payload Pix estático no padrão EMV/BR Code e o renderiza como QR.
+// O QR contém a chave cadastrada; não confirma o recebimento do pagamento.
+function pixTlv(id, value) {
+  const v = String(value ?? '');
+  return `${id}${String(v.length).padStart(2, '0')}${v}`;
+}
+function pixCrc16(payload) {
+  let crc = 0xFFFF;
+  for (let i = 0; i < payload.length; i++) {
+    crc ^= payload.charCodeAt(i) << 8;
+    for (let j = 0; j < 8; j++) crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) : (crc << 1);
+    crc &= 0xFFFF;
+  }
+  return crc.toString(16).toUpperCase().padStart(4, '0');
+}
+function buildPixPayload(key, merchantName = 'RT MOBILE', merchantCity = 'CASTANHAL', amount = 50) {
+  const pixKey = String(key || '').trim();
+  if (!pixKey) return '';
+  const name = String(merchantName || 'RT MOBILE').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9 ]/g, '').trim().slice(0, 25) || 'RT MOBILE';
+  const city = String(merchantCity || 'CASTANHAL').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9 ]/g, '').trim().slice(0, 15) || 'CASTANHAL';
+  const merchantAccount = pixTlv('00', 'BR.GOV.BCB.PIX') + pixTlv('01', pixKey);
+  const txid = '***';
+  let payload = pixTlv('00', '01') + pixTlv('01', '11') + pixTlv('26', merchantAccount) +
+    pixTlv('52', '0000') + pixTlv('53', '986');
+  if (Number.isFinite(Number(amount)) && Number(amount) > 0) payload += pixTlv('54', Number(amount).toFixed(2));
+  payload += pixTlv('58', 'BR') + pixTlv('59', name) + pixTlv('60', city) + pixTlv('62', pixTlv('05', txid)) + '6304';
+  return payload + pixCrc16(payload);
+}
+function PixQrCode({ pixKey, name = 'RT MOBILE', city = 'CASTANHAL', amount, size = 140 }) {
+  const payload = buildPixPayload(pixKey, name, city, amount);
+  if (!payload) return <div style={{width:size,height:size,display:'grid',placeItems:'center',color:'#aaa',fontSize:12,textAlign:'center'}}>Cadastre uma chave Pix para gerar o QR Code.</div>;
+  const src = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(payload)}`;
+  return <img src={src} alt="QR Code Pix" width={size} height={size} style={{display:'block',width:size,height:size,objectFit:'contain',background:'#fff',padding:6,borderRadius:8}} />;
+}
 
 function createRtOperationId(prefix = 'op') {
   const randomPart = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
@@ -1843,11 +1879,11 @@ await fetchData();
       </div>
       
       <form className="auth-card" onSubmit={handleAuth} style={{background: '#0a0a0c', border: '1px solid #1f1f23'}}>
-        <div style={{display: 'flex', gap: '8px', marginBottom: '20px', background: '#111', padding: '4px', borderRadius: '8px', border: '1px solid #222'}}>
-          <button type="button" className={`secondary-btn ${userRole === 'client' ? 'primary-btn' : ''}`} style={{flex: 1, fontSize: '13px'}} onClick={() => setUserRole('client')}>
+        <div className="auth-role-switch" style={{display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '20px', background: '#111', padding: '4px', borderRadius: '8px', border: '1px solid #222', minWidth: 0, width: '100%', boxSizing: 'border-box'}}>
+          <button type="button" className={`secondary-btn ${userRole === 'client' ? 'primary-btn' : ''}`} style={{flex: '1 1 140px', minWidth: 0, whiteSpace: 'normal', overflowWrap: 'anywhere', lineHeight: 1.25, fontSize: '13px', padding: '10px 8px'}} onClick={() => setUserRole('client')}>
             Área do Cliente (Portal)
           </button>
-          <button type="button" className={`secondary-btn ${userRole === 'tech' ? 'primary-btn' : ''}`} style={{flex: 1, fontSize: '13px'}} onClick={() => setUserRole('tech')}>
+          <button type="button" className={`secondary-btn ${userRole === 'tech' ? 'primary-btn' : ''}`} style={{flex: '1 1 140px', minWidth: 0, whiteSpace: 'normal', overflowWrap: 'anywhere', lineHeight: 1.25, fontSize: '13px', padding: '10px 8px'}} onClick={() => setUserRole('tech')}>
             Painel do Estabelecimento
           </button>
         </div>
@@ -1879,7 +1915,7 @@ await fetchData();
             <p className="muted" style={{fontSize: '13px'}}>Pague o Pix para manter seu estabelecimento ativo e liberar o painel sem limites para você e sua equipe.</p>
             
             <div style={{margin: '20px 0', background: '#000', padding: '15px', borderRadius: '12px', border: '1px solid #333', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px'}}>
-              <QrCode size={120} color="#25D366" />
+              <PixQrCode pixKey={adminPixKey} name="RT MOBILE" city="CASTANHAL" amount={50} size={150} />
               <span style={{fontSize: '12px', color: '#aaa'}}>Chave Pix (PicPay / Telefone):</span>
               <strong style={{fontSize: '16px', color: '#fff', background: '#18181f', padding: '8px 14px', borderRadius: '6px', border: '1px solid #444'}}>{adminPixKey}</strong>
               <button 
@@ -2039,7 +2075,7 @@ await fetchData();
               </p>
 
               <div style={{background: '#000', border: '1px solid #333', borderRadius: '12px', padding: '20px', margin: '0 0 24px'}}>
-                <QrCode size={130} color="#25D366" style={{margin: '0 auto 12px', display: 'block'}} />
+                <PixQrCode pixKey={adminPixKey} name="RT MOBILE" city="CASTANHAL" amount={50} size={150} />
                 <span style={{fontSize: '12px', color: '#888'}}>Chave Pix (Telefone / PicPay):</span>
                 <div style={{fontSize: '16px', fontWeight: 'bold', color: '#fff', background: '#18181f', padding: '8px', borderRadius: '6px', margin: '6px 0', border: '1px solid #444'}}>
                   {adminPixKey}
@@ -3442,7 +3478,7 @@ function CartModal({cart, onClose, onUpdateQty, onClear, pixKey, storeName, stor
 
             {paymentMethod === 'pix' && (
               <div style={{background: '#000', padding: '12px', borderRadius: '10px', border: '1px solid #333', textAlign: 'center', marginBottom: '16px'}}>
-                <QrCode size={90} color="#25D366" style={{margin: '0 auto 6px', display: 'block'}} />
+                <PixQrCode pixKey={pixKey} name={storeName || "LOJA"} city="CASTANHAL" size={110} />
                 <span style={{fontSize: '11px', color: '#aaa'}}>Chave Pix da Loja:</span>
                 <div style={{fontSize: '13px', fontWeight: 'bold', color: '#fff', margin: '4px 0'}}>{pixKey}</div>
                 <button type="button" onClick={copyPix} className="secondary-btn" style={{fontSize: '11px', padding: '4px 8px', margin: '0 auto', display: 'flex', alignItems: 'center', gap: '4px'}}>
