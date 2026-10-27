@@ -756,6 +756,35 @@ function App() {
 
   const activeStores = useMemo(() => allStores.filter(s => s.status === 'active'), [allStores]);
 
+  // A vitrine pública carrega apenas lojas pagas ativas ou ainda dentro das 48h de teste.
+  // A função RPC faz o filtro no banco, sem expor dados privados dos estabelecimentos.
+  useEffect(() => {
+    let cancelled = false;
+    const loadPublicStores = async () => {
+      if (!supabaseConfigured) return;
+      const { data, error } = await supabase.rpc('rt_public_active_stores');
+      if (cancelled) return;
+      if (error) {
+        console.warn('Não foi possível carregar a vitrine de lojas:', error.message);
+        return; // preserva a vitrine atual se o RPC ainda não foi instalado
+      }
+      const stores = (data || []).map((row) => ({
+        id: String(row.id),
+        name: row.name || 'Estabelecimento',
+        phone: row.phone || '',
+        status: 'active',
+        desc: row.desc || 'Estabelecimento RT Mobile',
+        address: row.address || 'Endereço não informado',
+        rating: 5.0,
+        reviewsCount: 0,
+      }));
+      if (stores.length) setAllStores(stores);
+      else setAllStores([]);
+    };
+    loadPublicStores();
+    return () => { cancelled = true; };
+  }, []);
+
   const [search, setSearch] = useState('');
   const [showNewOrder, setShowNewOrder] = useState(false);
   const [showNewCustomer, setShowNewCustomer] = useState(false);
@@ -861,11 +890,24 @@ function App() {
     return () => listener.subscription.unsubscribe();
   }, []);
 
+  // Garante que o dono tenha organização e vínculo no Supabase. Funcionários precisam ser convidados à loja existente.
+  const ensureMyOrganization = async (createIfMissing = false) => {
+    if (!supabaseConfigured || !session?.user?.id) throw new Error('Entre novamente na sua conta para continuar.');
+    const { data, error } = await supabase.rpc('rt_ensure_my_organization', { p_create_if_missing: Boolean(createIfMissing) });
+    if (error) throw error;
+    const organizationId = typeof data === 'string' ? data : data?.organization_id;
+    if (!organizationId) throw new Error('Sua conta ainda não está vinculada a uma loja. O proprietário precisa concluir o vínculo ou convidar você.');
+    return organizationId;
+  };
+
   const fetchData = async () => {
     if (!supabaseConfigured || !session) return;
     setRemotePersistenceReady(false);
     const userEmail = session.user?.email?.toLowerCase();
     const isOwnerByEmail = userEmail === ADMIN_EMAIL.toLowerCase();
+    // Cria/recupera automaticamente a organização de quem entra como dono (perfil técnico).
+    try { await ensureMyOrganization(userRole === 'tech' && !isOwnerByEmail); }
+    catch (bootstrapError) { console.warn('Vínculo da organização:', bootstrapError.message); }
 
     const userCreatedAt = session.user?.created_at ? new Date(session.user.created_at) : new Date();
     const now = new Date();
@@ -897,7 +939,7 @@ function App() {
         name: defaultName,
         whatsapp: '5591989117332',
         pix_key: '91989117332',
-        access_state: 'Teste',
+        access_state: 'pending',
         plan_status: 'Teste',
         plan_name: 'Teste 48h'
       }).select();
@@ -1113,6 +1155,11 @@ function App() {
       if (result.error) throw result.error;
 
       localStorage.setItem('rt_user_role', userRole);
+      // No login, provisiona a loja/vínculo; no cadastro com confirmação de e-mail, isso ocorrerá no primeiro login.
+      if (result.data?.session && userRole === 'tech') {
+        const { error: bootstrapError } = await supabase.rpc('rt_ensure_my_organization', { p_create_if_missing: true });
+        if (bootstrapError) console.warn('A configuração automática será repetida ao entrar:', bootstrapError.message);
+      }
 
       if (userRole === 'tech') {
         setActive('overview');
@@ -1132,10 +1179,9 @@ function App() {
     try {
       const generatedId = `OS-${Math.floor(1000 + Math.random() * 9000)}`;
       if (supabaseConfigured && session) {
-        const { data: memberships } = await supabase.from('organization_members').select('organization_id').eq('user_id', session.user.id).limit(1);
-        const orgId = memberships?.[0]?.organization_id;
+        const orgId = await ensureMyOrganization(userRole === 'tech');
         const { error } = await supabase.from('repair_orders').insert({
-          organization_id: orgId || null,
+          organization_id: orgId,
           created_by: session.user.id,
           customer_name: newOrder.customer.trim(),
           customer_phone: newOrder.phone.trim() || null,
@@ -1203,21 +1249,7 @@ function App() {
     setSaving(true);
     try {
       if (supabaseConfigured && session) {
-        const { data: memberships, error: membershipError } = await supabase
-  .from('organization_members')
-  .select('organization_id')
-  .eq('user_id', session.user.id)
-  .limit(1);
-
-if (membershipError) throw membershipError;
-
-const orgId = memberships?.[0]?.organization_id;
-
-if (!orgId) {
-  throw new Error(
-    'Sua conta não está vinculada a uma loja. Verifique o vínculo do usuário.'
-  );
-}
+        const orgId = await ensureMyOrganization(userRole === 'tech');
 
 const { error } = await supabase.from('customers').insert({
   organization_id: orgId,
@@ -1610,44 +1642,30 @@ await fetchData();
     if (raw === null) return;
     const openingBalance = parseMoneyValue(raw);
     if (openingBalance < 0) { notify('O saldo inicial não pode ser negativo.'); return; }
-    if (!supabaseConfigured || !session?.user?.id || !activeOrganizationId) {
-      notify('Não foi possível abrir o caixa: loja ou sessão não sincronizada. Atualize o site e entre novamente.');
-      return;
+    if (!session?.user?.id) { notify('Sua sessão expirou. Entre novamente antes de abrir o caixa.'); return; }
+    if (!activeOrganizationId) { notify('Não encontrei a loja vinculada à sua conta. Atualize a página e entre novamente.'); return; }
+
+    const openedAt = new Date().toISOString();
+    const history = [...(cashRegister.closedSessions || [])];
+    if (cashRegister.isOpen === false && cashRegister.closedAt && cashRegister.entries?.length) {
+      history.unshift({ openingBalance: cashRegister.openingBalance, openedAt: cashRegister.openedAt, openedBy: cashRegister.openedBy, closedAt: cashRegister.closedAt, closedBy: cashRegister.closedBy, countedCash: cashRegister.countedCash, expectedCash: cashRegister.expectedCash, difference: cashRegister.difference, entries: cashRegister.entries });
     }
-    setSaving(true);
+    const nextState = { ...cashRegister, isOpen: true, openingBalance, openedAt, openedBy: userAccessLevel === 'owner' ? 'Dono' : 'Técnico', closedAt: null, entries: [], closedSessions: history };
+
     try {
-      // Lê o estado remoto antes de abrir, para não depender do efeito assíncrono do React.
-      const { data: remoteRow, error: readError } = await supabase
-        .from('rt_cash_register_state').select('state')
-        .eq('organization_id', activeOrganizationId).maybeSingle();
-      if (readError) throw readError;
-      const previous = remoteRow?.state && typeof remoteRow.state === 'object'
-        ? remoteRow.state
-        : cashRegister;
-      const history = [...(previous.closedSessions || [])];
-      if (previous.isOpen === false && previous.closedAt && previous.entries?.length) {
-        history.unshift({ openingBalance: previous.openingBalance, openedAt: previous.openedAt, openedBy: previous.openedBy, closedAt: previous.closedAt, closedBy: previous.closedBy, countedCash: previous.countedCash, expectedCash: previous.expectedCash, difference: previous.difference, entries: previous.entries });
-      }
-      const nextState = {
-        ...previous, isOpen: true, openingBalance,
-        openedAt: new Date().toISOString(),
-        openedBy: userAccessLevel === 'owner' ? 'Dono' : 'Técnico',
-        closedAt: null, entries: [], closedSessions: history
-      };
-      const { error: saveError } = await supabase.from('rt_cash_register_state').upsert({
-        organization_id: activeOrganizationId, state: nextState,
-        updated_by: session.user.id, updated_at: new Date().toISOString()
+      const { error } = await supabase.from('rt_cash_register_state').upsert({
+        organization_id: activeOrganizationId,
+        state: nextState,
+        updated_by: session.user.id,
+        updated_at: openedAt
       }, { onConflict: 'organization_id' });
-      if (saveError) throw saveError;
+      if (error) throw error;
       setCashRegister(nextState);
-      setRemotePersistenceReady(true);
       addAuditLog(`Abriu o caixa com fundo inicial de R$ ${openingBalance.toFixed(2)}`);
       notify('Caixa aberto e sincronizado com o Supabase.');
     } catch (error) {
-      console.error('Falha ao sincronizar abertura do caixa:', error);
-      notify(`Não foi possível sincronizar a abertura do caixa: ${error?.message || 'verifique as permissões da tabela rt_cash_register_state'}`);
-    } finally {
-      setSaving(false);
+      console.error('Erro ao sincronizar abertura do caixa:', error);
+      notify(`Não foi possível abrir/sincronizar o caixa: ${error?.message || 'verifique as permissões da tabela rt_cash_register_state no Supabase'}`);
     }
   };
 
