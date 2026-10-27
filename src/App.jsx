@@ -905,8 +905,10 @@ function App() {
     setRemotePersistenceReady(false);
     const userEmail = session.user?.email?.toLowerCase();
     const isOwnerByEmail = userEmail === ADMIN_EMAIL.toLowerCase();
-    // Cria/recupera automaticamente a organização de quem entra como dono (perfil técnico).
-    try { await ensureMyOrganization(userRole === 'tech' && !isOwnerByEmail); }
+    // Recupera o ID pelo vínculo oficial e usa-o como fallback caso a consulta direta
+    // por owner_user_id/membership não retorne a loja por causa das políticas de acesso.
+    let ensuredOrganizationId = null;
+    try { ensuredOrganizationId = await ensureMyOrganization(userRole === 'tech' && !isOwnerByEmail); }
     catch (bootstrapError) { console.warn('Vínculo da organização:', bootstrapError.message); }
 
     const userCreatedAt = session.user?.created_at ? new Date(session.user.created_at) : new Date();
@@ -946,8 +948,16 @@ function App() {
       if (createdOrg) orgData = createdOrg;
     }
 
+    // A RPC é a fonte de recuperação do vínculo. Não criar uma segunda loja só
+    // porque a consulta anterior não retornou linhas.
+    if ((!orgData || orgData.length === 0) && ensuredOrganizationId) {
+      const { data: ensuredOrg, error: ensuredOrgError } = await supabase.from('organizations')
+        .select('*').eq('id', ensuredOrganizationId).maybeSingle();
+      if (!ensuredOrgError && ensuredOrg) orgData = [ensuredOrg];
+    }
+
     const org = orgData?.[0];
-    const organizationId = org?.id || null;
+    const organizationId = org?.id || ensuredOrganizationId || null;
     setActiveOrganizationId(organizationId);
 
     if (organizationId) {
@@ -1642,31 +1652,25 @@ await fetchData();
     if (raw === null) return;
     const openingBalance = parseMoneyValue(raw);
     if (openingBalance < 0) { notify('O saldo inicial não pode ser negativo.'); return; }
-    if (!session?.user?.id) { notify('Sua sessão expirou. Entre novamente antes de abrir o caixa.'); return; }
-    if (!activeOrganizationId) { notify('Não encontrei a loja vinculada à sua conta. Atualize a página e entre novamente.'); return; }
 
-    const openedAt = new Date().toISOString();
+    // Resolve a organização sem depender de activeOrganizationId já ter renderizado.
+    let orgId = activeOrganizationId;
+    if (supabaseConfigured && session?.user?.id && !orgId) {
+      try { orgId = await ensureMyOrganization(false); } catch (e) { console.warn('Não foi possível recuperar a loja para o caixa:', e); }
+    }
     const history = [...(cashRegister.closedSessions || [])];
-    if (cashRegister.isOpen === false && cashRegister.closedAt && cashRegister.entries?.length) {
-      history.unshift({ openingBalance: cashRegister.openingBalance, openedAt: cashRegister.openedAt, openedBy: cashRegister.openedBy, closedAt: cashRegister.closedAt, closedBy: cashRegister.closedBy, countedCash: cashRegister.countedCash, expectedCash: cashRegister.expectedCash, difference: cashRegister.difference, entries: cashRegister.entries });
-    }
-    const nextState = { ...cashRegister, isOpen: true, openingBalance, openedAt, openedBy: userAccessLevel === 'owner' ? 'Dono' : 'Técnico', closedAt: null, entries: [], closedSessions: history };
+    if (cashRegister.isOpen === false && cashRegister.closedAt && cashRegister.entries?.length) history.unshift({ openingBalance: cashRegister.openingBalance, openedAt: cashRegister.openedAt, openedBy: cashRegister.openedBy, closedAt: cashRegister.closedAt, closedBy: cashRegister.closedBy, countedCash: cashRegister.countedCash, expectedCash: cashRegister.expectedCash, difference: cashRegister.difference, entries: cashRegister.entries });
+    const nextCash = { ...cashRegister, isOpen: true, openingBalance, openedAt: new Date().toISOString(), openedBy: userAccessLevel === 'owner' ? 'Dono' : 'Técnico', closedAt: null, entries: [], closedSessions: history };
 
-    try {
-      const { error } = await supabase.from('rt_cash_register_state').upsert({
-        organization_id: activeOrganizationId,
-        state: nextState,
-        updated_by: session.user.id,
-        updated_at: openedAt
-      }, { onConflict: 'organization_id' });
-      if (error) throw error;
-      setCashRegister(nextState);
-      addAuditLog(`Abriu o caixa com fundo inicial de R$ ${openingBalance.toFixed(2)}`);
-      notify('Caixa aberto e sincronizado com o Supabase.');
-    } catch (error) {
-      console.error('Erro ao sincronizar abertura do caixa:', error);
-      notify(`Não foi possível abrir/sincronizar o caixa: ${error?.message || 'verifique as permissões da tabela rt_cash_register_state no Supabase'}`);
+    if (supabaseConfigured && session?.user?.id) {
+      if (!orgId) { notify('Não consegui identificar a loja para sincronizar o caixa. Atualize a página e entre novamente.'); return; }
+      const { error } = await supabase.from('rt_cash_register_state').upsert({ organization_id: orgId, state: nextCash, updated_by: session.user.id, updated_at: new Date().toISOString() }, { onConflict: 'organization_id' });
+      if (error) { console.error('Erro ao sincronizar abertura do caixa:', error); notify(`Não foi possível abrir/sincronizar o caixa: ${error.message}`); return; }
+      setActiveOrganizationId(orgId);
+      setRemotePersistenceReady(true);
     }
+    setCashRegister(nextCash);
+    addAuditLog(`Abriu o caixa com fundo inicial de R$ ${openingBalance.toFixed(2)}`); notify('Caixa aberto e sincronizado.');
   };
 
   const handleCloseCash = () => {
